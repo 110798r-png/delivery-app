@@ -2,33 +2,118 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- фикс для телефонов: не зумим, ширина = экран -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
 
-  <!-- tailwind через css, без проблемных скриптов -->
+  <!-- tailwind через CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
 
   <style>
-    .grid-cols-fit{ grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
+    /* общий тост */
     .toast{
-      position:fixed; right:1rem; bottom:1rem;
-      background:#111; color:#fff;
-      padding:.75rem 1rem; border-radius:12px;
+      position:fixed;
+      right:1rem;
+      bottom:1rem;
+      background:#111;
+      color:#fff;
+      padding:.75rem 1rem;
+      border-radius:12px;
       box-shadow:0 6px 20px rgba(0,0,0,.2);
-      opacity:.95; z-index:9999
+      opacity:.95;
+      z-index:9999;
     }
     .hidden{ display:none }
     body{ background:#f9fafb; }
+
+    /* ВНУТРЕННИЙ СКРОЛЛ ДЛЯ ТОВАРОВ (как ты рисовал) */
+    #menuScroll{
+      max-height: 16.5rem;         /* видно примерно 2 ряда */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-right: .25rem;
+    }
+
+    /* ❗ Мобильный вид: ровно 2 карточки в ряд */
+    #menuGrid{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .75rem;
+    }
+
+    /* Карточка товара — вертикальная, компактная */
+    .menu-card{
+      background:#fff;
+      border:1px solid #edf2f7;
+      border-radius:1.1rem;
+      padding:.75rem .6rem .75rem .6rem;
+      display:flex;
+      flex-direction:column;
+      gap:.4rem;
+      min-height:6.2rem;
+    }
+    .menu-card-title{
+      font-weight:600;
+      font-size:.8rem;
+      line-height:1.1rem;
+    }
+    .menu-card-price{
+      font-size:.7rem;
+      background:#f3f4f6;
+      border-radius:9999px;
+      padding:.25rem .6rem;
+      display:inline-block;
+    }
+    .menu-card-controls{
+      margin-top:auto;
+      display:flex;
+      gap:.3rem;
+      align-items:center;
+    }
+    .menu-card-btn{
+      width:2.2rem;
+      height:2.1rem;
+      border-radius:.75rem;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .menu-card-img{
+      display:none; /* в этом макете картинка не нужна, но можно включить */
+    }
+
+    /* 🖥️ На планшетах + десктопах можно больше */
+    @media (min-width: 900px){
+      #menuGrid{
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+    @media (min-width: 1200px){
+      #menuGrid{
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    /* чтобы айфон не увеличивал инпуты */
+    input, select, textarea, button { font-size: 16px; }
+
+    /* чуть уже шапку на маленьких */
+    @media (max-width: 640px) {
+      header h1 { font-size: 1.4rem; }
+      nav a, nav button { font-size: .8rem; }
+    }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-  <div class="max-w-6xl mx-auto p-6">
-    <header class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
+  <div class="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6">
+    <!-- ШАПКА -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+      <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
-        <a id="toClient" href="#/order" class="px-3 py-2 rounded-xl border">Клиент</a>
-        <button id="openDashboard" type="button" class="px-3 py-2 rounded-xl border">Табло</button>
-        <button id="hardRefresh" type="button" class="px-3 py-2 rounded-xl border">Обновить</button>
+        <a id="toClient" href="#/order" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Клиент</a>
+        <button id="openDashboard" type="button" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Табло</button>
+        <button id="hardRefresh" type="button" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Обновить</button>
       </nav>
     </header>
 
@@ -46,7 +131,9 @@
       </div>
     </div>
 
+    <!-- сюда будем рендерить -->
     <main id="app"></main>
+
     <p class="mt-6 text-sm text-gray-500">
       Данные клиента сохраняются локально и отправляются на сервер в Яндекс Cloud.
       Табло обновляется каждые 5 секунд.
@@ -56,16 +143,16 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-// ====== НАСТРОЙКИ ======
+/* ====== КОНСТАНТЫ ====== */
 const ALLOWED_PIN = "65Vafuza";
-const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 
-// если пришли просто по ссылке — сразу на экран клиента
+/* если просто открыли — идём на экран клиента */
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
   location.hash = "#/order";
 }
 
-// ====== clientId (против дублей) ======
+/* ====== УТИЛИТЫ ====== */
 function getClientId() {
   const KEY = 'yc_client_id_v1';
   let cid = localStorage.getItem(KEY);
@@ -75,121 +162,286 @@ function getClientId() {
   }
   return cid;
 }
-
-// ====== утилиты ======
 function showToast(msg){
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.remove('hidden');
+  t.textContent = msg;
+  t.classList.remove('hidden');
   setTimeout(()=> t.classList.add('hidden'), 2500);
 }
-function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
+function el(html){
+  const t=document.createElement('template');
+  t.innerHTML=html.trim();
+  return t.content.firstChild;
+}
 function money(x){ return x + ' руб.' }
 
-// ====== локальный запас ======
+/* ====== локальное хранилище для оффлайна ====== */
 const LS_KEY = 'orders_yc_fallback_v1';
 const store = {
-  load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{orders:[], nextId:1}; }catch{ return {orders:[], nextId:1}; } },
-  save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+  load(){
+    try{
+      return JSON.parse(localStorage.getItem(LS_KEY)) || {orders:[], nextId:1};
+    }catch{
+      return {orders:[], nextId:1};
+    }
+  },
+  save(data){
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  }
 };
 
-// ====== Яндекс ======
-async function ycCall(op, extra={}){
+/* ====== запрос к твоему Yandex Cloud ====== */
+async function ycCall(op, extra = {}){
   try {
     const res = await fetch(API_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ op, ...extra })
     });
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch (e) {
     console.warn("YC error:", e);
     return { error: "network" };
   }
 }
 
-// ====== меню ======
-const PRODUCTS = [
-  { name: 'твистер макс', price: 250 },
-  { name: 'твистер обычный', price: 200 },
-  { name: 'бургер говяжий', price: 200 },
-  { name: 'бургер куриный', price: 190 },
-  { name: 'фри маленький', price: 150 },
-  { name: 'фри большой', price: 180 },
+/* ====== категории меню (как договаривались) ====== */
+const MENU_CATEGORIES = [
+  {
+    key: 'burgers',
+    title: 'Бургеры',
+    items: [
+      { name: 'Говяжий бургер',   price: 280 },
+      { name: 'Говяжий двойной',  price: 340 },
+      { name: 'Куриный бургер',   price: 200 },
+      { name: 'Куриный двойной',  price: 250 },
+    ]
+  },
+  {
+    key: 'twisters',
+    title: 'Твистеры',
+    items: [
+      { name: 'Твистер обычный',  price: 200 },
+      { name: 'Твистер макс',     price: 250 },
+    ]
+  },
+  {
+    key: 'drinks',
+    title: 'Напитки',
+    items: [
+      { name: 'Добрый кола',      price: 100 },
+      { name: 'Добрый апельсин',  price: 100 },
+      { name: 'Спрайт',           price: 100 },
+      { name: 'Эспрессо',         price: 120 },
+      { name: 'Банановый раф',    price: 180 },
+      { name: 'Чай чёрный',       price: 70  },
+    ]
+  },
+  {
+    key: 'sushi',
+    title: 'Суши / роллы',
+    items: [
+      { name: 'Калифорния',  price: 350 },
+      { name: 'Филадельфия', price: 390 },
+      { name: 'Аляска',      price: 350 },
+    ]
+  },
+  {
+    key: 'potato',
+    title: 'Картошка',
+    items: [
+      { name: 'Фри маленький',           price: 150 },
+      { name: 'Фри большой',             price: 180 },
+      { name: 'По-деревенски маленький', price: 160 },
+      { name: 'По-деревенски большой',   price: 200 },
+    ]
+  },
 ];
 
-// ====== КЛИЕНТ ======
+/* ====== ЭКРАН КЛИЕНТА ====== */
 function OrderView(){
   const root = el(`
-    <div class="grid gap-6">
-      <section class="p-5 rounded-2xl bg-white border">
-        <h2 class="text-xl font-semibold mb-4">Меню</h2>
-        <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"></div>
+    <div class="grid gap-4 sm:gap-6">
+      <!-- БЛОК МЕНЮ -->
+      <section class="p-4 sm:p-5 rounded-2xl bg-white border">
+        <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
+
+        <!-- горизонтальный скролл категорий -->
+        <div id="categoryBar" class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+          ${MENU_CATEGORIES.map((cat,idx)=>`
+            <button data-cat="${cat.key}"
+              class="whitespace-nowrap px-3 py-2 rounded-full border
+              ${idx===0 ? 'bg-black text-white' : ''}">
+              ${cat.title}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- вертикальный скролл товаров -->
+        <div id="menuScroll" class="mt-3">
+          <div id="menuGrid"></div>
+        </div>
       </section>
-      <section class="p-5 rounded-2xl bg-white border">
-        <h2 class="text-xl font-semibold mb-4">Данные доставки</h2>
-        <form class="grid gap-4 max-w-xl">
+
+      <!-- БЛОК ФОРМЫ -->
+      <section class="p-4 sm:p-5 rounded-2xl bg-white border">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Данные доставки</h2>
+        <form class="grid gap-4 max-w-xl" id="orderForm">
           <input class="border rounded-xl p-3" placeholder="Имя" name="name" required />
           <input class="border rounded-xl p-3" placeholder="Телефон (например +7...)" name="phone" required />
           <input class="border rounded-xl p-3" placeholder="Адрес доставки" name="address" required />
+
           <label class="flex items-center gap-3">
             <input type="checkbox" name="deliverByTime" />
             <span>Доставить к времени</span>
           </label>
           <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
-          <div class="flex items-center justify-between">
-            <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
-            <button id="sendBtn" class="px-4 py-2 rounded-xl border bg-black text-white" type="submit">Отправить заказ</button>
+
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="text-lg">
+              <span class="font-semibold">Итого:</span>
+              <span id="total">0 руб.</span>
+            </div>
+            <button id="sendBtn"
+              class="px-4 py-2 rounded-xl border bg-black text-white flex-shrink-0"
+              type="submit">
+              Отправить заказ
+            </button>
           </div>
         </form>
       </section>
+
       <section id="result"></section>
     </div>
   `);
 
-  const menuGrid = root.querySelector('section:first-child > div');
-  const form = root.querySelector('form');
-  const totalEl = root.querySelector('#total');
+  const categoryBar = root.querySelector('#categoryBar');
+  const menuGrid   = root.querySelector('#menuGrid');
+  const menuScroll = root.querySelector('#menuScroll');
+  const form       = root.querySelector('#orderForm');
+  const totalEl    = root.querySelector('#total');
+  const sendBtn    = root.querySelector('#sendBtn');
   const deliverChk = form.deliverByTime;
-  const deliverTime = form.deliverTime;
-  const sendBtn = root.querySelector('#sendBtn');
+  const deliverTime= form.deliverTime;
 
-  const counts = {}; PRODUCTS.forEach(p=>counts[p.name]=0);
-  function recalc(){ let sum=0; PRODUCTS.forEach(p=> sum += p.price*(counts[p.name]||0)); totalEl.textContent=money(sum); }
+  const counts = {};
+  let currentCategory = MENU_CATEGORIES[0].key;
 
-  PRODUCTS.forEach(p=>{
-    const card = el(`
-      <div class="border rounded-2xl p-4 flex flex-col gap-3 bg-white">
-        <div class="text-lg font-medium">${p.name}</div>
-        <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm self-start">${money(p.price)}</div>
-        <div class="flex items-center gap-3 mt-auto">
-          <button type="button" class="px-3 py-2 rounded-xl border" data-act="dec">−</button>
-          <div class="w-8 text-center" data-q>0</div>
-          <button type="button" class="px-3 py-2 rounded-xl border bg-black text-white" data-act="inc">+</button>
-        </div>
-      </div>
-    `);
-    const q = card.querySelector('[data-q]');
-    card.addEventListener('click', e=>{
-      if (e.target.dataset.act==='inc'){ counts[p.name]++; q.textContent=counts[p.name]; recalc(); }
-      if (e.target.dataset.act==='dec'){ counts[p.name]=Math.max(0,counts[p.name]-1); q.textContent=counts[p.name]; recalc(); }
+  function recalcTotal(){
+    let sum = 0;
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const q = counts[item.name] || 0;
+        sum += item.price * q;
+      }
+    }
+    totalEl.textContent = money(sum);
+  }
+
+  function renderCategory(catKey){
+    currentCategory = catKey;
+
+    // подсветка
+    categoryBar.querySelectorAll('button').forEach(btn=>{
+      btn.classList.remove('bg-black','text-white');
+      if (btn.dataset.cat === catKey){
+        btn.classList.add('bg-black','text-white');
+      }
     });
-    menuGrid.appendChild(card);
+
+    const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
+    menuGrid.innerHTML = '';
+
+    cat.items.forEach(item=>{
+      const q = counts[item.name] || 0;
+      const card = el(`
+        <div class="menu-card">
+          <div class="menu-card-title">${item.name}</div>
+          <div class="menu-card-price">${money(item.price)}</div>
+          <div class="menu-card-controls">
+            <button type="button" class="menu-card-btn border" data-act="dec">−</button>
+            <div class="w-6 text-center" data-q>${q}</div>
+            <button type="button" class="menu-card-btn bg-black text-white" data-act="inc">+</button>
+          </div>
+        </div>
+      `);
+
+      const qEl = card.querySelector('[data-q]');
+
+      card.addEventListener('click', e=>{
+        if (e.target.dataset.act === 'inc'){
+          counts[item.name] = (counts[item.name] || 0) + 1;
+          qEl.textContent = counts[item.name];
+          recalcTotal();
+        }
+        if (e.target.dataset.act === 'dec'){
+          counts[item.name] = Math.max(0, (counts[item.name] || 0) - 1);
+          qEl.textContent = counts[item.name];
+          recalcTotal();
+        }
+      });
+
+      menuGrid.appendChild(card);
+    });
+  }
+
+  // начальная категория
+  renderCategory(currentCategory);
+
+  // клик по табам
+  categoryBar.addEventListener('click', e=>{
+    const btn = e.target.closest('button[data-cat]');
+    if (!btn) return;
+    renderCategory(btn.dataset.cat);
   });
 
+  // свайп по списку товаров → листаем категории
+  let touchStartX = 0;
+  menuScroll.addEventListener('touchstart', e=>{
+    touchStartX = e.touches[0].clientX;
+  }, {passive:true});
+  menuScroll.addEventListener('touchend', e=>{
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) < 50) return;
+    const idx = MENU_CATEGORIES.findIndex(c=>c.key===currentCategory);
+    if (dx < 0 && idx < MENU_CATEGORIES.length - 1){
+      renderCategory(MENU_CATEGORIES[idx+1].key);
+    } else if (dx > 0 && idx > 0){
+      renderCategory(MENU_CATEGORIES[idx-1].key);
+    }
+  });
+
+  // "доставить к времени"
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
-    if (!deliverChk.checked) deliverTime.value='';
+    if (!deliverChk.checked) deliverTime.value = '';
   });
 
+  function resetAll(){
+    for (const k in counts) delete counts[k];
+    renderCategory(currentCategory);
+    totalEl.textContent = '0 руб.';
+    form.reset();
+    deliverTime.classList.add('hidden');
+  }
+
+  // отправка формы
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
-
     if (sendBtn.disabled) return;
     sendBtn.disabled = true;
     sendBtn.textContent = 'Отправляем...';
 
-    const items = Object.entries(counts).filter(([,q])=>q>0).map(([name,qty])=>({name, qty}));
+    const items = [];
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const qty = counts[item.name] || 0;
+        if (qty > 0){
+          items.push({ name: item.name, qty });
+        }
+      }
+    }
+
     if (!items.length){
       alert('Выберите товары');
       sendBtn.disabled = false;
@@ -197,43 +449,66 @@ function OrderView(){
       return;
     }
 
+    // считаем total
+    const total = items.reduce((s,i)=>{
+      let price = 0;
+      for (const c of MENU_CATEGORIES){
+        const f = c.items.find(it=>it.name===i.name);
+        if (f){ price = f.price; break; }
+      }
+      return s + price * i.qty;
+    }, 0);
+
     const payload = {
       clientId: getClientId(),
-      name:form.name.value.trim(),
-      phone:form.phone.value.trim(),
-      address:form.address.value.trim(),
-      deliverByTime:form.deliverByTime.checked,
-      deliverTime:form.deliverTime.value||null,
+      name: form.name.value.trim(),
+      phone: form.phone.value.trim(),
+      address: form.address.value.trim(),
+      deliverByTime: form.deliverByTime.checked,
+      deliverTime: form.deliverTime.value || null,
       items
     };
 
     const res = await ycCall("create", { data: payload });
 
     if (res.error){
+      // оффлайн
       const data = store.load();
       const id = data.nextId++;
       const now = Date.now();
-      const prices = { 'твистер макс':250,'твистер обычный':200,'бургер говяжий':200,'бургер куриный':190,'фри маленький':150,'фри большой':180 };
-      const total = items.reduce((s,i)=> s + (prices[i.name.toLowerCase()]||0)*i.qty, 0);
-      const order = { id, ...payload, total, status:'новый', createdAt:now, updatedAt:now, _source:'local' };
-      data.orders.unshift(order); store.save(data);
+      const order = {
+        id,
+        ...payload,
+        total,
+        status:'новый',
+        createdAt:now,
+        updatedAt:now,
+        _source:'local'
+      };
+      data.orders.unshift(order);
+      store.save(data);
       showToast('Заказ сохранён локально (сервер недоступен)');
+      resetAll();
       sendBtn.disabled = false;
       sendBtn.textContent = 'Отправить заказ';
       return;
     }
 
-    const o = res.order;
+    const o = res.order || { id: '—', status: 'новый', total };
+
     root.querySelector('#result').innerHTML = `
-      <div class="p-5 rounded-2xl bg-white border">
-        <div class="text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+      <div class="p-4 sm:p-5 rounded-2xl bg-white border">
+        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
         <div class="text-gray-700">
-          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
+          Статус:
+          <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
           · Итог: <b>${o.total} руб.</b>
         </div>
-      </div>`;
+      </div>
+    `;
     showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
 
+    resetAll();
     sendBtn.disabled = false;
     sendBtn.textContent = 'Отправить заказ';
   });
@@ -241,7 +516,7 @@ function OrderView(){
   return root;
 }
 
-// ====== ТАБЛО (тут звук через Web Audio API) ======
+/* ====== ЭКРАН ТАБЛО ====== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4">
@@ -255,13 +530,13 @@ function DashboardView(){
       <div class="grid gap-4" id="list"></div>
     </div>
   `);
+
   const list = root.querySelector('#list');
 
-  // ---- звук через Web Audio ----
+  // звук
   let audioCtx = null;
   let soundEnabled = false;
-
-  function playBeep(duration = 0.35, freq = 880) {
+  function playBeep(duration = 0.35, freq = 880){
     if (!audioCtx || !soundEnabled) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -274,33 +549,24 @@ function DashboardView(){
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  root.querySelector('#enableSound').addEventListener('click', async () => {
+  root.querySelector('#enableSound').addEventListener('click', async ()=>{
     try {
-      if (!audioCtx) {
+      if (!audioCtx){
         const AC = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AC();
       }
-      if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
       soundEnabled = true;
-      // тестовый двойной бип
-      playBeep();
-      setTimeout(() => playBeep(), 200);
+      playBeep(); setTimeout(()=>playBeep(), 200);
       showToast("Звук новых заказов включён");
       root.querySelector('#enableSound').textContent = "🔔 Звук включён";
     } catch (e) {
-      console.warn(e);
       showToast("Браузер не дал включить звук");
     }
   });
 
-  // кнопка "Обновить" — полная перезагрузка
-  root.querySelector('#refresh').addEventListener('click', ()=> {
-    location.reload();
-  });
+  root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
-  // будем помнить, что уже показывали
   const seenIds = new Set();
 
   function orderCard(o){
@@ -319,7 +585,8 @@ function DashboardView(){
         <div class="mt-1">☎️ ${o.phone}</div>
         <div class="mt-2">🧾 ${itemLines || '—'}</div>
         <div class="mt-2">⏰ ${o.deliverByTime && o.deliverTime ? ('к ' + o.deliverTime) : 'как можно скорее'}</div>
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+
+        <div class="mt-4 flex flex-wrap gap-2">
           <div class="flex items-center gap-2">
             <label class="text-sm">Статус:</label>
             <select class="border rounded-xl p-2" data-k="status">
@@ -329,30 +596,35 @@ function DashboardView(){
           </div>
           <div class="flex items-center gap-2">
             <label class="text-sm">Ожидание (мин):</label>
-            <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
+            <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes ?? ''}" />
             <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
           </div>
-        </div>
-        <div class="mt-3 text-right">
-          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+          <div class="ml-auto">
+            <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+          </div>
         </div>
       </div>
     `);
 
+    // обработка кнопок
     card.addEventListener('click', async (e)=>{
       const act = e.target.dataset.act;
       if (!act) return;
+
       if (act === 'save'){
         const status = card.querySelector('[data-k="status"]').value;
         await ycCall("update", { id: o.id, patch: { status } });
         showToast(`Статус заказа #${o.id} обновлён`);
       }
+
       if (act === 'set-eta'){
         const etaMinutes = Number(card.querySelector('[data-k="eta"]').value || 0);
         await ycCall("update", { id: o.id, patch: { etaMinutes } });
         showToast(`ETA заказа #${o.id} обновлён`);
       }
+
       if (act === 'delete'){
+        // двойное нажатие
         if (!card.dataset.confirm){
           card.dataset.confirm = '1';
           e.target.textContent = 'Точно удалить?';
@@ -361,7 +633,7 @@ function DashboardView(){
               delete card.dataset.confirm;
               e.target.textContent = 'Удалить';
             }
-          }, 3000);
+          }, 2500);
           return;
         }
         await ycCall("delete", { id: o.id });
@@ -379,48 +651,38 @@ function DashboardView(){
 
     const unique = new Map();
 
-    if (!res.error && Array.isArray(res.orders)) {
-      res.orders.forEach(o => {
-        unique.set(String(o.id), o);
-      });
+    if (!res.error && Array.isArray(res.orders)){
+      res.orders.forEach(o => unique.set(String(o.id), o));
     } else {
+      // оффлайн
       const data = store.load();
-      data.orders.forEach(o => {
-        unique.set(String(o.id), o);
-      });
+      data.orders.forEach(o => unique.set(String(o.id), o));
     }
 
-    if (unique.size === 0) {
+    if (unique.size === 0){
       list.innerHTML = `<div class="p-5 rounded-2xl bg-white border text-gray-500">Пока нет заказов.</div>`;
       return;
     }
 
     const currentIds = new Set();
-    [...unique.values()].forEach(o => {
+    [...unique.values()].forEach(o=>{
       const idStr = String(o.id);
       currentIds.add(idStr);
 
-      // новый заказ → тост + звук
-      if (!seenIds.has(idStr)) {
+      if (!seenIds.has(idStr)){
         showToast("Новый заказ #" + o.id);
-
-        // 🔊 два бипа подряд
-        if (soundEnabled) {
-          playBeep();
-          setTimeout(() => playBeep(), 250);
-        }
+        if (soundEnabled){ playBeep(); setTimeout(()=>playBeep(), 250); }
       }
 
       list.appendChild(orderCard(o));
     });
 
-    // обновляем "увиденные"
+    // обновляем список "видели"
     seenIds.clear();
     currentIds.forEach(id => seenIds.add(id));
   }
 
   load();
-
   // автообновление
   setInterval(()=>{
     if (location.hash === '#/dashboard') load();
@@ -429,26 +691,35 @@ function DashboardView(){
   return root;
 }
 
-// ====== РОУТЕР ======
+/* ====== РОУТЕР ====== */
 function router(){
-  const app = document.getElementById('app'); app.innerHTML='';
-  if (location.hash==='#/dashboard') app.appendChild(DashboardView());
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  if (location.hash === '#/dashboard') app.appendChild(DashboardView());
   else app.appendChild(OrderView());
 }
 window.addEventListener('hashchange', router);
 router();
 
-// ====== ПИН ======
-const dashBtn = document.getElementById('openDashboard');
+/* ====== ПИН ====== */
+const dashBtn  = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
-const pinOk = document.getElementById('pinOk');
-const pinCancel = document.getElementById('pinCancel');
+const pinOk    = document.getElementById('pinOk');
+const pinCancel= document.getElementById('pinCancel');
 const pinError = document.getElementById('pinError');
 
-function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0); }
-function hidePin(){ pinModal.classList.add('hidden'); pinModal.classList.remove('flex'); }
-
+function showPin(){
+  pinError.classList.add('hidden');
+  pinInput.value='';
+  pinModal.classList.remove('hidden');
+  pinModal.classList.add('flex');
+  setTimeout(()=>pinInput.focus(),0);
+}
+function hidePin(){
+  pinModal.classList.add('hidden');
+  pinModal.classList.remove('flex');
+}
 function tryEnter(){
   if (pinInput.value === ALLOWED_PIN){
     hidePin();
@@ -458,17 +729,19 @@ function tryEnter(){
     pinInput.focus();
   }
 }
-
 dashBtn.addEventListener('click', (e)=>{ e.preventDefault(); showPin(); });
 pinOk.addEventListener('click', tryEnter);
 pinCancel.addEventListener('click', hidePin);
-pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
-pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
-
-// ====== КНОПКА "ОБНОВИТЬ" В ШАПКЕ ======
-document.getElementById('hardRefresh').addEventListener('click', ()=> {
-  location.reload();
+pinInput.addEventListener('keydown', (e)=>{
+  if (e.key==='Enter') tryEnter();
+  if (e.key==='Escape') hidePin();
 });
+pinModal.addEventListener('click', (e)=>{
+  if (e.target === pinModal) hidePin();
+});
+
+/* ====== ОБНОВИТЬ ====== */
+document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
 </script>
 </body>
 </html>
