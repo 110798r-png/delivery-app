@@ -2,17 +2,22 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- без зума и без выхода за экран -->
+  <!-- фикс для мобил: без зума и без горизонтального скролла -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
-
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
 
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body { background:#f9fafb; }
+    /* 1) вообще запрещаем горизонтальный скролл у страницы */
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background:#f9fafb;
+    }
 
-    img { max-width: 100%; height: auto; display: block; }
+    *, *::before, *::after { box-sizing: border-box; }
+    img { max-width: 100%; display: block; }
 
     .toast{
       position:fixed; right:1rem; bottom:1rem;
@@ -23,15 +28,14 @@
     }
     .hidden{ display:none }
 
-    /* “телефонная” ширина — 540px */
-    .client-shell{
+    /* 2) телефонная ширина — всё внутри 540px, по центру */
+    .phone-shell {
       width: 100%;
-      max-width: 540px;         /* вот это и даёт твой вид */
-      margin-left: auto;
-      margin-right: auto;
+      max-width: 540px;
+      margin: 0 auto;
     }
 
-    /* блок с категориями — реально скроллится */
+    /* 3) верхняя плашка категорий — только она скроллится по X */
     #categoryBar{
       display: flex;
       gap: .5rem;
@@ -39,10 +43,11 @@
       padding: 0 .25rem;
       scrollbar-width: none;
       -ms-overflow-style: none;
+      width: 100%;
     }
     #categoryBar::-webkit-scrollbar{ display:none; }
 
-    /* список товаров — одна колонка */
+    /* 4) список товаров — только вертикальный скролл */
     #menuScroll{
       max-height: 15.5rem;
       overflow-y: auto;
@@ -54,6 +59,7 @@
       flex-direction: column;
       gap: .75rem;
     }
+
     .menu-card{
       display: flex;
       gap: .75rem;
@@ -74,28 +80,26 @@
       object-fit: cover;
     }
 
-    /* формы на мобиле — на всю ширину */
+    /* формы на телефоне — на всю ширину */
     form input,
     form select,
     form button {
       width: 100%;
     }
 
-    /* чтобы iOS не зумил */
+    /* чтоб андроид/ios не зумил инпуты */
     input, select, textarea, button { font-size: 16px; }
 
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
-      /* карточку товара можно чуть уплотнить */
-      .menu-card { align-items: flex-start; }
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <!-- ВНЕШНЯЯ ОБЁРТКА: тут БЕЗ max-width -->
+<body>
+  <!-- 0) ВНЕШНЯЯ ОБЁРТКА: тянется на всю ширину, но внутри всё 540px -->
   <div class="w-full px-3 py-6" id="page-shell">
-    <!-- шапка — сужаем отдельно -->
-    <header class="client-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+    <!-- шапка — сразу “телефонная” -->
+    <header class="phone-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
       <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
         <a id="toClient" href="#/order" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Клиент</a>
@@ -104,7 +108,7 @@
       </nav>
     </header>
 
-    <!-- Модалка пин-кода -->
+    <!-- модалка пин-кода -->
     <div id="pinModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
       <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow">
         <h3 class="text-lg font-semibold mb-3">Вход в табло</h3>
@@ -118,10 +122,10 @@
       </div>
     </div>
 
-    <!-- тут мы будем менять клиент/табло -->
-    <main id="app" class="client-shell"></main>
+    <!-- сюда будем рендерить -->
+    <main id="app" class="phone-shell"></main>
 
-    <p class="mt-6 text-sm text-gray-500 client-shell">
+    <p class="mt-6 text-sm text-gray-500 phone-shell">
       Данные клиента сохраняются локально и отправляются на сервер в Яндекс Cloud.
       Табло обновляется каждые 5 секунд.
     </p>
@@ -130,6 +134,7 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
+/* ===== базовые настройки ===== */
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 
@@ -174,38 +179,60 @@ async function ycCall(op, extra={}) {
   }
 }
 
+/* ===== меню ===== */
 const MENU_CATEGORIES = [
-  { key: 'burgers', title: 'Бургеры', items: [
-    { name: 'Говяжий бургер', price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
-    { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-    { name: 'Куриный бургер', price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
-    { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
-  ]},
-  { key: 'twisters', title: 'Твистеры', items: [
-    { name: 'Твистер обычный', price: 200 },
-    { name: 'Твистер макс', price: 250 },
-  ]},
-  { key: 'drinks', title: 'Напитки', items: [
-    { name: 'Добрый кола', price: 100 },
-    { name: 'Добрый апельсин', price: 100 },
-    { name: 'Спрайт', price: 100 },
-    { name: 'Эспрессо', price: 120 },
-    { name: 'Банановый раф', price: 180 },
-    { name: 'Чай чёрный', price: 70 },
-  ]},
-  { key: 'sushi', title: 'Суши / роллы', items: [
-    { name: 'Калифорния', price: 350 },
-    { name: 'Филадельфия', price: 390 },
-    { name: 'Аляска', price: 350 },
-  ]},
-  { key: 'potato', title: 'Картошка', items: [
-    { name: 'Фри маленький', price: 150 },
-    { name: 'Фри большой', price: 180 },
-    { name: 'По-деревенски маленький', price: 160 },
-    { name: 'По-деревенски большой', price: 200 },
-  ]},
+  {
+    key: 'burgers',
+    title: 'Бургеры',
+    items: [
+      { name: 'Говяжий бургер', price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+      { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+      { name: 'Куриный бургер', price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+      { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
+    ]
+  },
+  {
+    key: 'twisters',
+    title: 'Твистеры',
+    items: [
+      { name: 'Твистер обычный', price: 200 },
+      { name: 'Твистер макс', price: 250 },
+    ]
+  },
+  {
+    key: 'drinks',
+    title: 'Напитки',
+    items: [
+      { name: 'Добрый кола', price: 100 },
+      { name: 'Добрый апельсин', price: 100 },
+      { name: 'Спрайт', price: 100 },
+      { name: 'Эспрессо', price: 120 },
+      { name: 'Банановый раф', price: 180 },
+      { name: 'Чай чёрный', price: 70 },
+    ]
+  },
+  {
+    key: 'sushi',
+    title: 'Суши / роллы',
+    items: [
+      { name: 'Калифорния', price: 350 },
+      { name: 'Филадельфия', price: 390 },
+      { name: 'Аляска', price: 350 },
+    ]
+  },
+  {
+    key: 'potato',
+    title: 'Картошка',
+    items: [
+      { name: 'Фри маленький', price: 150 },
+      { name: 'Фри большой', price: 180 },
+      { name: 'По-деревенски маленький', price: 160 },
+      { name: 'По-деревенски большой', price: 200 },
+    ]
+  },
 ];
 
+/* ===== экран клиента ===== */
 function OrderView(){
   const root = el(`
     <div class="grid gap-4 sm:gap-6">
@@ -213,7 +240,9 @@ function OrderView(){
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
         <div id="categoryBar">
           ${MENU_CATEGORIES.map((cat,idx)=>`
-            <button data-cat="${cat.key}" class="whitespace-nowrap px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">${cat.title}</button>
+            <button data-cat="${cat.key}" class="whitespace-nowrap px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">
+              ${cat.title}
+            </button>
           `).join('')}
         </div>
         <div id="menuScroll" class="mt-3">
@@ -245,7 +274,6 @@ function OrderView(){
 
   const categoryBar = root.querySelector('#categoryBar');
   const menuGrid = root.querySelector('#menuGrid');
-  const menuScroll = root.querySelector('#menuScroll');
   const form = root.querySelector('#orderForm');
   const totalEl = root.querySelector('#total');
   const deliverChk = form.deliverByTime;
@@ -311,28 +339,17 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
+  // Клик по категориям — только по бару, страница не двигается
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
+    // докручиваем, чтобы активная категория была в зоне видимости
+    btn.scrollIntoView({inline:'center', behavior:'smooth', block:'nearest'});
   });
 
-  let touchStartX = 0;
-  menuScroll.addEventListener('touchstart', e=>{
-    touchStartX = e.touches[0].clientX;
-  }, {passive:true});
-  menuScroll.addEventListener('touchend', e=>{
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) < 50) return;
-    const idx = MENU_CATEGORIES.findIndex(c=>c.key===currentCategory);
-    if (dx < 0 && idx < MENU_CATEGORIES.length - 1){
-      renderCategory(MENU_CATEGORIES[idx+1].key);
-      categoryBar.children[idx+1].scrollIntoView({inline:'center',behavior:'smooth'});
-    } else if (dx > 0 && idx > 0){
-      renderCategory(MENU_CATEGORIES[idx-1].key);
-      categoryBar.children[idx-1].scrollIntoView({inline:'center',behavior:'smooth'});
-    }
-  });
+  // ВАЖНО: мы УДАЛИЛИ свайп по списку товаров
+  // потому что он и дёргал тебе всю страницу
 
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
@@ -423,6 +440,7 @@ function OrderView(){
   return root;
 }
 
+/* ===== табло (с удалением) ===== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4 max-w-6xl">
@@ -436,7 +454,6 @@ function DashboardView(){
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
     </div>
   `);
-
   const list = root.querySelector('#list');
   let audioCtx = null;
   let soundEnabled = false;
@@ -477,6 +494,7 @@ function DashboardView(){
   function orderCard(o){
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
     const itemLines = (o.items || []).map(i=>`${i.name} ×${i.qty}`).join(', ');
+
     const card = el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
         <div class="flex items-center justify-between gap-4">
@@ -580,22 +598,24 @@ function DashboardView(){
   return root;
 }
 
+/* ===== роутер ===== */
 function router(){
   const app = document.getElementById('app');
   app.innerHTML = '';
   if (location.hash === '#/dashboard') {
-    // табло — широкое
-    app.classList.remove('client-shell');
+    // табло — широкое → снимаем ограничение 540
+    app.classList.remove('phone-shell');
     app.appendChild(DashboardView());
   } else {
-    // клиент — узкий
-    app.classList.add('client-shell');
+    // клиент — узкое
+    app.classList.add('phone-shell');
     app.appendChild(OrderView());
   }
 }
 window.addEventListener('hashchange', router);
 router();
 
+/* ===== пин ===== */
 const dashBtn = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
@@ -622,6 +642,7 @@ pinCancel.addEventListener('click', hidePin);
 pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
 pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
 
+/* ===== кнопка обновить ===== */
 document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
 </script>
 </body>
