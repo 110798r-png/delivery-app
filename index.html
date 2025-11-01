@@ -46,7 +46,16 @@
   <div id="toast" class="toast hidden"></div>
 <script>
 const ALLOWED_PIN = "65Vafuza";
-const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+
+// если мы запущены на vercel / на локалке — ходим в proxy на /api/order
+// иначе (например, если ты открыл прямо из файла или с какого-то другого домена)
+// — бьёмся напрямую в Яндекс
+const API_BASE = (
+  location.hostname.endsWith('.vercel.app') ||
+  location.hostname === 'localhost'
+)
+  ? '/api/order'
+  : 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order';
 if (!location.hash || location.hash === "#/" || location.hash === "#") { location.hash = "#/order"; }
 function getClientId() {
   const KEY = 'yc_client_id_v1';
