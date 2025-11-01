@@ -2,112 +2,103 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- фикс для телефонов: не зумим, ширина = экран -->
+  <!-- важное: фиксируем зум под телефоны -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
 
-  <!-- tailwind через CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
 
   <style>
-    /* общий тост */
     .toast{
-      position:fixed;
-      right:1rem;
-      bottom:1rem;
-      background:#111;
-      color:#fff;
-      padding:.75rem 1rem;
-      border-radius:12px;
+      position:fixed; right:1rem; bottom:1rem;
+      background:#111; color:#fff;
+      padding:.75rem 1rem; border-radius:12px;
       box-shadow:0 6px 20px rgba(0,0,0,.2);
-      opacity:.95;
-      z-index:9999;
+      opacity:.95; z-index:9999
     }
     .hidden{ display:none }
     body{ background:#f9fafb; }
 
-    /* ВНУТРЕННИЙ СКРОЛЛ ДЛЯ ТОВАРОВ (как ты рисовал) */
-    #menuScroll{
-      max-height: 16.5rem;         /* видно примерно 2 ряда */
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      padding-right: .25rem;
+    /* контентная колонка под телефон — как на твоём скрине */
+    .phone-shell{
+      width: 100%;
+      max-width: 460px;    /* ключевое место */
+      margin: 0 auto;
     }
 
-    /* ❗ Мобильный вид: ровно 2 карточки в ряд */
+    /* окно со списком товаров — внутренняя прокрутка */
+    #menuScroll{
+      max-height: 15.5rem;        /* ~2 карточки */
+      overflow-y: auto;
+      padding-right: .25rem;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* по умолчанию — колонка */
     #menuGrid{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: .75rem;
     }
 
-    /* Карточка товара — вертикальная, компактная */
+    /* карточка товара (как у тебя) */
     .menu-card{
-      background:#fff;
-      border:1px solid #edf2f7;
-      border-radius:1.1rem;
-      padding:.75rem .6rem .75rem .6rem;
-      display:flex;
-      flex-direction:column;
-      gap:.4rem;
-      min-height:6.2rem;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #edf2f7;
+      border-radius: 1.25rem;
+      padding: 1rem;
+      min-height: 6.4rem;
     }
-    .menu-card-title{
-      font-weight:600;
-      font-size:.8rem;
-      line-height:1.1rem;
-    }
-    .menu-card-price{
-      font-size:.7rem;
-      background:#f3f4f6;
-      border-radius:9999px;
-      padding:.25rem .6rem;
-      display:inline-block;
-    }
-    .menu-card-controls{
-      margin-top:auto;
-      display:flex;
-      gap:.3rem;
-      align-items:center;
-    }
-    .menu-card-btn{
-      width:2.2rem;
-      height:2.1rem;
-      border-radius:.75rem;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+    .menu-card-body{
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .menu-card-img{
-      display:none; /* в этом макете картинка не нужна, но можно включить */
+      width: 110px;
+      height: 70px;
+      border-radius: .75rem;
+      background: #eee;
+      flex: 0 0 auto;
+      object-fit: cover;
     }
 
-    /* 🖥️ На планшетах + десктопах можно больше */
-    @media (min-width: 900px){
-      #menuGrid{
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-    @media (min-width: 1200px){
-      #menuGrid{
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-    }
-
-    /* чтобы айфон не увеличивал инпуты */
+    /* чтобы iOS не зумил инпуты */
     input, select, textarea, button { font-size: 16px; }
 
-    /* чуть уже шапку на маленьких */
+    /* чуть меньше заголовок на очень узких */
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
-      nav a, nav button { font-size: .8rem; }
+    }
+
+    /* на больших — можно сделать сетку 2–4 в ряд,
+       НО только когда экран действительно большой,
+       чтобы не сломать телефонный вид */
+    @media (min-width: 1024px) {
+      /* снимаем ограничение 460px, даём нормальную ширину */
+      .phone-shell{
+        max-width: 100%;
+      }
+      #menuScroll{
+        max-height: none;    /* на десктопе пусть всё видно сразу */
+        overflow-y: visible;
+      }
+      #menuGrid{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      }
+      .menu-card{
+        min-height: 7rem;
+      }
     }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <div class="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6">
-    <!-- ШАПКА -->
+    <!-- шапка -->
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
       <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
@@ -131,7 +122,6 @@
       </div>
     </div>
 
-    <!-- сюда будем рендерить -->
     <main id="app"></main>
 
     <p class="mt-6 text-sm text-gray-500">
@@ -143,16 +133,22 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ====== КОНСТАНТЫ ====== */
+/* ====== НАСТРОЙКИ ====== */
 const ALLOWED_PIN = "65Vafuza";
-const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+/* если открыто на vercel / localhost → ходим на /api/order,
+   иначе → прямо в твой яндекс */
+const API_BASE = (
+  location.hostname.endsWith('.vercel.app') ||
+  location.hostname === 'localhost'
+) ? '/api/order'
+  : 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order';
 
-/* если просто открыли — идём на экран клиента */
+/* сразу на клиента */
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
   location.hash = "#/order";
 }
 
-/* ====== УТИЛИТЫ ====== */
+/* ====== clientId ====== */
 function getClientId() {
   const KEY = 'yc_client_id_v1';
   let cid = localStorage.getItem(KEY);
@@ -162,36 +158,25 @@ function getClientId() {
   }
   return cid;
 }
+
+/* ====== утилиты ====== */
 function showToast(msg){
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.remove('hidden');
+  t.textContent = msg; t.classList.remove('hidden');
   setTimeout(()=> t.classList.add('hidden'), 2500);
 }
-function el(html){
-  const t=document.createElement('template');
-  t.innerHTML=html.trim();
-  return t.content.firstChild;
-}
+function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function money(x){ return x + ' руб.' }
 
-/* ====== локальное хранилище для оффлайна ====== */
+/* ====== локальный оффлайн ====== */
 const LS_KEY = 'orders_yc_fallback_v1';
 const store = {
-  load(){
-    try{
-      return JSON.parse(localStorage.getItem(LS_KEY)) || {orders:[], nextId:1};
-    }catch{
-      return {orders:[], nextId:1};
-    }
-  },
-  save(data){
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-  }
+  load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{orders:[], nextId:1}; }catch{ return {orders:[], nextId:1}; } },
+  save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 };
 
-/* ====== запрос к твоему Yandex Cloud ====== */
-async function ycCall(op, extra = {}){
+/* ====== запрос к серверу ====== */
+async function ycCall(op, extra={}) {
   try {
     const res = await fetch(API_BASE, {
       method: "POST",
@@ -205,55 +190,55 @@ async function ycCall(op, extra = {}){
   }
 }
 
-/* ====== категории меню (как договаривались) ====== */
+/* ====== меню с категориями ====== */
 const MENU_CATEGORIES = [
   {
     key: 'burgers',
     title: 'Бургеры',
     items: [
-      { name: 'Говяжий бургер',   price: 280 },
-      { name: 'Говяжий двойной',  price: 340 },
-      { name: 'Куриный бургер',   price: 200 },
-      { name: 'Куриный двойной',  price: 250 },
+      { name: 'Говяжий бургер', price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+      { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+      { name: 'Куриный бургер', price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+      { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
     ]
   },
   {
     key: 'twisters',
     title: 'Твистеры',
     items: [
-      { name: 'Твистер обычный',  price: 200 },
-      { name: 'Твистер макс',     price: 250 },
+      { name: 'Твистер обычный', price: 200 },
+      { name: 'Твистер макс', price: 250 },
     ]
   },
   {
     key: 'drinks',
     title: 'Напитки',
     items: [
-      { name: 'Добрый кола',      price: 100 },
-      { name: 'Добрый апельсин',  price: 100 },
-      { name: 'Спрайт',           price: 100 },
-      { name: 'Эспрессо',         price: 120 },
-      { name: 'Банановый раф',    price: 180 },
-      { name: 'Чай чёрный',       price: 70  },
+      { name: 'Добрый кола', price: 100 },
+      { name: 'Добрый апельсин', price: 100 },
+      { name: 'Спрайт', price: 100 },
+      { name: 'Эспрессо', price: 120 },
+      { name: 'Банановый раф', price: 180 },
+      { name: 'Чай чёрный', price: 70 },
     ]
   },
   {
     key: 'sushi',
     title: 'Суши / роллы',
     items: [
-      { name: 'Калифорния',  price: 350 },
+      { name: 'Калифорния', price: 350 },
       { name: 'Филадельфия', price: 390 },
-      { name: 'Аляска',      price: 350 },
+      { name: 'Аляска', price: 350 },
     ]
   },
   {
     key: 'potato',
     title: 'Картошка',
     items: [
-      { name: 'Фри маленький',           price: 150 },
-      { name: 'Фри большой',             price: 180 },
+      { name: 'Фри маленький', price: 150 },
+      { name: 'Фри большой', price: 180 },
       { name: 'По-деревенски маленький', price: 160 },
-      { name: 'По-деревенски большой',   price: 200 },
+      { name: 'По-деревенски большой', price: 200 },
     ]
   },
 ];
@@ -261,52 +246,37 @@ const MENU_CATEGORIES = [
 /* ====== ЭКРАН КЛИЕНТА ====== */
 function OrderView(){
   const root = el(`
-    <div class="grid gap-4 sm:gap-6">
-      <!-- БЛОК МЕНЮ -->
+    <div class="phone-shell grid gap-4 sm:gap-6">
       <section class="p-4 sm:p-5 rounded-2xl bg-white border">
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
-
-        <!-- горизонтальный скролл категорий -->
+        <!-- категории -->
         <div id="categoryBar" class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           ${MENU_CATEGORIES.map((cat,idx)=>`
-            <button data-cat="${cat.key}"
-              class="whitespace-nowrap px-3 py-2 rounded-full border
-              ${idx===0 ? 'bg-black text-white' : ''}">
+            <button data-cat="${cat.key}" class="whitespace-nowrap px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">
               ${cat.title}
             </button>
           `).join('')}
         </div>
-
-        <!-- вертикальный скролл товаров -->
+        <!-- окно со списком товаров -->
         <div id="menuScroll" class="mt-3">
           <div id="menuGrid"></div>
         </div>
       </section>
 
-      <!-- БЛОК ФОРМЫ -->
       <section class="p-4 sm:p-5 rounded-2xl bg-white border">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">Данные доставки</h2>
-        <form class="grid gap-4 max-w-xl" id="orderForm">
+        <form class="grid gap-4" id="orderForm">
           <input class="border rounded-xl p-3" placeholder="Имя" name="name" required />
           <input class="border rounded-xl p-3" placeholder="Телефон (например +7...)" name="phone" required />
           <input class="border rounded-xl p-3" placeholder="Адрес доставки" name="address" required />
-
           <label class="flex items-center gap-3">
             <input type="checkbox" name="deliverByTime" />
             <span>Доставить к времени</span>
           </label>
           <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
-
           <div class="flex items-center justify-between gap-3 flex-wrap">
-            <div class="text-lg">
-              <span class="font-semibold">Итого:</span>
-              <span id="total">0 руб.</span>
-            </div>
-            <button id="sendBtn"
-              class="px-4 py-2 rounded-xl border bg-black text-white flex-shrink-0"
-              type="submit">
-              Отправить заказ
-            </button>
+            <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
+            <button id="sendBtn" class="px-4 py-2 rounded-xl border bg-black text-white flex-shrink-0" type="submit">Отправить заказ</button>
           </div>
         </form>
       </section>
@@ -316,13 +286,13 @@ function OrderView(){
   `);
 
   const categoryBar = root.querySelector('#categoryBar');
-  const menuGrid   = root.querySelector('#menuGrid');
+  const menuGrid = root.querySelector('#menuGrid');
   const menuScroll = root.querySelector('#menuScroll');
-  const form       = root.querySelector('#orderForm');
-  const totalEl    = root.querySelector('#total');
-  const sendBtn    = root.querySelector('#sendBtn');
+  const form = root.querySelector('#orderForm');
+  const totalEl = root.querySelector('#total');
   const deliverChk = form.deliverByTime;
-  const deliverTime= form.deliverTime;
+  const deliverTime = form.deliverTime;
+  const sendBtn = root.querySelector('#sendBtn');
 
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
@@ -340,7 +310,6 @@ function OrderView(){
 
   function renderCategory(catKey){
     currentCategory = catKey;
-
     // подсветка
     categoryBar.querySelectorAll('button').forEach(btn=>{
       btn.classList.remove('bg-black','text-white');
@@ -348,26 +317,25 @@ function OrderView(){
         btn.classList.add('bg-black','text-white');
       }
     });
-
     const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
     menuGrid.innerHTML = '';
-
     cat.items.forEach(item=>{
       const q = counts[item.name] || 0;
       const card = el(`
         <div class="menu-card">
-          <div class="menu-card-title">${item.name}</div>
-          <div class="menu-card-price">${money(item.price)}</div>
-          <div class="menu-card-controls">
-            <button type="button" class="menu-card-btn border" data-act="dec">−</button>
-            <div class="w-6 text-center" data-q>${q}</div>
-            <button type="button" class="menu-card-btn bg-black text-white" data-act="inc">+</button>
+          <div class="menu-card-body">
+            <div class="text-base sm:text-lg font-medium">${item.name}</div>
+            <div class="inline-flex items-center mt-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${money(item.price)}</div>
+            <div class="flex items-center gap-3 mt-3">
+              <button type="button" class="w-9 h-9 rounded-xl border flex items-center justify-center" data-act="dec">−</button>
+              <div class="w-6 text-center" data-q>${q}</div>
+              <button type="button" class="w-9 h-9 rounded-xl border bg-black text-white flex items-center justify-center" data-act="inc">+</button>
+            </div>
           </div>
+          <img src="${item.img || 'https://placehold.co/110x70?text=food'}" alt="" class="menu-card-img">
         </div>
       `);
-
       const qEl = card.querySelector('[data-q]');
-
       card.addEventListener('click', e=>{
         if (e.target.dataset.act === 'inc'){
           counts[item.name] = (counts[item.name] || 0) + 1;
@@ -380,15 +348,13 @@ function OrderView(){
           recalcTotal();
         }
       });
-
       menuGrid.appendChild(card);
     });
   }
 
-  // начальная категория
   renderCategory(currentCategory);
 
-  // клик по табам
+  // переключение категориями
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
@@ -411,21 +377,21 @@ function OrderView(){
     }
   });
 
-  // "доставить к времени"
+  // время доставки
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
-    if (!deliverChk.checked) deliverTime.value = '';
+    if (!deliverChk.checked) deliverTime.value='';
   });
 
   function resetAll(){
-    for (const k in counts) delete counts[k];
+    for (const key in counts) delete counts[key];
     renderCategory(currentCategory);
     totalEl.textContent = '0 руб.';
     form.reset();
     deliverTime.classList.add('hidden');
   }
 
-  // отправка формы
+  // отправка заказа
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
@@ -449,7 +415,6 @@ function OrderView(){
       return;
     }
 
-    // считаем total
     const total = items.reduce((s,i)=>{
       let price = 0;
       for (const c of MENU_CATEGORIES){
@@ -471,22 +436,13 @@ function OrderView(){
 
     const res = await ycCall("create", { data: payload });
 
+    // если сервер не доступен → в локал
     if (res.error){
-      // оффлайн
       const data = store.load();
       const id = data.nextId++;
       const now = Date.now();
-      const order = {
-        id,
-        ...payload,
-        total,
-        status:'новый',
-        createdAt:now,
-        updatedAt:now,
-        _source:'local'
-      };
-      data.orders.unshift(order);
-      store.save(data);
+      const order = { id, ...payload, total, status:'новый', createdAt:now, updatedAt:now, _source:'local' };
+      data.orders.unshift(order); store.save(data);
       showToast('Заказ сохранён локально (сервер недоступен)');
       resetAll();
       sendBtn.disabled = false;
@@ -495,17 +451,14 @@ function OrderView(){
     }
 
     const o = res.order || { id: '—', status: 'новый', total };
-
     root.querySelector('#result').innerHTML = `
       <div class="p-4 sm:p-5 rounded-2xl bg-white border">
         <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
         <div class="text-gray-700">
-          Статус:
-          <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
+          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
           · Итог: <b>${o.total} руб.</b>
         </div>
-      </div>
-    `;
+      </div>`;
     showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
 
     resetAll();
@@ -516,7 +469,7 @@ function OrderView(){
   return root;
 }
 
-/* ====== ЭКРАН ТАБЛО ====== */
+/* ====== ТАБЛО (с удалением) ====== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4">
@@ -532,11 +485,10 @@ function DashboardView(){
   `);
 
   const list = root.querySelector('#list');
-
-  // звук
   let audioCtx = null;
   let soundEnabled = false;
-  function playBeep(duration = 0.35, freq = 880){
+
+  function playBeep(duration = 0.35, freq = 880) {
     if (!audioCtx || !soundEnabled) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -549,9 +501,9 @@ function DashboardView(){
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  root.querySelector('#enableSound').addEventListener('click', async ()=>{
+  root.querySelector('#enableSound').addEventListener('click', async () => {
     try {
-      if (!audioCtx){
+      if (!audioCtx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AC();
       }
@@ -585,8 +537,7 @@ function DashboardView(){
         <div class="mt-1">☎️ ${o.phone}</div>
         <div class="mt-2">🧾 ${itemLines || '—'}</div>
         <div class="mt-2">⏰ ${o.deliverByTime && o.deliverTime ? ('к ' + o.deliverTime) : 'как можно скорее'}</div>
-
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-4 flex flex-wrap gap-3 items-center">
           <div class="flex items-center gap-2">
             <label class="text-sm">Статус:</label>
             <select class="border rounded-xl p-2" data-k="status">
@@ -596,17 +547,15 @@ function DashboardView(){
           </div>
           <div class="flex items-center gap-2">
             <label class="text-sm">Ожидание (мин):</label>
-            <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes ?? ''}" />
+            <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
             <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
           </div>
-          <div class="ml-auto">
-            <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
-          </div>
+          <button type="button" class="ml-auto px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
 
-    // обработка кнопок
+    // обработчики внутри карточки
     card.addEventListener('click', async (e)=>{
       const act = e.target.dataset.act;
       if (!act) return;
@@ -624,7 +573,6 @@ function DashboardView(){
       }
 
       if (act === 'delete'){
-        // двойное нажатие
         if (!card.dataset.confirm){
           card.dataset.confirm = '1';
           e.target.textContent = 'Точно удалить?';
@@ -633,7 +581,7 @@ function DashboardView(){
               delete card.dataset.confirm;
               e.target.textContent = 'Удалить';
             }
-          }, 2500);
+          }, 3000);
           return;
         }
         await ycCall("delete", { id: o.id });
@@ -650,26 +598,24 @@ function DashboardView(){
     list.innerHTML = '';
 
     const unique = new Map();
-
-    if (!res.error && Array.isArray(res.orders)){
+    if (!res.error && Array.isArray(res.orders)) {
       res.orders.forEach(o => unique.set(String(o.id), o));
     } else {
-      // оффлайн
       const data = store.load();
       data.orders.forEach(o => unique.set(String(o.id), o));
     }
 
-    if (unique.size === 0){
+    if (unique.size === 0) {
       list.innerHTML = `<div class="p-5 rounded-2xl bg-white border text-gray-500">Пока нет заказов.</div>`;
       return;
     }
 
     const currentIds = new Set();
-    [...unique.values()].forEach(o=>{
+    [...unique.values()].forEach(o => {
       const idStr = String(o.id);
       currentIds.add(idStr);
 
-      if (!seenIds.has(idStr)){
+      if (!seenIds.has(idStr)) {
         showToast("Новый заказ #" + o.id);
         if (soundEnabled){ playBeep(); setTimeout(()=>playBeep(), 250); }
       }
@@ -677,49 +623,36 @@ function DashboardView(){
       list.appendChild(orderCard(o));
     });
 
-    // обновляем список "видели"
     seenIds.clear();
     currentIds.forEach(id => seenIds.add(id));
   }
 
   load();
-  // автообновление
-  setInterval(()=>{
-    if (location.hash === '#/dashboard') load();
-  }, 5000);
+  setInterval(()=>{ if (location.hash === '#/dashboard') load(); }, 5000);
 
   return root;
 }
 
 /* ====== РОУТЕР ====== */
 function router(){
-  const app = document.getElementById('app');
-  app.innerHTML = '';
-  if (location.hash === '#/dashboard') app.appendChild(DashboardView());
+  const app = document.getElementById('app'); app.innerHTML='';
+  if (location.hash==='#/dashboard') app.appendChild(DashboardView());
   else app.appendChild(OrderView());
 }
 window.addEventListener('hashchange', router);
 router();
 
 /* ====== ПИН ====== */
-const dashBtn  = document.getElementById('openDashboard');
+const dashBtn = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
-const pinOk    = document.getElementById('pinOk');
-const pinCancel= document.getElementById('pinCancel');
+const pinOk = document.getElementById('pinOk');
+const pinCancel = document.getElementById('pinCancel');
 const pinError = document.getElementById('pinError');
 
-function showPin(){
-  pinError.classList.add('hidden');
-  pinInput.value='';
-  pinModal.classList.remove('hidden');
-  pinModal.classList.add('flex');
-  setTimeout(()=>pinInput.focus(),0);
-}
-function hidePin(){
-  pinModal.classList.add('hidden');
-  pinModal.classList.remove('flex');
-}
+function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0); }
+function hidePin(){ pinModal.classList.add('hidden'); pinModal.classList.remove('flex'); }
+
 function tryEnter(){
   if (pinInput.value === ALLOWED_PIN){
     hidePin();
@@ -729,16 +662,12 @@ function tryEnter(){
     pinInput.focus();
   }
 }
+
 dashBtn.addEventListener('click', (e)=>{ e.preventDefault(); showPin(); });
 pinOk.addEventListener('click', tryEnter);
 pinCancel.addEventListener('click', hidePin);
-pinInput.addEventListener('keydown', (e)=>{
-  if (e.key==='Enter') tryEnter();
-  if (e.key==='Escape') hidePin();
-});
-pinModal.addEventListener('click', (e)=>{
-  if (e.target === pinModal) hidePin();
-});
+pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
+pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
 
 /* ====== ОБНОВИТЬ ====== */
 document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
