@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- важное: фиксируем зум под телефоны -->
+  <!-- фиксируем зум под телефоны -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
 
@@ -17,32 +17,28 @@
       opacity:.95; z-index:9999
     }
     .hidden{ display:none }
-    body{ background:#f9fafb; }
-
-    /* контентная колонка под телефон — как на твоём скрине */
-    .phone-shell{
-      width: 100%;
-      max-width: 460px;    /* ключевое место */
-      margin: 0 auto;
+    body{
+      background:#f9fafb;
+      overflow-x: hidden; /* ✋ не даём странице расширяться */
     }
 
     /* окно со списком товаров — внутренняя прокрутка */
     #menuScroll{
-      max-height: 15.5rem;        /* ~2 карточки */
+      max-height: 15.5rem;     /* влезают ~2 карточки как на твоём скрине */
       overflow-y: auto;
       padding-right: .25rem;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
     }
 
-    /* по умолчанию — колонка */
+    /* сами товары — колонкой */
     #menuGrid{
       display: flex;
       flex-direction: column;
       gap: .75rem;
     }
 
-    /* карточка товара (как у тебя) */
+    /* карточка товара */
     .menu-card{
       display: flex;
       gap: .75rem;
@@ -52,10 +48,11 @@
       border-radius: 1.25rem;
       padding: 1rem;
       min-height: 6.4rem;
+      width: 100%;
     }
     .menu-card-body{
       flex: 1 1 auto;
-      min-width: 0;
+      min-width: 0; /* ✋ чтобы текст не растягивал контейнер */
     }
     .menu-card-img{
       width: 110px;
@@ -66,32 +63,45 @@
       object-fit: cover;
     }
 
-    /* чтобы iOS не зумил инпуты */
+    /* футер формы: итого + кнопка */
+    .order-footer{
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    /* на телефоне — в столбик */
+    @media (max-width: 480px){
+      .order-footer{
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .order-footer button{
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+    }
+
+    /* шапка чтоб не раздувалась */
+    @media (max-width: 600px){
+      header nav{
+        flex-wrap: wrap;
+      }
+    }
+
+    /* чтобы на iOS не увеличивало при фокусе */
     input, select, textarea, button { font-size: 16px; }
 
-    /* чуть меньше заголовок на очень узких */
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
     }
 
-    /* на больших — можно сделать сетку 2–4 в ряд,
-       НО только когда экран действительно большой,
-       чтобы не сломать телефонный вид */
-    @media (min-width: 1024px) {
-      /* снимаем ограничение 460px, даём нормальную ширину */
-      .phone-shell{
-        max-width: 100%;
-      }
+    /* на широких можно сделать меню поуже */
+    @media (min-width: 1024px){
       #menuScroll{
-        max-height: none;    /* на десктопе пусть всё видно сразу */
-        overflow-y: visible;
-      }
-      #menuGrid{
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      }
-      .menu-card{
-        min-height: 7rem;
+        max-height: 18rem;
       }
     }
   </style>
@@ -123,7 +133,6 @@
     </div>
 
     <main id="app"></main>
-
     <p class="mt-6 text-sm text-gray-500">
       Данные клиента сохраняются локально и отправляются на сервер в Яндекс Cloud.
       Табло обновляется каждые 5 секунд.
@@ -133,22 +142,23 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ====== НАСТРОЙКИ ====== */
+// ====== НАСТРОЙКИ ======
 const ALLOWED_PIN = "65Vafuza";
-/* если открыто на vercel / localhost → ходим на /api/order,
-   иначе → прямо в твой яндекс */
-const API_BASE = (
-  location.hostname.endsWith('.vercel.app') ||
-  location.hostname === 'localhost'
-) ? '/api/order'
-  : 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order';
 
-/* сразу на клиента */
+// если мы на Vercel или на локалке — ходим через /api/order (пробивает VPN)
+const API_BASE = (
+  location.hostname.endsWith(".vercel.app") ||
+  location.hostname === "localhost"
+)
+  ? "/api/order"
+  : "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+
+// сразу на клиента
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
   location.hash = "#/order";
 }
 
-/* ====== clientId ====== */
+// ====== clientId ======
 function getClientId() {
   const KEY = 'yc_client_id_v1';
   let cid = localStorage.getItem(KEY);
@@ -159,7 +169,7 @@ function getClientId() {
   return cid;
 }
 
-/* ====== утилиты ====== */
+// ====== утилиты ======
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.remove('hidden');
@@ -168,15 +178,15 @@ function showToast(msg){
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function money(x){ return x + ' руб.' }
 
-/* ====== локальный оффлайн ====== */
+// ====== локальный запас ======
 const LS_KEY = 'orders_yc_fallback_v1';
 const store = {
   load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{orders:[], nextId:1}; }catch{ return {orders:[], nextId:1}; } },
   save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 };
 
-/* ====== запрос к серверу ====== */
-async function ycCall(op, extra={}) {
+// ====== Яндекс / API ======
+async function ycCall(op, extra={}){
   try {
     const res = await fetch(API_BASE, {
       method: "POST",
@@ -190,7 +200,7 @@ async function ycCall(op, extra={}) {
   }
 }
 
-/* ====== меню с категориями ====== */
+// ====== Категории ======
 const MENU_CATEGORIES = [
   {
     key: 'burgers',
@@ -243,13 +253,13 @@ const MENU_CATEGORIES = [
   },
 ];
 
-/* ====== ЭКРАН КЛИЕНТА ====== */
+// ====== ЭКРАН КЛИЕНТА ======
 function OrderView(){
   const root = el(`
-    <div class="phone-shell grid gap-4 sm:gap-6">
+    <div class="grid gap-4 sm:gap-6">
       <section class="p-4 sm:p-5 rounded-2xl bg-white border">
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
-        <!-- категории -->
+        <!-- горизонтальный скролл категорий -->
         <div id="categoryBar" class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           ${MENU_CATEGORIES.map((cat,idx)=>`
             <button data-cat="${cat.key}" class="whitespace-nowrap px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">
@@ -257,7 +267,7 @@ function OrderView(){
             </button>
           `).join('')}
         </div>
-        <!-- окно со списком товаров -->
+        <!-- внутренняя прокрутка товаров -->
         <div id="menuScroll" class="mt-3">
           <div id="menuGrid"></div>
         </div>
@@ -265,7 +275,7 @@ function OrderView(){
 
       <section class="p-4 sm:p-5 rounded-2xl bg-white border">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">Данные доставки</h2>
-        <form class="grid gap-4" id="orderForm">
+        <form class="grid gap-4 max-w-xl" id="orderForm">
           <input class="border rounded-xl p-3" placeholder="Имя" name="name" required />
           <input class="border rounded-xl p-3" placeholder="Телефон (например +7...)" name="phone" required />
           <input class="border rounded-xl p-3" placeholder="Адрес доставки" name="address" required />
@@ -274,7 +284,7 @@ function OrderView(){
             <span>Доставить к времени</span>
           </label>
           <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
-          <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="order-footer">
             <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
             <button id="sendBtn" class="px-4 py-2 rounded-xl border bg-black text-white flex-shrink-0" type="submit">Отправить заказ</button>
           </div>
@@ -354,14 +364,14 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
-  // переключение категориями
+  // переключение категорий
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
   });
 
-  // свайп по списку товаров → листаем категории
+  // свайп по товарам → листаем категории
   let touchStartX = 0;
   menuScroll.addEventListener('touchstart', e=>{
     touchStartX = e.touches[0].clientX;
@@ -377,7 +387,6 @@ function OrderView(){
     }
   });
 
-  // время доставки
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
     if (!deliverChk.checked) deliverTime.value='';
@@ -391,7 +400,6 @@ function OrderView(){
     deliverTime.classList.add('hidden');
   }
 
-  // отправка заказа
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
@@ -436,7 +444,6 @@ function OrderView(){
 
     const res = await ycCall("create", { data: payload });
 
-    // если сервер не доступен → в локал
     if (res.error){
       const data = store.load();
       const id = data.nextId++;
@@ -469,7 +476,7 @@ function OrderView(){
   return root;
 }
 
-/* ====== ТАБЛО (с удалением) ====== */
+// ====== ТАБЛО (с удалением, как просил) ======
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4">
@@ -537,57 +544,30 @@ function DashboardView(){
         <div class="mt-1">☎️ ${o.phone}</div>
         <div class="mt-2">🧾 ${itemLines || '—'}</div>
         <div class="mt-2">⏰ ${o.deliverByTime && o.deliverTime ? ('к ' + o.deliverTime) : 'как можно скорее'}</div>
-        <div class="mt-4 flex flex-wrap gap-3 items-center">
-          <div class="flex items-center gap-2">
-            <label class="text-sm">Статус:</label>
-            <select class="border rounded-xl p-2" data-k="status">
-              ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
-            </select>
-            <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
-          </div>
-          <div class="flex items-center gap-2">
-            <label class="text-sm">Ожидание (мин):</label>
-            <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
-            <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
-          </div>
-          <button type="button" class="ml-auto px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+        <div class="mt-3 text-right">
+          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
 
-    // обработчики внутри карточки
     card.addEventListener('click', async (e)=>{
-      const act = e.target.dataset.act;
-      if (!act) return;
-
-      if (act === 'save'){
-        const status = card.querySelector('[data-k="status"]').value;
-        await ycCall("update", { id: o.id, patch: { status } });
-        showToast(`Статус заказа #${o.id} обновлён`);
+      if (e.target.dataset.act !== 'delete') return;
+      const btn = e.target;
+      if (!btn.dataset.confirm){
+        btn.dataset.confirm = "1";
+        btn.textContent = "Точно удалить?";
+        setTimeout(()=>{
+          if (btn && btn.dataset.confirm === "1"){
+            delete btn.dataset.confirm;
+            btn.textContent = "Удалить";
+          }
+        }, 3000);
+        return;
       }
-
-      if (act === 'set-eta'){
-        const etaMinutes = Number(card.querySelector('[data-k="eta"]').value || 0);
-        await ycCall("update", { id: o.id, patch: { etaMinutes } });
-        showToast(`ETA заказа #${o.id} обновлён`);
-      }
-
-      if (act === 'delete'){
-        if (!card.dataset.confirm){
-          card.dataset.confirm = '1';
-          e.target.textContent = 'Точно удалить?';
-          setTimeout(()=>{
-            if (card && card.dataset.confirm === '1'){
-              delete card.dataset.confirm;
-              e.target.textContent = 'Удалить';
-            }
-          }, 3000);
-          return;
-        }
-        await ycCall("delete", { id: o.id });
-        card.remove();
-        showToast(`Заказ #${o.id} удалён`);
-      }
+      // удаляем
+      await ycCall("delete", { id: o.id });
+      card.remove();
+      showToast(`Заказ #${o.id} удалён`);
     });
 
     return card;
@@ -614,12 +594,10 @@ function DashboardView(){
     [...unique.values()].forEach(o => {
       const idStr = String(o.id);
       currentIds.add(idStr);
-
       if (!seenIds.has(idStr)) {
         showToast("Новый заказ #" + o.id);
         if (soundEnabled){ playBeep(); setTimeout(()=>playBeep(), 250); }
       }
-
       list.appendChild(orderCard(o));
     });
 
@@ -633,7 +611,7 @@ function DashboardView(){
   return root;
 }
 
-/* ====== РОУТЕР ====== */
+// ====== РОУТЕР ======
 function router(){
   const app = document.getElementById('app'); app.innerHTML='';
   if (location.hash==='#/dashboard') app.appendChild(DashboardView());
@@ -642,7 +620,7 @@ function router(){
 window.addEventListener('hashchange', router);
 router();
 
-/* ====== ПИН ====== */
+// ====== ПИН ======
 const dashBtn = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
@@ -669,7 +647,7 @@ pinCancel.addEventListener('click', hidePin);
 pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
 pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
 
-/* ====== ОБНОВИТЬ ====== */
+// ====== ОБНОВИТЬ ======
 document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
 </script>
 </body>
