@@ -2,12 +2,11 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- без зума и без горизонтального скролла -->
+  <!-- фикс для мобилок -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
-    /* базово: не даём странице скроллиться по X */
     html, body {
       width: 100%;
       max-width: 100%;
@@ -17,34 +16,7 @@
     *, *::before, *::after {
       box-sizing: border-box;
     }
-
-    /* телефонный контейнер: НЕ шире экрана, но до 540 */
-    .phone-shell {
-      width: min(100vw, 540px);
-      margin: 0 auto;
-    }
-
-    /* белые блоки внутри — тоже не шире экрана */
-    .phone-shell section,
-    .phone-shell form,
-    .phone-shell header,
-    .phone-shell main {
-      width: 100%;
-      max-width: 100%;
-    }
-
-    /* чтобы инпуты / кнопки не растягивали родителя */
-    input, select, button {
-      font-size: 16px;
-      max-width: 100%;
-    }
-
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-
+    img { max-width: 100%; display:block; }
     .toast{
       position:fixed; right:1rem; bottom:1rem;
       background:#111; color:#fff;
@@ -54,19 +26,13 @@
     }
     .hidden{ display:none }
 
-    /* только список категорий скроллится по X */
-    #categoryBar{
-      display: flex;
-      gap: .5rem;
-      overflow-x: auto;
-      width: 100%;
-      padding: 0 .25rem;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+    /* главный "телефонный" контейнер */
+    .phone-shell{
+      width: min(100vw, 540px);
+      margin: 0 auto;
     }
-    #categoryBar::-webkit-scrollbar{ display:none; }
 
-    /* окно товаров — только по Y */
+    /* блок с товарами — как у тебя на картинке: внутренняя прокрутка только у списка */
     #menuScroll{
       max-height: 15.5rem;
       overflow-y: auto;
@@ -75,6 +41,7 @@
       width: 100%;
     }
 
+    /* сами товары списком */
     #menuGrid{
       display: flex;
       flex-direction: column;
@@ -92,12 +59,8 @@
       padding: 1rem;
       min-height: 6.4rem;
       width: 100%;
-      max-width: 100%;
     }
-    .menu-card-body{
-      flex: 1 1 auto;
-      min-width: 0;
-    }
+    .menu-card-body{ flex:1 1 auto; min-width:0; }
     .menu-card-img{
       width: 110px;
       height: 70px;
@@ -107,7 +70,39 @@
       object-fit: cover;
     }
 
-    /* на маленьком экране хедер — колонкой */
+    /* КАТЕГОРИИ: 3 в ряд, 2 ряда, БЕЗ скролла */
+    .category-grid{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: .5rem;
+      width: 100%;
+    }
+    .category-btn{
+      width: 100%;
+      text-align: center;
+      border-radius: 9999px;
+      border: 1px solid #e5e7eb;
+      padding: .5rem .75rem;
+      font-size: .9rem;
+      background: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .category-btn.active{
+      background:#000;
+      color:#fff;
+      border-color:#000;
+    }
+    /* если экран прям очень узкий — по 2 в ряд */
+    @media (max-width: 380px) {
+      .category-grid{
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+    }
+
+    input, select, textarea, button { font-size: 16px; max-width:100%; }
+
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
       nav { width: 100%; flex-wrap: wrap; }
@@ -116,7 +111,6 @@
   </style>
 </head>
 <body>
-  <!-- ВНЕШНЯЯ ОБОЛОЧКА (растягивается), внутри — телефон -->
   <div class="w-full px-3 py-6">
     <!-- шапка -->
     <header class="phone-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
@@ -142,7 +136,7 @@
       </div>
     </div>
 
-    <!-- сюда рендерим -->
+    <!-- контент -->
     <main id="app" class="phone-shell"></main>
 
     <p class="mt-6 text-sm text-gray-500 phone-shell">
@@ -198,6 +192,7 @@ async function ycCall(op, extra={}) {
   }
 }
 
+/* 6 категорий: 5 твоих + полуфабрикаты */
 const MENU_CATEGORIES = [
   {
     key: 'burgers',
@@ -248,21 +243,27 @@ const MENU_CATEGORIES = [
       { name: 'По-деревенски большой', price: 200 },
     ]
   },
+  {
+    key: 'semi',
+    title: 'Полуфабрикаты',
+    items: [
+      { name: 'Наггетсы 6 шт.', price: 160 },
+      { name: 'Наггетсы 9 шт.', price: 210 },
+      { name: 'Стрипсы', price: 190 },
+    ]
+  },
 ];
 
+/* ===== экран клиента ===== */
 function OrderView(){
   const root = el(`
     <div class="grid gap-4 sm:gap-6">
       <section class="p-4 sm:p-5 rounded-2xl bg-white border">
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
-        <div id="categoryBar">
-          ${MENU_CATEGORIES.map((cat,idx)=>`
-            <button data-cat="${cat.key}" class="whitespace-nowrap px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">
-              ${cat.title}
-            </button>
-          `).join('')}
-        </div>
-        <div id="menuScroll" class="mt-3">
+        <!-- 6 кнопок без скролла -->
+        <div id="categoryBar" class="category-grid mb-3"></div>
+        <!-- список товаров -->
+        <div id="menuScroll">
           <div id="menuGrid"></div>
         </div>
       </section>
@@ -300,6 +301,18 @@ function OrderView(){
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
+  /* отрисовать кнопки */
+  MENU_CATEGORIES.forEach((cat, idx) => {
+    const btn = el(`
+      <button type="button"
+              class="category-btn ${idx===0 ? 'active' : ''}"
+              data-cat="${cat.key}">
+        ${cat.title}
+      </button>
+    `);
+    categoryBar.appendChild(btn);
+  });
+
   function recalcTotal(){
     let sum = 0;
     for (const cat of MENU_CATEGORIES){
@@ -313,12 +326,11 @@ function OrderView(){
 
   function renderCategory(catKey){
     currentCategory = catKey;
-    categoryBar.querySelectorAll('button').forEach(btn=>{
-      btn.classList.remove('bg-black','text-white');
-      if (btn.dataset.cat === catKey){
-        btn.classList.add('bg-black','text-white');
-      }
+    // подсветка
+    categoryBar.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.cat === catKey);
     });
+    // товары
     const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
     menuGrid.innerHTML = '';
     cat.items.forEach(item=>{
@@ -356,15 +368,14 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
+  // клик по категориям
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
-    btn.scrollIntoView({inline:'center', behavior:'smooth', block:'nearest'});
   });
 
-  // убрали свайпы — они и дёргали страницу
-
+  // чекбокс "к времени"
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
     if (!deliverChk.checked) deliverTime.value='';
@@ -378,6 +389,7 @@ function OrderView(){
     deliverTime.classList.add('hidden');
   }
 
+  // отправка формы
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
@@ -454,6 +466,7 @@ function OrderView(){
   return root;
 }
 
+/* ===== табло ===== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4 max-w-6xl">
@@ -467,6 +480,7 @@ function DashboardView(){
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
     </div>
   `);
+
   const list = root.querySelector('#list');
   let audioCtx = null;
   let soundEnabled = false;
