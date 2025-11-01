@@ -2,22 +2,48 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- фикс для мобил: без зума и без горизонтального скролла -->
+  <!-- без зума и без горизонтального скролла -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-
   <style>
-    /* 1) вообще запрещаем горизонтальный скролл у страницы */
+    /* базово: не даём странице скроллиться по X */
     html, body {
       width: 100%;
       max-width: 100%;
       overflow-x: hidden;
       background:#f9fafb;
     }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
 
-    *, *::before, *::after { box-sizing: border-box; }
-    img { max-width: 100%; display: block; }
+    /* телефонный контейнер: НЕ шире экрана, но до 540 */
+    .phone-shell {
+      width: min(100vw, 540px);
+      margin: 0 auto;
+    }
+
+    /* белые блоки внутри — тоже не шире экрана */
+    .phone-shell section,
+    .phone-shell form,
+    .phone-shell header,
+    .phone-shell main {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* чтобы инпуты / кнопки не растягивали родителя */
+    input, select, button {
+      font-size: 16px;
+      max-width: 100%;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
 
     .toast{
       position:fixed; right:1rem; bottom:1rem;
@@ -28,36 +54,32 @@
     }
     .hidden{ display:none }
 
-    /* 2) телефонная ширина — всё внутри 540px, по центру */
-    .phone-shell {
-      width: 100%;
-      max-width: 540px;
-      margin: 0 auto;
-    }
-
-    /* 3) верхняя плашка категорий — только она скроллится по X */
+    /* только список категорий скроллится по X */
     #categoryBar{
       display: flex;
       gap: .5rem;
       overflow-x: auto;
+      width: 100%;
       padding: 0 .25rem;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      width: 100%;
     }
     #categoryBar::-webkit-scrollbar{ display:none; }
 
-    /* 4) список товаров — только вертикальный скролл */
+    /* окно товаров — только по Y */
     #menuScroll{
       max-height: 15.5rem;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      width: 100%;
     }
+
     #menuGrid{
       display: flex;
       flex-direction: column;
       gap: .75rem;
+      width: 100%;
     }
 
     .menu-card{
@@ -69,8 +91,13 @@
       border-radius: 1.25rem;
       padding: 1rem;
       min-height: 6.4rem;
+      width: 100%;
+      max-width: 100%;
     }
-    .menu-card-body{ flex: 1 1 auto; min-width: 0; }
+    .menu-card-body{
+      flex: 1 1 auto;
+      min-width: 0;
+    }
     .menu-card-img{
       width: 110px;
       height: 70px;
@@ -80,25 +107,18 @@
       object-fit: cover;
     }
 
-    /* формы на телефоне — на всю ширину */
-    form input,
-    form select,
-    form button {
-      width: 100%;
-    }
-
-    /* чтоб андроид/ios не зумил инпуты */
-    input, select, textarea, button { font-size: 16px; }
-
+    /* на маленьком экране хедер — колонкой */
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
+      nav { width: 100%; flex-wrap: wrap; }
+      nav > * { flex: 1 1 auto; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <!-- 0) ВНЕШНЯЯ ОБЁРТКА: тянется на всю ширину, но внутри всё 540px -->
-  <div class="w-full px-3 py-6" id="page-shell">
-    <!-- шапка — сразу “телефонная” -->
+  <!-- ВНЕШНЯЯ ОБОЛОЧКА (растягивается), внутри — телефон -->
+  <div class="w-full px-3 py-6">
+    <!-- шапка -->
     <header class="phone-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
       <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
@@ -122,7 +142,7 @@
       </div>
     </div>
 
-    <!-- сюда будем рендерить -->
+    <!-- сюда рендерим -->
     <main id="app" class="phone-shell"></main>
 
     <p class="mt-6 text-sm text-gray-500 phone-shell">
@@ -134,7 +154,6 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ===== базовые настройки ===== */
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 
@@ -179,7 +198,6 @@ async function ycCall(op, extra={}) {
   }
 }
 
-/* ===== меню ===== */
 const MENU_CATEGORIES = [
   {
     key: 'burgers',
@@ -232,7 +250,6 @@ const MENU_CATEGORIES = [
   },
 ];
 
-/* ===== экран клиента ===== */
 function OrderView(){
   const root = el(`
     <div class="grid gap-4 sm:gap-6">
@@ -339,17 +356,14 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
-  // Клик по категориям — только по бару, страница не двигается
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
-    // докручиваем, чтобы активная категория была в зоне видимости
     btn.scrollIntoView({inline:'center', behavior:'smooth', block:'nearest'});
   });
 
-  // ВАЖНО: мы УДАЛИЛИ свайп по списку товаров
-  // потому что он и дёргал тебе всю страницу
+  // убрали свайпы — они и дёргали страницу
 
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
@@ -440,7 +454,6 @@ function OrderView(){
   return root;
 }
 
-/* ===== табло (с удалением) ===== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4 max-w-6xl">
@@ -494,7 +507,6 @@ function DashboardView(){
   function orderCard(o){
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
     const itemLines = (o.items || []).map(i=>`${i.name} ×${i.qty}`).join(', ');
-
     const card = el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
         <div class="flex items-center justify-between gap-4">
@@ -598,16 +610,14 @@ function DashboardView(){
   return root;
 }
 
-/* ===== роутер ===== */
 function router(){
   const app = document.getElementById('app');
   app.innerHTML = '';
   if (location.hash === '#/dashboard') {
-    // табло — широкое → снимаем ограничение 540
+    // для табло ширина не ограничена
     app.classList.remove('phone-shell');
     app.appendChild(DashboardView());
   } else {
-    // клиент — узкое
     app.classList.add('phone-shell');
     app.appendChild(OrderView());
   }
@@ -615,7 +625,7 @@ function router(){
 window.addEventListener('hashchange', router);
 router();
 
-/* ===== пин ===== */
+/* пин */
 const dashBtn = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
@@ -642,7 +652,6 @@ pinCancel.addEventListener('click', hidePin);
 pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
 pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
 
-/* ===== кнопка обновить ===== */
 document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
 </script>
 </body>
