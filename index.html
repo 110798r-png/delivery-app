@@ -183,17 +183,18 @@ const MENU_CATEGORIES = [
 function OrderView(){
   const root = el(`
     <div class="grid gap-4">
-      <section class="section-card">
-        <h2 class="text-lg font-semibold mb-3">Меню</h2>
-        <div id="categoryBar">
-          ${MENU_CATEGORIES.map((cat,idx)=>`
-            <button data-cat="${cat.key}" class="px-3 py-2 rounded-full border ${idx===0?'bg-black text-white':''}">
-              ${cat.title}
-            </button>
-          `).join('')}
-        </div>
-        <div class="mt-3" id="menuGrid"></div>
-      </section>
+    <section class="section-card">
+  <h2 class="text-lg font-semibold mb-3">Меню</h2>
+  <div id="categoryBar">
+    <!-- как было, 2 ряда по 3 -->
+  </div>
+
+  <!-- 👇 вот ЭТО: ограничиваем высоту и даём скролл -->
+  <div id="menuScroll" class="mt-3" style="max-height: 250px; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+    <div id="menuGrid"></div>
+  </div>
+</section>
+
 
       <section class="section-card">
         <h2 class="text-lg font-semibold mb-4">Данные доставки</h2>
