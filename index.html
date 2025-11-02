@@ -2,7 +2,6 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- без зума -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>🍟 Онлайн-заказ (клиент + табло)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
@@ -13,7 +12,9 @@
       overflow-x: hidden;
       background:#f9fafb;
     }
-    *, *::before, *::after { box-sizing: border-box; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     img { max-width: 100%; display:block; }
 
     .toast{
@@ -25,27 +26,13 @@
     }
     .hidden{ display:none }
 
-    /* главный телефонный контейнер */
     .phone-shell{
       width: min(100vw, 540px);
       margin: 0 auto;
-      padding-left: .5rem;
-      padding-right: .5rem;
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
     }
 
-    /* общий белый блок */
-    .section-card {
-      background: #fff;
-      border-radius: 1.5rem;
-      border: 1px solid #e5e7eb;
-      padding: 1rem 1rem 1.25rem 1rem;
-      width: 100%;
-    }
-    @media (min-width: 640px) {
-      .section-card { padding: 1.25rem 1.5rem 1.5rem 1.5rem; }
-    }
-
-    /* список товаров с внутренним скроллом */
     #menuScroll{
       max-height: 15.5rem;
       overflow-y: auto;
@@ -82,36 +69,48 @@
       object-fit: cover;
     }
 
-    /* 🔥 ГОРИЗОНТАЛЬНАЯ КАРУСЕЛЬ КАТЕГОРИЙ (то, что хотим завтра докрасить) */
-    #categoryBar {
-      display: flex;
+    .category-grid{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
       gap: .5rem;
-      overflow-x: auto;
-      padding-bottom: .4rem;
-      -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x mandatory;   /* чтобы потом сделать “прилипание” */
+      width: 100%;
     }
-    #categoryBar::-webkit-scrollbar { display:none; }
-
     .category-btn{
-      flex: 0 0 auto;
-      scroll-snap-align: start;
+      width: 100%;
       text-align: center;
       border-radius: 9999px;
       border: 1px solid #e5e7eb;
-      padding: .55rem 1rem;
+      padding: .5rem .75rem;
       font-size: .9rem;
       background: #fff;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .category-btn.active{
       background:#000;
       color:#fff;
       border-color:#000;
     }
+    @media (max-width: 380px) {
+      .category-grid{
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+    }
 
-    /* чтобы формы не разъезжались */
     input, select, textarea, button { font-size: 16px; max-width:100%; }
+
+    .section-card {
+      background: #fff;
+      border-radius: 1.5rem;
+      border: 1px solid #e5e7eb;
+      padding: 1rem 1rem 1.25rem 1rem;
+      width: 100%;
+    }
+
+    @media (min-width: 640px) {
+      .section-card { padding: 1.25rem 1.5rem 1.5rem 1.5rem; }
+    }
 
     @media (max-width: 640px) {
       header h1 { font-size: 1.4rem; }
@@ -122,7 +121,6 @@
 </head>
 <body>
   <div class="w-full py-6">
-    <!-- шапка -->
     <header class="phone-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
       <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
@@ -132,7 +130,6 @@
       </nav>
     </header>
 
-    <!-- модалка пин-кода -->
     <div id="pinModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
       <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow">
         <h3 class="text-lg font-semibold mb-3">Вход в табло</h3>
@@ -146,7 +143,6 @@
       </div>
     </div>
 
-    <!-- контент -->
     <main id="app" class="phone-shell"></main>
 
     <p class="mt-6 text-sm text-gray-500 phone-shell">
@@ -159,7 +155,7 @@
 
 <script>
 const ALLOWED_PIN = "65Vafuza";
-const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
   location.hash = "#/order";
@@ -208,9 +204,9 @@ const MENU_CATEGORIES = [
     key: 'burgers',
     title: 'Бургеры',
     items: [
-      { name: 'Говяжий бургер', price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+      { name: 'Говяжий бургер',  price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
       { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-      { name: 'Куриный бургер', price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+      { name: 'Куриный бургер',  price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
       { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
     ]
   },
@@ -219,38 +215,38 @@ const MENU_CATEGORIES = [
     title: 'Твистеры',
     items: [
       { name: 'Твистер обычный', price: 200 },
-      { name: 'Твистер макс', price: 250 },
+      { name: 'Твистер макс',    price: 250 },
     ]
   },
   {
     key: 'drinks',
     title: 'Напитки',
     items: [
-      { name: 'Добрый кола', price: 100 },
-      { name: 'Добрый апельсин', price: 100 },
-      { name: 'Спрайт', price: 100 },
-      { name: 'Эспрессо', price: 120 },
-      { name: 'Банановый раф', price: 180 },
-      { name: 'Чай чёрный', price: 70 },
+      { name: 'Добрый кола',      price: 100 },
+      { name: 'Добрый апельсин',  price: 100 },
+      { name: 'Спрайт',           price: 100 },
+      { name: 'Эспрессо',         price: 120 },
+      { name: 'Банановый раф',    price: 180 },
+      { name: 'Чай чёрный',       price: 70  },
     ]
   },
   {
     key: 'sushi',
     title: 'Суши / роллы',
     items: [
-      { name: 'Калифорния', price: 350 },
+      { name: 'Калифорния',  price: 350 },
       { name: 'Филадельфия', price: 390 },
-      { name: 'Аляска', price: 350 },
+      { name: 'Аляска',      price: 350 },
     ]
   },
   {
     key: 'potato',
     title: 'Картошка',
     items: [
-      { name: 'Фри маленький', price: 150 },
-      { name: 'Фри большой', price: 180 },
-      { name: 'По-деревенски маленький', price: 160 },
-      { name: 'По-деревенски большой', price: 200 },
+      { name: 'Фри маленький',             price: 150 },
+      { name: 'Фри большой',               price: 180 },
+      { name: 'По-деревенски маленький',   price: 160 },
+      { name: 'По-деревенски большой',     price: 200 },
     ]
   },
   {
@@ -259,10 +255,29 @@ const MENU_CATEGORIES = [
     items: [
       { name: 'Наггетсы 6 шт.', price: 160 },
       { name: 'Наггетсы 9 шт.', price: 210 },
-      { name: 'Стрипсы', price: 190 },
+      { name: 'Стрипсы',        price: 190 },
     ]
   },
 ];
+
+/* найти цену по имени (на всякий случай) */
+function findPriceByName(name){
+  for (const cat of MENU_CATEGORIES){
+    const f = cat.items.find(i => i.name === name);
+    if (f) return f.price;
+  }
+  return 0;
+}
+
+/* пересчитать из items (для табло) */
+function calcTotalFromItems(order){
+  let sum = 0;
+  (order.items || []).forEach(i => {
+    const p = typeof i.price === 'number' ? i.price : findPriceByName(i.name);
+    sum += p * (i.qty || 0);
+  });
+  return sum;
+}
 
 /* ===== экран клиента ===== */
 function OrderView(){
@@ -270,9 +285,7 @@ function OrderView(){
     <div class="grid gap-4 sm:gap-6">
       <section class="section-card">
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
-        <!-- КАРУСЕЛЬ КАТЕГОРИЙ -->
-        <div id="categoryBar" class="mb-3"></div>
-        <!-- список товаров с вертикальным скроллом -->
+        <div id="categoryBar" class="category-grid mb-3"></div>
         <div id="menuScroll">
           <div id="menuGrid"></div>
         </div>
@@ -301,20 +314,21 @@ function OrderView(){
   `);
 
   const categoryBar = root.querySelector('#categoryBar');
-  const menuGrid = root.querySelector('#menuGrid');
-  const form = root.querySelector('#orderForm');
-  const totalEl = root.querySelector('#total');
-  const deliverChk = form.deliverByTime;
+  const menuGrid    = root.querySelector('#menuGrid');
+  const form        = root.querySelector('#orderForm');
+  const totalEl     = root.querySelector('#total');
+  const deliverChk  = form.deliverByTime;
   const deliverTime = form.deliverTime;
-  const sendBtn = root.querySelector('#sendBtn');
+  const sendBtn     = root.querySelector('#sendBtn');
 
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
-  // рисуем кнопки категорий
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
-      <button type="button" class="category-btn ${idx===0 ? 'active':''}" data-cat="${cat.key}">
+      <button type="button"
+              class="category-btn ${idx===0 ? 'active' : ''}"
+              data-cat="${cat.key}">
         ${cat.title}
       </button>
     `);
@@ -330,15 +344,14 @@ function OrderView(){
       }
     }
     totalEl.textContent = money(sum);
+    return sum;
   }
 
   function renderCategory(catKey){
     currentCategory = catKey;
-    // подсветка
     categoryBar.querySelectorAll('button').forEach(b=>{
       b.classList.toggle('active', b.dataset.cat === catKey);
     });
-    // сами товары
     const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
     menuGrid.innerHTML = '';
     cat.items.forEach(item=>{
@@ -376,15 +389,12 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
-  // переключение категорий
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
-    // завтра сюда добавим автопрокрутку к активной
   });
 
-  // чекбокс "к времени"
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
     if (!deliverChk.checked) deliverTime.value='';
@@ -404,13 +414,16 @@ function OrderView(){
     sendBtn.disabled = true;
     sendBtn.textContent = 'Отправляем...';
 
-    // собираем позиции
     const items = [];
     for (const cat of MENU_CATEGORIES){
       for (const item of cat.items){
         const qty = counts[item.name] || 0;
         if (qty > 0){
-          items.push({ name: item.name, qty });
+          items.push({
+            name:  item.name,
+            qty:   qty,
+            price: item.price
+          });
         }
       }
     }
@@ -422,14 +435,7 @@ function OrderView(){
       return;
     }
 
-    // считаем итог здесь же
-    let total = 0;
-    for (const cat of MENU_CATEGORIES){
-      for (const item of cat.items){
-        const q = counts[item.name] || 0;
-        if (q > 0) total += item.price * q;
-      }
-    }
+    const total = recalcTotal();
 
     const payload = {
       clientId: getClientId(),
@@ -439,13 +445,12 @@ function OrderView(){
       deliverByTime: form.deliverByTime.checked,
       deliverTime: form.deliverTime.value || null,
       items,
-      total   // 👈 шлём итог сразу
+      total
     };
 
     const res = await ycCall("create", { data: payload });
 
     if (res.error){
-      // локальный фолбэк
       const data = store.load();
       const id = data.nextId++;
       const now = Date.now();
@@ -458,20 +463,27 @@ function OrderView(){
       return;
     }
 
-    // сервер может не посчитать total → подставим наш
-    const o = res.order || { id: '—', status: 'новый', total };
-    if (!o.total || o.total === 0) o.total = total;
+const o = res.order || { id: '—', status: 'новый', items, total };
 
-    // показываем клиенту
-    root.querySelector('#result').innerHTML = `
-      <div class="section-card mt-0">
-        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
-        <div class="text-gray-700">
-          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
-          · Итог: <b>${o.total} руб.</b>
-        </div>
-      </div>
-    `;
+// 1) что сказал сервер
+const serverTotal = typeof o.total === 'number' ? o.total : 0;
+// 2) что мы посчитали до отправки
+const clientTotalBefore = typeof total === 'number' ? total : 0;
+// 3) что можно пересчитать по списку из ответа
+const clientTotalFromResp = calcTotalFromItems(o);
+
+// главное: берём максимум
+const shownTotal = Math.max(serverTotal, clientTotalBefore, clientTotalFromResp);
+
+root.querySelector('#result').innerHTML = `
+  <div class="section-card mt-0">
+    <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+    <div class="text-gray-700">
+      Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
+      · Итог: <b>${shownTotal} руб.</b>
+    </div>
+  </div>`;
+
     showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
 
     resetAll();
@@ -533,27 +545,15 @@ function DashboardView(){
 
   root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
-  function calcOrderTotal(o){
-    if (o.total && o.total > 0) return o.total;
-    let sum = 0;
-    if (Array.isArray(o.items)){
-      o.items.forEach(it=>{
-        const price = (() => {
-          for (const cat of MENU_CATEGORIES){
-            const found = cat.items.find(x => x.name === it.name);
-            if (found) return found.price;
-          }
-          return 0;
-        })();
-        sum += price * (it.qty || 0);
-      });
-    }
-    return sum;
-  }
-
   function orderCard(o){
+    // вот тут ГЛАВНАЯ ПРАВКА
+    const clientTotal = calcTotalFromItems(o);
+    const total = Math.max(
+      typeof o.total === 'number' ? o.total : 0,
+      clientTotal
+    );
+
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
-    const total = calcOrderTotal(o);  // 👈 показываем реальный итог
     const itemLines = (o.items || []).map(i=>`${i.name} ×${i.qty}`).join(', ');
     const card = el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
@@ -673,11 +673,11 @@ window.addEventListener('hashchange', router);
 router();
 
 /* пин */
-const dashBtn = document.getElementById('openDashboard');
+const dashBtn  = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
-const pinOk = document.getElementById('pinOk');
-const pinCancel = document.getElementById('pinCancel');
+const pinOk    = document.getElementById('pinOk');
+const pinCancel= document.getElementById('pinCancel');
 const pinError = document.getElementById('pinError');
 
 function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0); }
