@@ -463,17 +463,26 @@ function OrderView(){
       return;
     }
 
-    const o = res.order || {};
-    const shownTotal = (typeof o.total === 'number' && o.total > 0) ? o.total : total;
+const o = res.order || { id: '—', status: 'новый', items, total };
 
-    document.getElementById('result').innerHTML = `
-      <div class="section-card mt-0">
-        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id ?? '—'} принят.</div>
-        <div class="text-gray-700">
-          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
-          · Итог: <b>${shownTotal} руб.</b>
-        </div>
-      </div>`;
+// 1) что сказал сервер
+const serverTotal = typeof o.total === 'number' ? o.total : 0;
+// 2) что мы посчитали до отправки
+const clientTotalBefore = typeof total === 'number' ? total : 0;
+// 3) что можно пересчитать по списку из ответа
+const clientTotalFromResp = calcTotalFromItems(o);
+
+// главное: берём максимум
+const shownTotal = Math.max(serverTotal, clientTotalBefore, clientTotalFromResp);
+
+root.querySelector('#result').innerHTML = `
+  <div class="section-card mt-0">
+    <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+    <div class="text-gray-700">
+      Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
+      · Итог: <b>${shownTotal} руб.</b>
+    </div>
+  </div>`;
 
     showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
 
