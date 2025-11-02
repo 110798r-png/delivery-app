@@ -162,6 +162,21 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+  
+    <!-- модалка подтверждения заказа -->
+  <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[9998]">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
+      <h3 class="text-lg font-semibold">Подтвердите заказ</h3>
+      <div id="orderConfirmList" class="space-y-2 text-sm"></div>
+      <div id="orderConfirmTotal" class="text-base font-medium pt-1"></div>
+      <div id="orderConfirmClient" class="text-sm text-gray-500"></div>
+      <div class="flex gap-2 justify-end pt-2">
+        <button id="orderConfirmCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
+        <button id="orderConfirmOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
 
 <script>
 const ALLOWED_PIN = "65Vafuza";
