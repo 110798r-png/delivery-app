@@ -13,9 +13,7 @@
       overflow-x: hidden;
       background:#f9fafb;
     }
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { box-sizing: border-box; }
     img { max-width: 100%; display:block; }
 
     .toast{
@@ -31,8 +29,8 @@
     .phone-shell{
       width: min(100vw, 540px);
       margin: 0 auto;
-      padding-left: 0.75rem;   /* было 0.35 */
-      padding-right: 0.75rem;  /* было 0.35 */
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
     }
 
     /* блок с товарами — внутренняя прокрутка только у списка */
@@ -73,7 +71,7 @@
       object-fit: cover;
     }
 
-    /* КАТЕГОРИИ: 3 в ряд, 2 ряда, БЕЗ скролла */
+    /* КАТЕГОРИИ: 3 в ряд, 2 ряда, без скролла */
     .category-grid{
       display: grid;
       grid-template-columns: repeat(3, minmax(0,1fr));
@@ -97,17 +95,14 @@
       color:#fff;
       border-color:#000;
     }
-    /* очень узкие телефоны — по 2 в ряд */
     @media (max-width: 380px) {
       .category-grid{
         grid-template-columns: repeat(2, minmax(0,1fr));
       }
     }
 
-    /* чтобы мобилки не зумились */
     input, select, textarea, button { font-size: 16px; max-width:100%; }
 
-    /* универсальный белый блок */
     .section-card {
       background: #fff;
       border-radius: 1.5rem;
@@ -116,7 +111,6 @@
       width: 100%;
       box-shadow: 0 6px 24px rgba(15,23,42,0.03);
     }
-
     @media (min-width: 640px) {
       .section-card { padding: 1.25rem 1.5rem 1.5rem 1.5rem; }
     }
@@ -272,6 +266,15 @@ const MENU_CATEGORIES = [
   },
 ];
 
+/* сделаем индекс по itemId, чтобы не путаться с именами */
+const MENU_INDEX = {};
+MENU_CATEGORIES.forEach(cat => {
+  cat.items.forEach((item, idx) => {
+    const itemId = `${cat.key}:${idx}`;
+    MENU_INDEX[itemId] = { ...item, itemId, catKey: cat.key };
+  });
+});
+
 /* ===== экран клиента ===== */
 function OrderView(){
   const root = el(`
@@ -314,10 +317,11 @@ function OrderView(){
   const deliverTime = form.deliverTime;
   const sendBtn = root.querySelector('#sendBtn');
 
+  // здесь теперь храним не name, а itemId → qty
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
-  // кнопки категорий
+  // рисуем кнопки категорий
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
       <button type="button"
@@ -329,13 +333,14 @@ function OrderView(){
     categoryBar.appendChild(btn);
   });
 
+  // пересчёт суммы — только по counts
   function recalcTotal(){
     let sum = 0;
-    for (const cat of MENU_CATEGORIES){
-      for (const item of cat.items){
-        const q = counts[item.name] || 0;
-        sum += item.price * q;
-      }
+    for (const id in counts){
+      const qty = counts[id] || 0;
+      const item = MENU_INDEX[id];
+      if (!item) continue;
+      sum += item.price * qty;
     }
     totalEl.textContent = money(sum);
   }
@@ -347,10 +352,11 @@ function OrderView(){
     });
     const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
     menuGrid.innerHTML = '';
-    cat.items.forEach(item=>{
-      const q = counts[item.name] || 0;
+    cat.items.forEach((item, idx)=>{
+      const itemId = `${cat.key}:${idx}`;
+      const q = counts[itemId] || 0;
       const card = el(`
-        <div class="menu-card">
+        <div class="menu-card" data-item-id="${itemId}">
           <div class="menu-card-body">
             <div class="text-base sm:text-lg font-medium">${item.name}</div>
             <div class="inline-flex items-center mt-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${money(item.price)}</div>
@@ -365,14 +371,17 @@ function OrderView(){
       `);
       const qEl = card.querySelector('[data-q]');
       card.addEventListener('click', e=>{
-        if (e.target.dataset.act === 'inc'){
-          counts[item.name] = (counts[item.name] || 0) + 1;
-          qEl.textContent = counts[item.name];
+        const act = e.target.dataset.act;
+        if (!act) return;
+        const id = card.dataset.itemId;
+        if (act === 'inc'){
+          counts[id] = (counts[id] || 0) + 1;
+          qEl.textContent = counts[id];
           recalcTotal();
         }
-        if (e.target.dataset.act === 'dec'){
-          counts[item.name] = Math.max(0, (counts[item.name] || 0) - 1);
-          qEl.textContent = counts[item.name];
+        if (act === 'dec'){
+          counts[id] = Math.max(0, (counts[id] || 0) - 1);
+          qEl.textContent = counts[id];
           recalcTotal();
         }
       });
@@ -403,22 +412,23 @@ function OrderView(){
     deliverTime.classList.add('hidden');
   }
 
-  // отправка формы
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
     sendBtn.disabled = true;
     sendBtn.textContent = 'Отправляем...';
 
-    const items = [];
-    for (const cat of MENU_CATEGORIES){
-      for (const item of cat.items){
-        const qty = counts[item.name] || 0;
-        if (qty > 0){
-          items.push({ name: item.name, qty });
-        }
-      }
-    }
+    // собираем только выбранные товары
+    const items = Object.entries(counts)
+      .filter(([,qty]) => qty > 0)
+      .map(([id,qty]) => {
+        const item = MENU_INDEX[id];
+        return {
+          id,
+          name: item ? item.name : id,
+          qty
+        };
+      });
 
     if (!items.length){
       alert('Выберите товары');
@@ -427,29 +437,26 @@ function OrderView(){
       return;
     }
 
-    // итоговая сумма
-    const total = items.reduce((s,i)=>{
-      let price = 0;
-      for (const c of MENU_CATEGORIES){
-        const f = c.items.find(it=>it.name===i.name);
-        if (f){ price = f.price; break; }
-      }
-      return s + price * i.qty;
+    // точный итог по индексу
+    const total = items.reduce((sum, it) => {
+      const item = MENU_INDEX[it.id];
+      if (!item) return sum;
+      return sum + item.price * it.qty;
     }, 0);
 
-    // делаем уникальный токен, чтобы сервер не склеивал заказы с одного телефона
+    // чтобы яндекс не склеивал
     const uniqueToken = 'o-' + Date.now() + '-' + Math.random().toString(36).slice(2);
 
     const payload = {
       clientId: getClientId(),
-      dedupBy: uniqueToken,            // ← добавили
+      dedupBy: uniqueToken,
       name: form.name.value.trim(),
       phone: form.phone.value.trim(),
       address: form.address.value.trim(),
       deliverByTime: form.deliverByTime.checked,
       deliverTime: form.deliverTime.value || null,
       items,
-      total                           // ← отправляем сумму
+      total
     };
 
     const res = await ycCall("create", { data: payload });
@@ -519,7 +526,6 @@ function DashboardView(){
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  // кнопка включения звука
   root.querySelector('#enableSound').addEventListener('click', async () => {
     try {
       if (!audioCtx) {
@@ -536,7 +542,6 @@ function DashboardView(){
     }
   });
 
-  // автообновление страницы
   root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
   function orderCard(o){
@@ -642,8 +647,8 @@ function DashboardView(){
   load();
   setInterval(()=>{ if (location.hash === '#/dashboard') load(); }, 5000);
 
-  // 🔊 попытка включить звук автоматически
-  async function tryEnableSoundAuto() {
+  // попытка включить звук сама
+  (async () => {
     try {
       if (!audioCtx) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -651,12 +656,8 @@ function DashboardView(){
       }
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       soundEnabled = true;
-      showToast("Звук включён (если браузер разрешил)");
-    } catch (e) {
-      // браузер мог не дать — ок
-    }
-  }
-  tryEnableSoundAuto();
+    } catch (e) {}
+  })();
 
   return root;
 }
