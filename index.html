@@ -196,17 +196,35 @@ const store = {
   save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 };
 
-async function ycCall(op, extra={}) {
+// === patched ycCall ===
+async function ycCall(op, extra = {}) {
+  const payload = { op, ...extra };
   try {
     const res = await fetch(API_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op, ...extra })
+      body: JSON.stringify(payload)
     });
-    return await res.json();
+
+    const text = await res.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // сервер вернул не-JSON
+        return { error: "bad-json", status: res.status, raw: text };
+      }
+    }
+
+    if (!res.ok) {
+      return { error: "http", status: res.status, data };
+    }
+
+    return data;
   } catch (e) {
-    console.warn("YC error:", e);
-    return { error: "network" };
+    console.warn("YC network error:", e);
+    return { error: "network", message: e.message };
   }
 }
 
@@ -296,7 +314,7 @@ function calcTotalFromItems(order){
 /* ===== недоступные товары: общие функции ===== */
 async function fetchUnavailableFromServer(){
   const res = await ycCall("getUnavailable", {});
-  if (res && Array.isArray(res.items)) return res.items;
+  if (!res.error && res && Array.isArray(res.items)) return res.items;
   return null;
 }
 async function saveUnavailableToServer(items){
@@ -369,9 +387,7 @@ function OrderView(){
     const srv = await fetchUnavailableFromServer();
     if (Array.isArray(srv)) {
       const srvSet = new Set(srv);
-      // если что-то реально поменялось — перерисуем
-      if (srv.length !== unavailable.size ||
-          srv.some(n => !unavailable.has(n))) {
+      if (srv.length !== unavailable.size || srv.some(n => !unavailable.has(n))) {
         unavailable = srvSet;
         saveUnavailableToLS(srv);
         renderCategory(currentCategory);
@@ -516,6 +532,7 @@ function OrderView(){
 
     const res = await ycCall("create", { data: payload });
 
+    // если ЛЮБАЯ ошибка — уходим в локальный режим
     if (res.error){
       const data = store.load();
       const id = data.nextId++;
@@ -725,14 +742,18 @@ function DashboardView(){
     return card;
   }
 
+  // === patched list load ===
   async function load(){
     const res = await ycCall("list");
+
     list.innerHTML = '';
 
     const unique = new Map();
+
     if (!res.error && Array.isArray(res.orders)) {
       res.orders.forEach(o => unique.set(String(o.id), o));
     } else {
+      // сервер что-то не то ответил — показываем локальное
       const data = store.load();
       data.orders.forEach(o => unique.set(String(o.id), o));
     }
