@@ -13,7 +13,9 @@
       overflow-x: hidden;
       background:#f9fafb;
     }
-    *, *::before, *::after { box-sizing: border-box; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     img { max-width: 100%; display:block; }
 
     .toast{
@@ -29,8 +31,8 @@
     .phone-shell{
       width: min(100vw, 540px);
       margin: 0 auto;
-      padding-left: 0.75rem;
-      padding-right: 0.75rem;
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
     }
 
     /* блок с товарами — внутренняя прокрутка только у списка */
@@ -71,7 +73,7 @@
       object-fit: cover;
     }
 
-    /* КАТЕГОРИИ: 3 в ряд, 2 ряда, без скролла */
+    /* КАТЕГОРИИ: 3 в ряд, 2 ряда, БЕЗ скролла */
     .category-grid{
       display: grid;
       grid-template-columns: repeat(3, minmax(0,1fr));
@@ -103,14 +105,15 @@
 
     input, select, textarea, button { font-size: 16px; max-width:100%; }
 
+    /* универсальный белый блок */
     .section-card {
       background: #fff;
       border-radius: 1.5rem;
       border: 1px solid #e5e7eb;
       padding: 1rem 1rem 1.25rem 1rem;
       width: 100%;
-      box-shadow: 0 6px 24px rgba(15,23,42,0.03);
     }
+
     @media (min-width: 640px) {
       .section-card { padding: 1.25rem 1.5rem 1.5rem 1.5rem; }
     }
@@ -161,7 +164,7 @@
 
 <script>
 const ALLOWED_PIN = "65Vafuza";
-const API_BASE = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
+const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
   location.hash = "#/order";
@@ -210,9 +213,9 @@ const MENU_CATEGORIES = [
     key: 'burgers',
     title: 'Бургеры',
     items: [
-      { name: 'Говяжий бургер', price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+      { name: 'Говяжий бургер',  price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
       { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-      { name: 'Куриный бургер', price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+      { name: 'Куриный бургер',  price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
       { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
     ]
   },
@@ -221,38 +224,38 @@ const MENU_CATEGORIES = [
     title: 'Твистеры',
     items: [
       { name: 'Твистер обычный', price: 200 },
-      { name: 'Твистер макс', price: 250 },
+      { name: 'Твистер макс',    price: 250 },
     ]
   },
   {
     key: 'drinks',
     title: 'Напитки',
     items: [
-      { name: 'Добрый кола', price: 100 },
-      { name: 'Добрый апельсин', price: 100 },
-      { name: 'Спрайт', price: 100 },
-      { name: 'Эспрессо', price: 120 },
-      { name: 'Банановый раф', price: 180 },
-      { name: 'Чай чёрный', price: 70 },
+      { name: 'Добрый кола',      price: 100 },
+      { name: 'Добрый апельсин',  price: 100 },
+      { name: 'Спрайт',           price: 100 },
+      { name: 'Эспрессо',         price: 120 },
+      { name: 'Банановый раф',    price: 180 },
+      { name: 'Чай чёрный',       price: 70  },
     ]
   },
   {
     key: 'sushi',
     title: 'Суши / роллы',
     items: [
-      { name: 'Калифорния', price: 350 },
+      { name: 'Калифорния',  price: 350 },
       { name: 'Филадельфия', price: 390 },
-      { name: 'Аляска', price: 350 },
+      { name: 'Аляска',      price: 350 },
     ]
   },
   {
     key: 'potato',
     title: 'Картошка',
     items: [
-      { name: 'Фри маленький', price: 150 },
-      { name: 'Фри большой', price: 180 },
-      { name: 'По-деревенски маленький', price: 160 },
-      { name: 'По-деревенски большой', price: 200 },
+      { name: 'Фри маленький',             price: 150 },
+      { name: 'Фри большой',               price: 180 },
+      { name: 'По-деревенски маленький',   price: 160 },
+      { name: 'По-деревенски большой',     price: 200 },
     ]
   },
   {
@@ -261,19 +264,29 @@ const MENU_CATEGORIES = [
     items: [
       { name: 'Наггетсы 6 шт.', price: 160 },
       { name: 'Наггетсы 9 шт.', price: 210 },
-      { name: 'Стрипсы', price: 190 },
+      { name: 'Стрипсы',        price: 190 },
     ]
   },
 ];
 
-/* сделаем индекс по itemId, чтобы не путаться с именами */
-const MENU_INDEX = {};
-MENU_CATEGORIES.forEach(cat => {
-  cat.items.forEach((item, idx) => {
-    const itemId = `${cat.key}:${idx}`;
-    MENU_INDEX[itemId] = { ...item, itemId, catKey: cat.key };
+/* вспомогательная: найти цену по имени */
+function findPriceByName(name){
+  for (const cat of MENU_CATEGORIES){
+    const f = cat.items.find(i => i.name === name);
+    if (f) return f.price;
+  }
+  return 0;
+}
+
+/* посчитать сумму из массива items (для табло) */
+function calcTotalFromItems(order){
+  let sum = 0;
+  (order.items || []).forEach(i => {
+    const p = (typeof i.price === 'number') ? i.price : findPriceByName(i.name);
+    sum += p * (i.qty || 0);
   });
-});
+  return sum;
+}
 
 /* ===== экран клиента ===== */
 function OrderView(){
@@ -310,18 +323,17 @@ function OrderView(){
   `);
 
   const categoryBar = root.querySelector('#categoryBar');
-  const menuGrid = root.querySelector('#menuGrid');
-  const form = root.querySelector('#orderForm');
-  const totalEl = root.querySelector('#total');
-  const deliverChk = form.deliverByTime;
+  const menuGrid    = root.querySelector('#menuGrid');
+  const form        = root.querySelector('#orderForm');
+  const totalEl     = root.querySelector('#total');
+  const deliverChk  = form.deliverByTime;
   const deliverTime = form.deliverTime;
-  const sendBtn = root.querySelector('#sendBtn');
+  const sendBtn     = root.querySelector('#sendBtn');
 
-  // здесь теперь храним не name, а itemId → qty
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
-  // рисуем кнопки категорий
+  /* нарисовать кнопки категорий */
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
       <button type="button"
@@ -333,16 +345,16 @@ function OrderView(){
     categoryBar.appendChild(btn);
   });
 
-  // пересчёт суммы — только по counts
   function recalcTotal(){
     let sum = 0;
-    for (const id in counts){
-      const qty = counts[id] || 0;
-      const item = MENU_INDEX[id];
-      if (!item) continue;
-      sum += item.price * qty;
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const q = counts[item.name] || 0;
+        sum += item.price * q;
+      }
     }
     totalEl.textContent = money(sum);
+    return sum;
   }
 
   function renderCategory(catKey){
@@ -352,11 +364,10 @@ function OrderView(){
     });
     const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
     menuGrid.innerHTML = '';
-    cat.items.forEach((item, idx)=>{
-      const itemId = `${cat.key}:${idx}`;
-      const q = counts[itemId] || 0;
+    cat.items.forEach(item=>{
+      const q = counts[item.name] || 0;
       const card = el(`
-        <div class="menu-card" data-item-id="${itemId}">
+        <div class="menu-card">
           <div class="menu-card-body">
             <div class="text-base sm:text-lg font-medium">${item.name}</div>
             <div class="inline-flex items-center mt-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${money(item.price)}</div>
@@ -371,17 +382,14 @@ function OrderView(){
       `);
       const qEl = card.querySelector('[data-q]');
       card.addEventListener('click', e=>{
-        const act = e.target.dataset.act;
-        if (!act) return;
-        const id = card.dataset.itemId;
-        if (act === 'inc'){
-          counts[id] = (counts[id] || 0) + 1;
-          qEl.textContent = counts[id];
+        if (e.target.dataset.act === 'inc'){
+          counts[item.name] = (counts[item.name] || 0) + 1;
+          qEl.textContent = counts[item.name];
           recalcTotal();
         }
-        if (act === 'dec'){
-          counts[id] = Math.max(0, (counts[id] || 0) - 1);
-          qEl.textContent = counts[id];
+        if (e.target.dataset.act === 'dec'){
+          counts[item.name] = Math.max(0, (counts[item.name] || 0) - 1);
+          qEl.textContent = counts[item.name];
           recalcTotal();
         }
       });
@@ -391,14 +399,12 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
-  // клик по категориям
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
   });
 
-  // чекбокс "к времени"
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
     if (!deliverChk.checked) deliverTime.value='';
@@ -418,17 +424,20 @@ function OrderView(){
     sendBtn.disabled = true;
     sendBtn.textContent = 'Отправляем...';
 
-    // собираем только выбранные товары
-    const items = Object.entries(counts)
-      .filter(([,qty]) => qty > 0)
-      .map(([id,qty]) => {
-        const item = MENU_INDEX[id];
-        return {
-          id,
-          name: item ? item.name : id,
-          qty
-        };
-      });
+    /* собираем товары + сразу прикладываем цену на каждый */
+    const items = [];
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const qty = counts[item.name] || 0;
+        if (qty > 0){
+          items.push({
+            name:  item.name,
+            qty:   qty,
+            price: item.price     // ← отправляем цену
+          });
+        }
+      }
+    }
 
     if (!items.length){
       alert('Выберите товары');
@@ -437,26 +446,18 @@ function OrderView(){
       return;
     }
 
-    // точный итог по индексу
-    const total = items.reduce((sum, it) => {
-      const item = MENU_INDEX[it.id];
-      if (!item) return sum;
-      return sum + item.price * it.qty;
-    }, 0);
-
-    // чтобы яндекс не склеивал
-    const uniqueToken = 'o-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    /* считаем общий итог и ТЕЖЕ отправляем */
+    const total = recalcTotal();
 
     const payload = {
       clientId: getClientId(),
-      dedupBy: uniqueToken,
       name: form.name.value.trim(),
       phone: form.phone.value.trim(),
       address: form.address.value.trim(),
       deliverByTime: form.deliverByTime.checked,
       deliverTime: form.deliverTime.value || null,
       items,
-      total
+      total          // ← вот этого раньше не было
     };
 
     const res = await ycCall("create", { data: payload });
@@ -474,15 +475,21 @@ function OrderView(){
       return;
     }
 
-    const o = res.order || { id: '—', status: 'новый', total };
-    root.querySelector('#result').innerHTML = `
+    /* если сервер всё равно вернул 0 — подставим наш total */
+    const srvOrder = res.order || {};
+    const shownTotal = (typeof srvOrder.total === 'number' && srvOrder.total > 0)
+      ? srvOrder.total
+      : total;
+
+    document.getElementById('result').innerHTML = `
       <div class="section-card mt-0">
-        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${srvOrder.id ?? '—'} принят.</div>
         <div class="text-gray-700">
-          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</span>
-          · Итог: <b>${o.total} руб.</b>
+          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${srvOrder.status || 'новый'}</span>
+          · Итог: <b>${shownTotal} руб.</b>
         </div>
       </div>`;
+
     showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
 
     resetAll();
@@ -545,6 +552,11 @@ function DashboardView(){
   root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
   function orderCard(o){
+    /* если сервер вернул total=0, пересчитаем из позиций */
+    const total = (typeof o.total === 'number' && o.total > 0)
+      ? o.total
+      : calcTotalFromItems(o);
+
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
     const itemLines = (o.items || []).map(i=>`${i.name} ×${i.qty}`).join(', ');
     const card = el(`
@@ -554,7 +566,7 @@ function DashboardView(){
           <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</div>
         </div>
         <div class="text-sm text-gray-600">
-          ${created.toLocaleString()} · Итог: <b>${o.total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}
+          ${created.toLocaleString()} · Итог: <b>${total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}
         </div>
         <div>📍 ${o.address}</div>
         <div>☎️ ${o.phone}</div>
@@ -647,18 +659,6 @@ function DashboardView(){
   load();
   setInterval(()=>{ if (location.hash === '#/dashboard') load(); }, 5000);
 
-  // попытка включить звук сама
-  (async () => {
-    try {
-      if (!audioCtx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AC();
-      }
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-      soundEnabled = true;
-    } catch (e) {}
-  })();
-
   return root;
 }
 
@@ -677,11 +677,11 @@ window.addEventListener('hashchange', router);
 router();
 
 /* пин */
-const dashBtn = document.getElementById('openDashboard');
+const dashBtn  = document.getElementById('openDashboard');
 const pinModal = document.getElementById('pinModal');
 const pinInput = document.getElementById('pinInput');
-const pinOk = document.getElementById('pinOk');
-const pinCancel = document.getElementById('pinCancel');
+const pinOk    = document.getElementById('pinOk');
+const pinCancel= document.getElementById('pinCancel');
 const pinError = document.getElementById('pinError');
 
 function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0); }
