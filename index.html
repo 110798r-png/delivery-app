@@ -118,7 +118,7 @@
       nav > * { flex: 1 1 auto; text-align: center; }
     }
 
-    /* 🔴 добавили стиль для недоступного товара */
+    /* недоступный товар */
     .menu-card.disabled {
       opacity: .5;
     }
@@ -167,8 +167,6 @@
 <script>
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
-
-/* 🔴 локальный ключ на случай, если бек не умеет get/setUnavailable */
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
@@ -274,12 +272,10 @@ const MENU_CATEGORIES = [
   },
 ];
 
-/* 🔴 плоский список всех товаров — нужно табло */
 const ALL_ITEMS = MENU_CATEGORIES.flatMap(cat =>
   cat.items.map(it => ({ name: it.name, cat: cat.key }))
 );
 
-/* найти цену по имени (на всякий случай) */
 function findPriceByName(name){
   for (const cat of MENU_CATEGORIES){
     const f = cat.items.find(i => i.name === name);
@@ -288,7 +284,6 @@ function findPriceByName(name){
   return 0;
 }
 
-/* пересчитать из items (для табло) */
 function calcTotalFromItems(order){
   let sum = 0;
   (order.items || []).forEach(i => {
@@ -298,7 +293,7 @@ function calcTotalFromItems(order){
   return sum;
 }
 
-/* 🔴 универсальные функции загрузки/сохранения недоступных товаров */
+/* ===== недоступные товары: общие функции ===== */
 async function fetchUnavailableFromServer(){
   const res = await ycCall("getUnavailable", {});
   if (res && Array.isArray(res.items)) return res.items;
@@ -343,7 +338,7 @@ function OrderView(){
             <input type="checkbox" name="deliverByTime" />
             <span>Доставить к времени</span>
           </label>
-          <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
+          <input class="border rounded-xl п-3 hidden" type="time" name="deliverTime" />
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
             <button id="sendBtn" class="px-4 py-3 rounded-xl border bg-black text-white w-full sm:w-auto" type="submit">Отправить заказ</button>
@@ -366,18 +361,28 @@ function OrderView(){
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
-  /* 🔴 здесь будет список недоступных, при старте — из LS */
+  /* 🔁 начальный список недоступных — из LS */
   let unavailable = new Set(loadUnavailableFromLS());
 
-  /* при старте пробуем подтянуть с сервера — если сервер умеет, то обновим */
-  (async ()=>{
+  /* 🔁 функция, которая подхватывает с сервера и сравнивает */
+  async function syncUnavailable(){
     const srv = await fetchUnavailableFromServer();
     if (Array.isArray(srv)) {
-      unavailable = new Set(srv);
-      renderCategory(currentCategory);
-      saveUnavailableToLS(srv);
+      const srvSet = new Set(srv);
+      // если что-то реально поменялось — перерисуем
+      if (srv.length !== unavailable.size ||
+          srv.some(n => !unavailable.has(n))) {
+        unavailable = srvSet;
+        saveUnavailableToLS(srv);
+        renderCategory(currentCategory);
+      }
     }
-  })();
+  }
+
+  // 🔁 первая попытка сразу
+  syncUnavailable();
+  // 🔁 и потом каждые 10 секунд — для телефона, который уже открыт
+  setInterval(syncUnavailable, 10000);
 
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
@@ -525,7 +530,6 @@ function OrderView(){
     }
 
     const o = res.order || { id: '—', status: 'новый', items, total };
-
     const serverTotal = typeof o.total === 'number' ? o.total : 0;
     const clientTotalBefore = typeof total === 'number' ? total : 0;
     const clientTotalFromResp = calcTotalFromItems(o);
@@ -562,7 +566,6 @@ function DashboardView(){
         </div>
       </div>
 
-      <!-- 🔴 блок для отсутствующих товаров -->
       <div class="p-4 rounded-2xl bg-white border">
         <h3 class="font-semibold mb-3">Наличие товаров</h3>
         <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне клиента товар станет серым и его нельзя будет добавить.</p>
@@ -581,7 +584,6 @@ function DashboardView(){
   let soundEnabled = false;
   const seenIds = new Set();
 
-  /* 🔴 работа с наличием в табло */
   const stockList = root.querySelector('#stockList');
   let unavailable = new Set(loadUnavailableFromLS());
 
@@ -599,7 +601,6 @@ function DashboardView(){
   }
   renderStock();
 
-  /* при открытии табло тоже пробуем подтянуть с сервера */
   (async ()=>{
     const srv = await fetchUnavailableFromServer();
     if (Array.isArray(srv)) {
@@ -612,15 +613,10 @@ function DashboardView(){
   root.querySelector('#saveStock').addEventListener('click', async ()=>{
     const checked = Array.from(stockList.querySelectorAll('input[type=checkbox]:checked'))
       .map(i=>i.value);
-    /* сохраняем в LS в любом случае */
     saveUnavailableToLS(checked);
-    /* пытаемся в Яндекс */
     const ok = await saveUnavailableToServer(checked);
-    if (ok) {
-      showToast('Наличие сохранено');
-    } else {
-      showToast('Сохранено только локально (Яндекс не ответил)');
-    }
+    if (ok) showToast('Наличие сохранено');
+    else showToast('Сохранено только локально');
     unavailable = new Set(checked);
   });
 
