@@ -162,8 +162,8 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  
-    <!-- модалка подтверждения заказа -->
+
+  <!-- модалка подтверждения заказа -->
   <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[9998]">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
       <h3 class="text-lg font-semibold">Подтвердите заказ</h3>
@@ -177,13 +177,10 @@
     </div>
   </div>
 
-
 <script>
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
-
-// 🆕 ключ для истории заказов по клиенту
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
@@ -207,7 +204,7 @@ function showToast(msg){
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function money(x){ return x + ' руб.' }
 
-// 🆕 локальное хранилище для офлайна → ID делаем не числом, а "L1"
+// офлайн-стор
 const LS_KEY = 'orders_yc_fallback_v1';
 const store = {
   load(){
@@ -220,7 +217,7 @@ const store = {
   save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
 };
 
-// === patched ycCall === (осталось как у тебя)
+// запрос к Яндекс апигейт
 async function ycCall(op, extra = {}) {
   const payload = { op, ...extra };
   try {
@@ -373,11 +370,69 @@ function saveClientHistory(clientId, list){
 }
 function addToClientHistory(clientId, order){
   const list = loadClientHistory(clientId);
-  // кладём новый в начало
   list.unshift(order);
-  // ограничим, скажем, 20 последними
   saveClientHistory(clientId, list.slice(0, 20));
 }
+
+/* ===== модалка подтверждения ===== */
+const orderConfirm = {
+  _ok: null,
+  _cancel: null,
+  open(data){
+    const wrap = document.getElementById('orderConfirmModal');
+    const list = document.getElementById('orderConfirmList');
+    const totalEl = document.getElementById('orderConfirmTotal');
+    const clientEl = document.getElementById('orderConfirmClient');
+
+    list.innerHTML = '';
+    data.items.forEach(it=>{
+      const row = document.createElement('div');
+      row.className = 'flex justify-between gap-2';
+      row.innerHTML = `<span>${it.name} ×${it.qty}</span><span>${it.price * it.qty} руб.</span>`;
+      list.appendChild(row);
+    });
+    totalEl.textContent = 'Итого: ' + data.total + ' руб.';
+    clientEl.textContent =
+      (data.client.name ? data.client.name + ' · ' : '') +
+      (data.client.phone ? data.client.phone + ' · ' : '') +
+      (data.client.address ? data.client.address : '') +
+      (data.client.deliverByTime && data.client.deliverTime ? ' · к ' + data.client.deliverTime : '');
+
+    this._ok = data.onOk || null;
+    this._cancel = data.onCancel || null;
+
+    wrap.classList.remove('hidden');
+    wrap.classList.add('flex');
+  },
+  close(){
+    const wrap = document.getElementById('orderConfirmModal');
+    wrap.classList.add('hidden');
+    wrap.classList.remove('flex');
+  }
+};
+
+// навесим обработчики один раз
+(function initConfirmModal(){
+  const wrap = document.getElementById('orderConfirmModal');
+  const btnOk = document.getElementById('orderConfirmOk');
+  const btnCancel = document.getElementById('orderConfirmCancel');
+
+  btnOk.addEventListener('click', ()=>{
+    const cb = orderConfirm._ok;
+    orderConfirm.close();
+    if (cb) cb();
+  });
+  btnCancel.addEventListener('click', ()=>{
+    const cb = orderConfirm._cancel;
+    orderConfirm.close();
+    if (cb) cb();
+  });
+  wrap.addEventListener('click', (e)=>{
+    if (e.target === wrap) {
+      orderConfirm.close();
+    }
+  });
+})();
 
 /* ===== экран клиента ===== */
 function OrderView(){
@@ -401,7 +456,6 @@ function OrderView(){
             <input type="checkbox" name="deliverByTime" />
             <span>Доставить к времени</span>
           </label>
-          <!-- 🛠 тут было "п-3" кириллицей, поменял на "p-3" -->
           <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
@@ -412,7 +466,6 @@ function OrderView(){
 
       <section id="result"></section>
 
-      <!-- 🆕 история заказов -->
       <section class="section-card">
         <h2 class="text-lg sm:text-xl font-semibold mb-3">Мои заказы</h2>
         <p class="text-sm text-gray-500 mb-3">Здесь только ваши заказы с этого устройства. Можно удалить из истории.</p>
@@ -435,10 +488,8 @@ function OrderView(){
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
-  /* 🔁 начальный список недоступных — из LS */
   let unavailable = new Set(loadUnavailableFromLS());
 
-  /* 🔁 функция, которая подхватывает с сервера и сравнивает */
   async function syncUnavailable(){
     const srv = await fetchUnavailableFromServer();
     if (Array.isArray(srv)) {
@@ -451,18 +502,14 @@ function OrderView(){
     }
   }
 
-  // 🔁 первая попытка сразу
   syncUnavailable();
-  // 🔁 и потом каждые 10 секунд
   setInterval(syncUnavailable, 10000);
 
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
       <button type="button"
               class="category-btn ${idx===0 ? 'active' : ''}"
-              data-cat="${cat.key}">
-        ${cat.title}
-      </button>
+              data-cat="${cat.key}">${cat.title}</button>
     `);
     categoryBar.appendChild(btn);
   });
@@ -546,7 +593,6 @@ function OrderView(){
     deliverTime.classList.add('hidden');
   }
 
-  // 🆕 рендер истории
   function renderHistory(){
     const list = loadClientHistory(clientId);
     myOrdersBox.innerHTML = '';
@@ -575,57 +621,48 @@ function OrderView(){
     });
   }
 
-  // 🆕 синкнемся один раз с сервера и не будем стирать локальные
+  // первый прогон истории + пробуем подтянуть с сервера
   (async ()=>{
     const res = await ycCall("list");
     if (!res.error && Array.isArray(res.orders)) {
       const mine = res.orders.filter(o => o.clientId === clientId);
       if (mine.length){
-        // добавляем только те, которых нет по localUid/id
         const local = loadClientHistory(clientId);
         const ids = new Set(local.map(x => String(x.id)));
-        const merged = [...mine.map(o => ({
-          ...o,
-          localUid: 'srv-' + o.id
-        })), ...local.filter(x => !ids.has(String(x.id)))];
+        const merged = [
+          ...mine.map(o => ({ ...o, localUid: 'srv-'+o.id })),
+          ...local.filter(x => !ids.has(String(x.id)))
+        ];
         saveClientHistory(clientId, merged.slice(0, 20));
       }
     }
     renderHistory();
   })();
 
-  // если совсем офлайн — хоть историю загрузим
   renderHistory();
 
-  form.addEventListener('submit', async (e)=>{
+  // === главное: сабмит → сначала модалка, потом реальный отправ
+  form.addEventListener('submit', (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Отправляем...';
 
+    // собрали товары
     const items = [];
     for (const cat of MENU_CATEGORIES){
       for (const item of cat.items){
         const qty = counts[item.name] || 0;
         if (qty > 0){
-          items.push({
-            name:  item.name,
-            qty:   qty,
-            price: item.price
-          });
+          items.push({ name: item.name, qty, price: item.price });
         }
       }
     }
 
     if (!items.length){
       alert('Выберите товары');
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Отправить заказ';
       return;
     }
 
     const total = recalcTotal();
-
     const payload = {
       clientId,
       name: form.name.value.trim(),
@@ -637,53 +674,79 @@ function OrderView(){
       total
     };
 
-    const res = await ycCall("create", { data: payload });
+    // показываем подтверждение
+    orderConfirm.open({
+      items,
+      total,
+      client: {
+        name: payload.name,
+        phone: payload.phone,
+        address: payload.address,
+        deliverByTime: payload.deliverByTime,
+        deliverTime: payload.deliverTime
+      },
+      onOk: async ()=>{
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Отправляем...';
 
-    // если ЛЮБАЯ ошибка — уходим в локальный режим
-    if (res.error){
-      const data = store.load();
-      const id = 'L' + (data.nextLocalId++);
-      const now = Date.now();
-      const order = { id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local', localUid: 'local-'+id };
-      data.orders.unshift(order); store.save(data);
-      addToClientHistory(clientId, order);
-      renderHistory();
-      showToast('Заказ сохранён локально (сервер недоступен)');
-      resetAll();
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Отправить заказ';
-      return;
-    }
+        const res = await ycCall("create", { data: payload });
 
-    const o = res.order || { id: '—', status: 'новый', items, total };
-    const serverTotal = typeof o.total === 'number' ? o.total : 0;
-    const clientTotalBefore = typeof total === 'number' ? total : 0;
-    const clientTotalFromResp = calcTotalFromItems(o);
-    const shownTotal = Math.max(serverTotal, clientTotalBefore, clientTotalFromResp);
-    const now = Date.now();
+        if (res.error){
+          const data = store.load();
+          const id = 'L' + (data.nextLocalId++);
+          const now = Date.now();
+          const order = { id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local', localUid: 'local-'+id };
+          data.orders.unshift(order); store.save(data);
+          addToClientHistory(clientId, order);
+          renderHistory();
+          showToast('Заказ сохранён локально (сервер недоступен)');
+          root.querySelector('#result').innerHTML = `
+            <div class="section-card mt-0">
+              <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${order.id} принят (локально).</div>
+              <div class="text-gray-700">
+                Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${order.status}</span>
+                · Итог: <b>${order.total} руб.</b>
+              </div>
+            </div>`;
+          resetAll();
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Отправить заказ';
+          return;
+        }
 
-    // 🆕 кладём в историю уже серверный
-    addToClientHistory(clientId, {
-      ...o,
-      createdAt: o.createdAt || now,
-      localUid: 'srv-'+o.id
+        const o = res.order || { id: '—', status: 'новый', items, total };
+        const serverTotal = typeof o.total === 'number' ? o.total : 0;
+        const clientTotalBefore = typeof total === 'number' ? total : 0;
+        const clientTotalFromResp = calcTotalFromItems(o);
+        const shownTotal = Math.max(serverTotal, clientTotalBefore, clientTotalFromResp);
+        const now = Date.now();
+
+        addToClientHistory(clientId, {
+          ...o,
+          createdAt: o.createdAt || now,
+          localUid: 'srv-'+o.id
+        });
+        renderHistory();
+
+        root.querySelector('#result').innerHTML = `
+          <div class="section-card mt-0">
+            <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+            <div class="text-gray-700">
+              Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
+              · Итог: <b>${shownTotal} руб.</b>
+            </div>
+          </div>`;
+
+        showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
+
+        resetAll();
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Отправить заказ';
+      },
+      onCancel: ()=>{
+        // ничего, просто закрыли
+      }
     });
-    renderHistory();
-
-    root.querySelector('#result').innerHTML = `
-      <div class="section-card mt-0">
-        <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
-        <div class="text-gray-700">
-          Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
-          · Итог: <b>${shownTotal} руб.</b>
-        </div>
-      </div>`;
-
-    showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
-
-    resetAll();
-    sendBtn.disabled = false;
-    sendBtn.textContent = 'Отправить заказ';
   });
 
   return root;
@@ -718,10 +781,7 @@ function DashboardView(){
   let audioCtx = null;
   let soundEnabled = false;
   const seenIds = new Set();
-
-  // 🆕 запомним последнюю нормальную выдачу сервера,
-  // чтобы на следующем "пустом" ответе не очищать экран
-  let lastOrdersMap = new Map();
+  let lastOrdersMap = new Map();   // чтобы не исчезало
 
   const stockList = root.querySelector('#stockList');
   let unavailable = new Set(loadUnavailableFromLS());
@@ -864,22 +924,17 @@ function DashboardView(){
     return card;
   }
 
-  // === patched list load, НЕ чистим при ошибке ===
   async function load(){
     const res = await ycCall("list");
 
     const unique = new Map();
 
-    // сначала — сервер, если он нормальный и не пустой
     if (!res.error && Array.isArray(res.orders) && res.orders.length > 0) {
       res.orders.forEach(o => unique.set(String(o.id), o));
-      // запомним как "последнее хорошее"
       lastOrdersMap = new Map(unique);
     } else if (lastOrdersMap.size > 0) {
-      // сервер тупанул → берём последнее успешное
       lastOrdersMap.forEach((v,k)=> unique.set(k,v));
     } else {
-      // и только если у нас вообще ничего нет — возьмём локальное
       const data = store.load();
       data.orders.forEach(o => unique.set(String(o.id), o));
     }
