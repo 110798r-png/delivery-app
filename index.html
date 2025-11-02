@@ -31,8 +31,8 @@
     .phone-shell{
       width: min(100vw, 540px);
       margin: 0 auto;
-      padding-left: 0.35rem;
-      padding-right: 0.35rem;
+      padding-left: 0.75rem;   /* было 0.35 */
+      padding-right: 0.75rem;  /* было 0.35 */
     }
 
     /* блок с товарами — внутренняя прокрутка только у списка */
@@ -114,6 +114,7 @@
       border: 1px solid #e5e7eb;
       padding: 1rem 1rem 1.25rem 1rem;
       width: 100%;
+      box-shadow: 0 6px 24px rgba(15,23,42,0.03);
     }
 
     @media (min-width: 640px) {
@@ -316,6 +317,7 @@ function OrderView(){
   const counts = {};
   let currentCategory = MENU_CATEGORIES[0].key;
 
+  // кнопки категорий
   MENU_CATEGORIES.forEach((cat, idx) => {
     const btn = el(`
       <button type="button"
@@ -380,12 +382,14 @@ function OrderView(){
 
   renderCategory(currentCategory);
 
+  // клик по категориям
   categoryBar.addEventListener('click', e=>{
     const btn = e.target.closest('button[data-cat]');
     if (!btn) return;
     renderCategory(btn.dataset.cat);
   });
 
+  // чекбокс "к времени"
   deliverChk.addEventListener('change', ()=>{
     deliverTime.classList.toggle('hidden', !deliverChk.checked);
     if (!deliverChk.checked) deliverTime.value='';
@@ -399,6 +403,7 @@ function OrderView(){
     deliverTime.classList.add('hidden');
   }
 
+  // отправка формы
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     if (sendBtn.disabled) return;
@@ -422,6 +427,7 @@ function OrderView(){
       return;
     }
 
+    // итоговая сумма
     const total = items.reduce((s,i)=>{
       let price = 0;
       for (const c of MENU_CATEGORIES){
@@ -431,14 +437,19 @@ function OrderView(){
       return s + price * i.qty;
     }, 0);
 
+    // делаем уникальный токен, чтобы сервер не склеивал заказы с одного телефона
+    const uniqueToken = 'o-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+
     const payload = {
       clientId: getClientId(),
+      dedupBy: uniqueToken,            // ← добавили
       name: form.name.value.trim(),
       phone: form.phone.value.trim(),
       address: form.address.value.trim(),
       deliverByTime: form.deliverByTime.checked,
       deliverTime: form.deliverTime.value || null,
-      items
+      items,
+      total                           // ← отправляем сумму
     };
 
     const res = await ycCall("create", { data: payload });
@@ -447,7 +458,7 @@ function OrderView(){
       const data = store.load();
       const id = data.nextId++;
       const now = Date.now();
-      const order = { id, ...payload, total, status:'новый', createdAt:now, updatedAt:now, _source:'local' };
+      const order = { id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local' };
       data.orders.unshift(order); store.save(data);
       showToast('Заказ сохранён локально (сервер недоступен)');
       resetAll();
@@ -493,7 +504,7 @@ function DashboardView(){
   const list = root.querySelector('#list');
   let audioCtx = null;
   let soundEnabled = false;
-  const seenIds = new Set(); // ← ЭТОГО раньше не было
+  const seenIds = new Set();
 
   function playBeep(duration = 0.35, freq = 880) {
     if (!audioCtx || !soundEnabled) return;
@@ -508,6 +519,7 @@ function DashboardView(){
     osc.stop(audioCtx.currentTime + duration);
   }
 
+  // кнопка включения звука
   root.querySelector('#enableSound').addEventListener('click', async () => {
     try {
       if (!audioCtx) {
@@ -524,6 +536,7 @@ function DashboardView(){
     }
   });
 
+  // автообновление страницы
   root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
   function orderCard(o){
@@ -628,6 +641,22 @@ function DashboardView(){
 
   load();
   setInterval(()=>{ if (location.hash === '#/dashboard') load(); }, 5000);
+
+  // 🔊 попытка включить звук автоматически
+  async function tryEnableSoundAuto() {
+    try {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      soundEnabled = true;
+      showToast("Звук включён (если браузер разрешил)");
+    } catch (e) {
+      // браузер мог не дать — ок
+    }
+  }
+  tryEnableSoundAuto();
 
   return root;
 }
