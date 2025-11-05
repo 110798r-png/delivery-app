@@ -3,99 +3,143 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>🍟 Онлайн-заказ</title>
+  <title>🍟 Онлайн-заказ (клиент + табло)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
-    html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
-    *, *::before, *::after { box-sizing:border-box; }
-    img { max-width:100%; display:block; }
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background:#f9fafb;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    img { max-width: 100%; display:block; }
+
+    .toast{
+      position:fixed; right:1rem; bottom:1rem;
+      background:#111; color:#fff;
+      padding:.75rem 1rem; border-radius:12px;
+      box-shadow:0 6px 20px rgba(0,0,0,.2);
+      opacity:.95; z-index:9999
+    }
     .hidden{ display:none }
-    .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
 
-    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px;
-      box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
-
-    /* Glass + UI */
-    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%);
-      backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
-    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
-    .sticky-top{ position:sticky; top:.5rem; z-index:40 }
-
-    /* правый хэндл истории (оставил как было) */
-    .sheet{ position:fixed; inset:0; z-index:85; background:rgba(0,0,0,.2); display:none; }
-    .sheet.open{ display:block }
-    .sheet-panel{ position:absolute; top:0; right:0; height:100%; width:min(92vw,360px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2); overflow:auto }
-    .history-handle{ position:fixed; top:40%; right:max(0, calc((100vw - 540px)/2 - 2px)); transform:translateY(-50%);
-      writing-mode:vertical-rl; text-orientation:mixed; background:#0f172a; color:#fff; border-radius:10px 0 0 10px; padding:.5rem .35rem; z-index:70; font-size:.8rem }
-
-    /* ===== фиксированный низ для оформления ===== */
-    .checkout-bar{
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: .75rem;
-      width: min(540px, 96vw);
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 1rem;
-      padding: .6rem .75rem;
-      box-shadow: 0 14px 35px rgba(15,23,42,.15);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .75rem;
-      z-index: 60;
-    }
-    .checkout-btn{
-      background:#000; color:#fff; border-radius:.9rem; padding:.75rem 1rem; font-weight:600;
+    .phone-shell{
+      width: min(100vw, 540px);
+      margin: 0 auto;
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
     }
 
-    /* внутри OrderView: собственный скролл у списка */
     #menuScroll{
+      max-height: 15.5rem;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
-    }
-    .cat-section-title{
-      font-size:.95rem; font-weight:600; margin: .25rem 0 .35rem;
+      width: 100%;
     }
 
-    /* карточки меню */
-    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:1.25rem; padding:1rem; min-height:6.4rem }
-    .menu-card.disabled{ opacity:.5 }
-    .menu-card-img{ width:110px; height:70px; border-radius:.75rem; background:#eee; object-fit:cover }
+    #menuGrid{
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      width: 100%;
+    }
+
+    .menu-card{
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #edf2f7;
+      border-radius: 1.25rem;
+      padding: 1rem;
+      min-height: 6.4rem;
+      width: 100%;
+    }
+    .menu-card-body{ flex:1 1 auto; min-width:0; }
+    .menu-card-img{
+      width: 110px;
+      height: 70px;
+      border-radius: .75rem;
+      background: #eee;
+      flex: 0 0 auto;
+      object-fit: cover;
+    }
+
+    .category-grid{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: .5rem;
+      width: 100%;
+    }
+    .category-btn{
+      width: 100%;
+      text-align: center;
+      border-radius: 9999px;
+      border: 1px solid #e5e7eb;
+      padding: .5rem .75rem;
+      font-size: .9rem;
+      background: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .category-btn.active{
+      background:#000;
+      color:#fff;
+      border-color:#000;
+    }
+    @media (max-width: 380px) {
+      .category-grid{
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+    }
+
+    input, select, textarea, button { font-size: 16px; max-width:100%; }
+
+    .section-card {
+      background: #fff;
+      border-radius: 1.5rem;
+      border: 1px solid #e5e7eb;
+      padding: 1rem 1rem 1.25rem 1rem;
+      width: 100%;
+    }
+
+    @media (min-width: 640px) {
+      .section-card { padding: 1.25rem 1.5rem 1.5rem 1.5rem; }
+    }
+
+    @media (max-width: 640px) {
+      header h1 { font-size: 1.4rem; }
+      nav { width: 100%; flex-wrap: wrap; }
+      nav > * { flex: 1 1 auto; text-align: center; }
+    }
+
+    .menu-card.disabled {
+      opacity: .5;
+    }
+    .menu-card.disabled small {
+      display: block;
+      margin-top: .35rem;
+      color: #b91c1c;
+      font-size: .7rem;
+    }
   </style>
 </head>
 <body>
   <div class="w-full py-6">
-    <!-- Header -->
-    <header class="phone-shell flex items-center justify-between mb-4 sm:mb-6 gap-3">
-      <div class="flex items-center gap-3">
-        <button id="burgerBtn" class="px-3 py-2 rounded-xl border" aria-label="menu">☰</button>
-        <h1 class="text-xl sm:text-2xl font-bold">🍟 Онлайн-заказ</h1>
-      </div>
+    <header class="phone-shell flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
+      <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">🍟 Онлайн-заказ</h1>
       <nav class="flex gap-2 items-center">
-        <!-- меню-бургер (drawer) открывается слева -->
+        <a id="toClient" href="#/order" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Клиент</a>
+        <button id="openDashboard" type="button" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Табло</button>
+        <button id="hardRefresh" type="button" class="px-3 py-2 rounded-xl border text-sm sm:text-base">Обновить</button>
       </nav>
     </header>
 
-    <!-- Drawer -->
-    <div id="drawer" class="drawer" style="position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.35); display:none;">
-      <div class="drawer-panel" style="position:absolute; top:0; left:0; height:100%; width:min(88vw,320px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2)">
-        <div class="flex items-center justify-between mb-3">
-          <div class="text-lg font-semibold">Меню</div>
-          <button id="drawerClose" class="px-2 py-1 rounded-lg border">✕</button>
-        </div>
-        <div class="grid gap-2">
-          <a href="#/profile" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Личный кабинет</a>
-          <button id="drawerPay" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Способ оплаты</button>
-          <button id="drawerLegal" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Юридическая информация</button>
-          <a href="tel:+798989932108" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Техподдержка: +7 989 899 32 108</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pin modal (tablo) -->
     <div id="pinModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
       <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow">
         <h3 class="text-lg font-semibold mb-3">Вход в табло</h3>
@@ -109,15 +153,18 @@
       </div>
     </div>
 
-    <!-- Screens -->
     <main id="app" class="phone-shell"></main>
+
+    <p class="mt-6 text-sm text-gray-500 phone-shell">
+      Данные клиента сохраняются локально и отправляются на сервер в Яндекс Cloud.
+      Табло обновляется каждые 5 секунд.
+    </p>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Order confirm modal -->
-  <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99]">
+  <!-- модалка подтверждения заказа -->
+  <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[9998]">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
       <h3 class="text-lg font-semibold">Подтвердите заказ</h3>
       <div id="orderConfirmList" class="space-y-2 text-sm"></div>
@@ -130,479 +177,590 @@
     </div>
   </div>
 
-  <!-- Payment modal -->
-  <div id="paymentModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[98]">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-lg space-y-3">
-      <h3 class="text-lg font-semibold">Способ оплаты</h3>
-      <div class="grid gap-2">
-        <button data-pay="cash" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Наличные</button>
-        <button data-pay="card" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Банковская карта</button>
-        <button data-pay="transfer" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Перевод</button>
-      </div>
-      <div class="flex justify-end pt-1">
-        <button id="paymentClose" class="px-3 py-2 rounded-xl border">Закрыть</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right history sheet -->
-  <button id="historyHandle" class="history-handle">История</button>
-  <div id="historySheet" class="sheet">
-    <div class="sheet-panel">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-lg font-semibold">Мои заказы</h3>
-        <button id="historyClose" class="px-2 py-1 rounded-lg border">✕</button>
-      </div>
-      <div id="historyList" class="grid gap-2"></div>
-    </div>
-  </div>
-
 <script>
-/* ===== Config ===== */
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
-const PROFILE_LS_KEY = 'client_profile_v1';
 
 if (!location.hash || location.hash === "#/" || location.hash === "#") {
-  location.hash = "#/home";
+  location.hash = "#/order";
 }
 
-/* ===== Helpers ===== */
-function getClientId(){
-  const KEY='yc_client_id_v1';
-  let cid=localStorage.getItem(KEY);
-  if(!cid){ cid='cid-'+Math.random().toString(36).slice(2)+Date.now(); localStorage.setItem(KEY,cid); }
+function getClientId() {
+  const KEY = 'yc_client_id_v1';
+  let cid = localStorage.getItem(KEY);
+  if (!cid) {
+    cid = 'cid-' + Math.random().toString(36).slice(2) + Date.now();
+    localStorage.setItem(KEY, cid);
+  }
   return cid;
 }
-function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500); }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.remove('hidden');
+  setTimeout(()=> t.classList.add('hidden'), 2500);
+}
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
-function money(x){ return x+' руб.' }
+function money(x){ return x + ' руб.' }
 
-function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_KEY))||{} }catch{ return {} } }
-function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})) }
+// офлайн-стор
+const LS_KEY = 'orders_yc_fallback_v1';
+const store = {
+  load(){
+    try{
+      return JSON.parse(localStorage.getItem(LS_KEY)) || {orders:[], nextLocalId:1};
+    }catch{
+      return {orders:[], nextLocalId:1};
+    }
+  },
+  save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+};
 
-/* offline store */
-const LS_KEY='orders_yc_fallback_v1';
-const store={ load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{orders:[], nextLocalId:1} }catch{ return {orders:[], nextLocalId:1} } },
-              save(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)) } };
+// запрос к Яндекс апигейт
+async function ycCall(op, extra = {}) {
+  const payload = { op, ...extra };
+  try {
+    const res = await fetch(API_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-/* API */
-async function ycCall(op, extra={}){
-  const payload={ op, ...extra };
-  try{
-    const res=await fetch(API_BASE,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
-    const text=await res.text(); let data={}; if(text){ try{ data=JSON.parse(text) }catch{ return {error:"bad-json", status:res.status, raw:text} } }
-    if(!res.ok) return { error:"http", status:res.status, data };
+    const text = await res.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        return { error: "bad-json", status: res.status, raw: text };
+      }
+    }
+
+    if (!res.ok) {
+      return { error: "http", status: res.status, data };
+    }
+
     return data;
-  }catch(e){ return { error:"network", message:e.message } }
+  } catch (e) {
+    console.warn("YC network error:", e);
+    return { error: "network", message: e.message };
+  }
 }
 
-/* Menu data */
+/* меню */
 const MENU_CATEGORIES = [
-  { key:'burgers', title:'Бургеры', items:[
-    { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
-    { name:'Говяжий двойной', price:340, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-    { name:'Куриный бургер', price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
-    { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
-  ]},
-  { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 } ]},
-  { key:'drinks', title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 }, { name:'Банановый раф', price:180 }, { name:'Чай чёрный', price:70 } ]},
-  { key:'sushi', title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'potato', title:'Картошка', items:[ { name:'Фри маленький', price:150 }, { name:'Фри большой', price:180 }, { name:'По-деревенски маленький', price:160 }, { name:'По-деревенски большой', price:200 } ]},
-  { key:'semi', title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
+  {
+    key: 'burgers',
+    title: 'Бургеры',
+    items: [
+      { name: 'Говяжий бургер',  price: 280, img: 'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+      { name: 'Говяжий двойной', price: 340, img: 'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+      { name: 'Куриный бургер',  price: 200, img: 'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+      { name: 'Куриный двойной', price: 250, img: 'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
+    ]
+  },
+  {
+    key: 'twisters',
+    title: 'Твистеры',
+    items: [
+      { name: 'Твистер обычный', price: 200 },
+      { name: 'Твистер макс',    price: 250 },
+    ]
+  },
+  {
+    key: 'drinks',
+    title: 'Напитки',
+    items: [
+      { name: 'Добрый кола',      price: 100 },
+      { name: 'Добрый апельсин',  price: 100 },
+      { name: 'Спрайт',           price: 100 },
+      { name: 'Эспрессо',         price: 120 },
+      { name: 'Банановый раф',    price: 180 },
+      { name: 'Чай чёрный',       price: 70  },
+    ]
+  },
+  {
+    key: 'sushi',
+    title: 'Суши / роллы',
+    items: [
+      { name: 'Калифорния',  price: 350 },
+      { name: 'Филадельфия', price: 390 },
+      { name: 'Аляска',      price: 350 },
+    ]
+  },
+  {
+    key: 'potato',
+    title: 'Картошка',
+    items: [
+      { name: 'Фри маленький',             price: 150 },
+      { name: 'Фри большой',               price: 180 },
+      { name: 'По-деревенски маленький',   price: 160 },
+      { name: 'По-деревенски большой',     price: 200 },
+    ]
+  },
+  {
+    key: 'semi',
+    title: 'Полуфабрикаты',
+    items: [
+      { name: 'Наггетсы 6 шт.', price: 160 },
+      { name: 'Наггетсы 9 шт.', price: 210 },
+      { name: 'Стрипсы',        price: 190 },
+    ]
+  },
 ];
 
-function findPriceByName(name){ for(const cat of MENU_CATEGORIES){ const f=cat.items.find(i=>i.name===name); if(f) return f.price } return 0 }
-function calcTotalFromItems(order){ let sum=0; (order.items||[]).forEach(i=>{ const p=typeof i.price==='number'?i.price:findPriceByName(i.name); sum += p*(i.qty||0) }); return sum }
+const ALL_ITEMS = MENU_CATEGORIES.flatMap(cat =>
+  cat.items.map(it => ({ name: it.name, cat: cat.key }))
+);
 
-/* unavailable */
-async function fetchUnavailableFromServer(){ const res=await ycCall("getUnavailable",{}); if(!res.error && res && Array.isArray(res.items)) return res.items; return null }
-async function saveUnavailableToServer(items){ const res=await ycCall("setUnavailable",{items}); return !res.error }
-function loadUnavailableFromLS(){ try{ const raw=localStorage.getItem(UNAVAILABLE_LS_KEY); if(!raw) return []; const arr=JSON.parse(raw); return Array.isArray(arr)?arr:[] }catch{ return [] } }
-function saveUnavailableToLS(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(items)) }
+function findPriceByName(name){
+  for (const cat of MENU_CATEGORIES){
+    const f = cat.items.find(i => i.name === name);
+    if (f) return f.price;
+  }
+  return 0;
+}
 
-/* client history */
-function loadClientHistory(clientId){ try{ const all=JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||{}; return Array.isArray(all[clientId])?all[clientId]:[] }catch{ return [] } }
-function saveClientHistory(clientId, list){ const all=(()=>{ try{ return JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||{} }catch{ return {} } })(); all[clientId]=list; localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(all)) }
-function addToClientHistory(clientId, order){ const list=loadClientHistory(clientId); list.unshift(order); saveClientHistory(clientId, list.slice(0,20)) }
+function calcTotalFromItems(order){
+  let sum = 0;
+  (order.items || []).forEach(i => {
+    const p = typeof i.price === 'number' ? i.price : findPriceByName(i.name);
+    sum += p * (i.qty || 0);
+  });
+  return sum;
+}
 
-/* confirm modal */
-const orderConfirm={ _ok:null,_cancel:null,
+/* ===== недоступные товары ===== */
+async function fetchUnavailableFromServer(){
+  const res = await ycCall("getUnavailable", {});
+  if (!res.error && res && Array.isArray(res.items)) return res.items;
+  return null;
+}
+async function saveUnavailableToServer(items){
+  const res = await ycCall("setUnavailable", { items });
+  return !res.error;
+}
+function loadUnavailableFromLS(){
+  try {
+    const raw = localStorage.getItem(UNAVAILABLE_LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr;
+    return [];
+  } catch(e){ return []; }
+}
+function saveUnavailableToLS(items){
+  localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(items));
+}
+
+/* ===== история по клиенту ===== */
+function loadClientHistory(clientId){
+  try{
+    const all = JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY)) || {};
+    return Array.isArray(all[clientId]) ? all[clientId] : [];
+  }catch{
+    return [];
+  }
+}
+function saveClientHistory(clientId, list){
+  const all = (()=>{ try { return JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY)) || {}; } catch { return {}; } })();
+  all[clientId] = list;
+  localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(all));
+}
+function addToClientHistory(clientId, order){
+  const list = loadClientHistory(clientId);
+  list.unshift(order);
+  saveClientHistory(clientId, list.slice(0, 20));
+}
+
+/* ===== модалка подтверждения ===== */
+const orderConfirm = {
+  _ok: null,
+  _cancel: null,
   open(data){
-    const wrap=document.getElementById('orderConfirmModal');
-    const list=document.getElementById('orderConfirmList');
-    const totalEl=document.getElementById('orderConfirmTotal');
-    const clientEl=document.getElementById('orderConfirmClient');
-    list.innerHTML='';
+    const wrap = document.getElementById('orderConfirmModal');
+    const list = document.getElementById('orderConfirmList');
+    const totalEl = document.getElementById('orderConfirmTotal');
+    const clientEl = document.getElementById('orderConfirmClient');
+
+    list.innerHTML = '';
     data.items.forEach(it=>{
-      const row=document.createElement('div');
-      row.className='flex justify-between gap-2';
-      row.innerHTML=`<span>${it.name} ×${it.qty}</span><span>${it.price*it.qty} руб.</span>`;
+      const row = document.createElement('div');
+      row.className = 'flex justify-between gap-2';
+      row.innerHTML = `<span>${it.name} ×${it.qty}</span><span>${it.price * it.qty} руб.</span>`;
       list.appendChild(row);
     });
-    totalEl.textContent='Итого: '+data.total+' руб.';
-    const p = data.client||{};
-    clientEl.textContent = (p.name? p.name+' · ':'')+(p.phone? p.phone+' · ':'')+(p.address||'')+(p.paymentMethod? ' · '+nicePay(p.paymentMethod):'');
-    this._ok=data.onOk||null; this._cancel=data.onCancel||null;
-    wrap.classList.remove('hidden'); wrap.classList.add('flex');
+    totalEl.textContent = 'Итого: ' + data.total + ' руб.';
+    clientEl.textContent =
+      (data.client.name ? data.client.name + ' · ' : '') +
+      (data.client.phone ? data.client.phone + ' · ' : '') +
+      (data.client.address ? data.client.address : '') +
+      (data.client.deliverByTime && data.client.deliverTime ? ' · к ' + data.client.deliverTime : '');
+
+    this._ok = data.onOk || null;
+    this._cancel = data.onCancel || null;
+
+    wrap.classList.remove('hidden');
+    wrap.classList.add('flex');
   },
-  close(){ const wrap=document.getElementById('orderConfirmModal'); wrap.classList.add('hidden'); wrap.classList.remove('flex') }
+  close(){
+    const wrap = document.getElementById('orderConfirmModal');
+    wrap.classList.add('hidden');
+    wrap.classList.remove('flex');
+  }
 };
-(function(){
-  const wrap=document.getElementById('orderConfirmModal');
-  document.getElementById('orderConfirmOk').onclick=()=>{ const cb=orderConfirm._ok; orderConfirm.close(); if(cb) cb() };
-  document.getElementById('orderConfirmCancel').onclick=()=>{ const cb=orderConfirm._cancel; orderConfirm.close(); if(cb) cb() };
-  wrap.addEventListener('click',(e)=>{ if(e.target===wrap) orderConfirm.close() });
+
+// навесим обработчики один раз
+(function initConfirmModal(){
+  const wrap = document.getElementById('orderConfirmModal');
+  const btnOk = document.getElementById('orderConfirmOk');
+  const btnCancel = document.getElementById('orderConfirmCancel');
+
+  btnOk.addEventListener('click', ()=>{
+    const cb = orderConfirm._ok;
+    orderConfirm.close();
+    if (cb) cb();
+  });
+  btnCancel.addEventListener('click', ()=>{
+    const cb = orderConfirm._cancel;
+    orderConfirm.close();
+    if (cb) cb();
+  });
+  wrap.addEventListener('click', (e)=>{
+    if (e.target === wrap) {
+      orderConfirm.close();
+    }
+  });
 })();
 
-/* payment modal */
-function nicePay(k){ return k==='cash'?'Наличные':k==='card'?'Банковская карта':k==='transfer'?'Перевод':'' }
-function openPaymentModal(updateLabel){
-  const wrap=document.getElementById('paymentModal');
-  const close=document.getElementById('paymentClose');
-  wrap.classList.remove('hidden'); wrap.classList.add('flex');
-  function setPay(k){ const cur=loadProfile(); cur.paymentMethod=k; saveProfile(cur); if(updateLabel) updateLabel(nicePay(k)); wrap.classList.add('hidden'); wrap.classList.remove('flex') }
-  wrap.querySelector('[data-pay="cash"]').onclick=()=>setPay('cash');
-  wrap.querySelector('[data-pay="card"]').onclick=()=>setPay('card');
-  wrap.querySelector('[data-pay="transfer"]').onclick=()=>setPay('transfer');
-  close.onclick=()=>{ wrap.classList.add('hidden'); wrap.classList.remove('flex') };
-  wrap.onclick=(e)=>{ if(e.target===wrap) close.onclick() };
-}
-
-/* ===== Views ===== */
-function HomeView(){
-  const root=el(`
-    <div class="grid gap-6 pb-24">
-      <section class="glass-panel rounded-2xl p-6 mt-2 flex flex-col items-center text-center">
-        <div class="text-3xl">🍔</div>
-        <h2 class="text-xl font-semibold mt-2">Добро пожаловать!</h2>
-        <p class="text-sm text-gray-600 mt-1">Онлайн-заказ в пару кликов</p>
-        <button class="mt-4 px-4 py-3 rounded-xl bg-black text-white" id="goMenu">Перейти к меню</button>
-      </section>
-
-      <section class="rounded-2xl p-6 bg-white border">
-        <h3 class="font-semibold mb-2">О нас</h3>
-        <p class="text-sm text-gray-600">Логотип и коллаж добавим позже. Выберите блюда, оформите заказ — остальное мы сделаем сами.</p>
-      </section>
-
-      <footer class="rounded-2xl p-6 bg-white border">
-        <h3 class="font-semibold mb-3">Контакты и юридическая информация</h3>
-        <div class="grid gap-2">
-          <a href="tel:+798989932108" class="px-3 py-2 rounded-xl border hover:bg-gray-50 w-full text-left">Техподдержка: +7 989 899 32 108</a>
-          <button id="legalBtn" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-left">Юридическая информация</button>
-          <button id="devBtn" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-left">Сотрудничество с разработчиком</button>
-          <div class="text-xs text-gray-500 mt-2">Дата создания веб-приложения: 2025</div>
-
-          <div class="border-t my-3"></div>
-          <div class="text-xs text-gray-500">Быстрые ссылки:</div>
-          <div class="flex flex-wrap gap-2">
-            <a href="#/order" class="px-3 py-2 rounded-xl border text-sm">Клиент</a>
-            <button id="tabloOpen" class="px-3 py-2 rounded-xl border text-sm">Табло</button>
-          </div>
-        </div>
-      </footer>
-
-      <div class="checkout-bar" style="position:static; transform:none; width:100%; border-style:dashed; opacity:.85">
-        <div class="text-sm text-gray-500">Нижняя плашка оформления показывается только на экране «Меню»</div>
-      </div>
-    </div>
-  `);
-
-  root.querySelector('#goMenu').onclick=()=>{ location.hash='#/order' };
-  root.querySelector('#legalBtn').onclick=()=> alert('Здесь будет юридическая информация');
-  root.querySelector('#devBtn').onclick=()=> alert('Почта разработчика: sabirbis@bk.ru');
-  root.querySelector('#tabloOpen').onclick=()=> showPin();
-
-  return root;
-}
-
-/* Личный кабинет */
-function ProfileView(){
-  const prof=Object.assign({ name:'', phone:'', address:'', deliverByTime:false, deliverTime:'', paymentMethod:'' }, loadProfile());
-  const root=el(`
-    <div class="grid gap-6 pb-24">
-      <section class="glass-panel rounded-2xl p-5">
-        <h2 class="text-lg font-semibold mb-3">Личный кабинет</h2>
-        <div class="grid gap-3">
-          <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${prof.name||''}">
-          <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${prof.phone||''}">
-          <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${prof.address||''}">
-          <label class="flex items-center gap-3">
-            <input id="pByTime" type="checkbox" ${prof.deliverByTime?'checked':''}>
-            <span>Доставлять к времени</span>
-          </label>
-          <input id="pTime" class="border rounded-xl p-3 ${prof.deliverByTime?'':'hidden'}" type="time" value="${prof.deliverTime||''}">
-          <div class="flex items-center justify-between gap-3">
-            <div class="text-sm text-gray-600">Способ оплаты: <b id="pPayVal">${prof.paymentMethod? nicePay(prof.paymentMethod):'не выбран'}</b></div>
-            <button id="pPayBtn" class="px-3 py-2 rounded-xl border">Выбрать</button>
-          </div>
-          <button id="pSave" class="px-4 py-3 rounded-xl border bg-black text-white">Сохранить</button>
-        </div>
-      </section>
-
-      <section class="glass-panel rounded-2xl p-5">
-        <h3 class="text-lg font-semibold mb-3">История заказов</h3>
-        <div id="pHistory" class="grid gap-2"></div>
-      </section>
-    </div>
-  `);
-
-  const pName=root.querySelector('#pName'), pPhone=root.querySelector('#pPhone'), pAddr=root.querySelector('#pAddr');
-  const pByTime=root.querySelector('#pByTime'), pTime=root.querySelector('#pTime'), pPayVal=root.querySelector('#pPayVal');
-
-  pByTime.addEventListener('change', ()=>{ pTime.classList.toggle('hidden', !pByTime.checked); if(!pByTime.checked) pTime.value='' });
-  root.querySelector('#pPayBtn').onclick=()=> openPaymentModal((txt)=> pPayVal.textContent=txt||'не выбран');
-  root.querySelector('#pSave').onclick=()=>{
-    saveProfile({ name:pName.value.trim(), phone:pPhone.value.trim(), address:pAddr.value.trim(),
-      deliverByTime:pByTime.checked, deliverTime:pTime.value||'', paymentMethod:(loadProfile().paymentMethod||'') });
-    showToast('Профиль сохранён');
-  };
-
-  // история
-  const clientId=getClientId(); const box=root.querySelector('#pHistory');
-  const hist=loadClientHistory(clientId);
-  if(!hist.length) box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>';
-  hist.forEach(o=>{
-    const tot=typeof o.total==='number'?o.total:calcTotalFromItems(o);
-    const card=el(`
-      <div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white">
-        <div>
-          <div class="text-sm font-semibold">#${o.id||'—'} ${o.status? '· '+o.status:''}</div>
-          <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-          <div class="text-sm mt-1">${tot? tot+' руб.':''}</div>
-        </div>
-        <button type="button" class="text-xs text-red-500" data-del>Удалить</button>
-      </div>`);
-    card.querySelector('[data-del]').onclick=()=>{ const cur=loadClientHistory(clientId).filter(x=>x.localUid!==o.localUid); saveClientHistory(clientId,cur); card.remove() };
-    box.appendChild(card);
-  });
-
-  return root;
-}
-
-/* ===== Экран Меню: ВНУТРЕННИЙ СКРОЛЛ + синхронизация категорий + фиксированный низ ===== */
+/* ===== экран клиента ===== */
 function OrderView(){
-  const root=el(`
-    <div class="relative" id="orderRoot">
-      <!-- Категории -->
-      <section class="sticky-top mb-3">
-        <div class="glass-panel rounded-2xl px-3 py-3">
-          <h2 class="text-base font-semibold mb-2">🥘 Меню</h2>
-          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+  const root = el(`
+    <div class="grid gap-4 sm:gap-6">
+      <section class="section-card">
+        <h2 class="text-lg sm:text-xl font-semibold mb-3">Меню</h2>
+        <div id="categoryBar" class="category-grid mb-3"></div>
+        <div id="menuScroll">
+          <div id="menuGrid"></div>
         </div>
       </section>
 
-      <!-- ВНУТРЕННИЙ скролл списка -->
-      <section>
-        <div id="menuScroll" class="no-scrollbar">
-          <div id="menuSections" class="grid gap-3"></div>
-        </div>
+      <section class="section-card">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Данные доставки</h2>
+        <form class="grid gap-4" id="orderForm">
+          <input class="border rounded-xl p-3" placeholder="Имя" name="name" required />
+          <input class="border rounded-xl p-3" placeholder="Телефон (например +7...)" name="phone" required />
+          <input class="border rounded-xl p-3" placeholder="Адрес доставки" name="address" required />
+          <label class="flex items-center gap-3">
+            <input type="checkbox" name="deliverByTime" />
+            <span>Доставить к времени</span>
+          </label>
+          <input class="border rounded-xl p-3 hidden" type="time" name="deliverTime" />
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="text-lg"><span class="font-semibold">Итого:</span> <span id="total">0 руб.</span></div>
+            <button id="sendBtn" class="px-4 py-3 rounded-xl border bg-black text-white w-full sm:w-auto" type="submit">Отправить заказ</button>
+          </div>
+        </form>
       </section>
 
-      <!-- Фиксированный низ оформления -->
-      <div class="checkout-bar" id="checkoutBar">
-        <div class="text-base"><span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b></div>
-        <button id="checkoutBtn" class="checkout-btn">Отправить заказ</button>
-      </div>
+      <section id="result"></section>
+
+      <section class="section-card">
+        <h2 class="text-lg sm:text-xl font-semibold mb-3">Мои заказы</h2>
+        <p class="text-sm text-gray-500 mb-3">Здесь только ваши заказы с этого устройства. Можно удалить из истории.</p>
+        <div id="myOrders" class="grid gap-2"></div>
+      </section>
     </div>
   `);
 
-  const categoryBar=root.querySelector('#categoryBar');
-  const menuScroll=root.querySelector('#menuScroll');
-  const sections=root.querySelector('#menuSections');
-  const totalVal=root.querySelector('#totalVal');
-  const checkoutBtn=root.querySelector('#checkoutBtn');
+  const categoryBar = root.querySelector('#categoryBar');
+  const menuGrid    = root.querySelector('#menuGrid');
+  const form        = root.querySelector('#orderForm');
+  const totalEl     = root.querySelector('#total');
+  const deliverChk  = form.deliverByTime;
+  const deliverTime = form.deliverTime;
+  const sendBtn     = root.querySelector('#sendBtn');
+  const myOrdersBox = root.querySelector('#myOrders');
 
-  const clientId=getClientId();
-  const counts={};
-  let unavailable=new Set(loadUnavailableFromLS());
-  let activeKey = MENU_CATEGORIES[0].key;
+  const clientId = getClientId();
 
-  // высота для внутреннего скролла: заполним оставшееся место между заголовком и плашкой
-  function fitHeights(){
-    const rectRoot = root.getBoundingClientRect();
-    const headerH = root.querySelector('.sticky-top').getBoundingClientRect().height;
-    const barH = root.querySelector('#checkoutBar').getBoundingClientRect().height + 12; // + отступ
-    const available = window.innerHeight - (rectRoot.top + headerH + barH + 12);
-    menuScroll.style.maxHeight = Math.max(220, available) + 'px';
-    menuScroll.style.height = menuScroll.style.maxHeight;
-  }
-  window.addEventListener('resize', fitHeights);
-  setTimeout(fitHeights, 0);
+  const counts = {};
+  let currentCategory = MENU_CATEGORIES[0].key;
 
-  // sync unavailable
+  let unavailable = new Set(loadUnavailableFromLS());
+
   async function syncUnavailable(){
-    const srv=await fetchUnavailableFromServer();
-    if(Array.isArray(srv)){
-      const srvSet=new Set(srv);
-      if(srv.length!==unavailable.size || srv.some(n=>!unavailable.has(n))){
-        unavailable=srvSet; saveUnavailableToLS(srv); renderSections();
+    const srv = await fetchUnavailableFromServer();
+    if (Array.isArray(srv)) {
+      const srvSet = new Set(srv);
+      if (srv.length !== unavailable.size || srv.some(n => !unavailable.has(n))) {
+        unavailable = srvSet;
+        saveUnavailableToLS(srv);
+        renderCategory(currentCategory);
       }
     }
   }
-  syncUnavailable(); setInterval(syncUnavailable, 10000);
 
-  // чипсы категорий
-  MENU_CATEGORIES.forEach((cat,idx)=>{
-    const btn=el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-cat="${cat.key}">${cat.title}</button>`);
+  syncUnavailable();
+  setInterval(syncUnavailable, 10000);
+
+  MENU_CATEGORIES.forEach((cat, idx) => {
+    const btn = el(`
+      <button type="button"
+              class="category-btn ${idx===0 ? 'active' : ''}"
+              data-cat="${cat.key}">${cat.title}</button>
+    `);
     categoryBar.appendChild(btn);
   });
 
-  // рендер секций — все категории подряд
-  function renderSections(){
-    sections.innerHTML='';
-    MENU_CATEGORIES.forEach(cat=>{
-      const sec = el(`<div id="sec-${cat.key}"></div>`);
-      // название секции визуально скрываем? оставим мелким шрифтом
-      sec.appendChild(el(`<div class="cat-section-title">${cat.title}</div>`));
-
-      cat.items.forEach(item=>{
-        const q=counts[item.name]||0; const isOff=unavailable.has(item.name);
-        const card=el(`
-          <div class="menu-card ${isOff?'disabled':''}">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <div class="text-sm sm:text-base font-medium">${item.name}</div>
-                ${isOff?'<span class="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full">нет</span>':''}
-              </div>
-              <div class="inline-flex items-center mt-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${money(item.price)}</div>
-              <div class="flex items-center gap-3 mt-3">
-                <button type="button" class="w-9 h-9 rounded-xl border" data-act="dec" ${isOff?'disabled':''}>−</button>
-                <div class="w-6 text-center" data-q>${q}</div>
-                <button type="button" class="w-9 h-9 rounded-xl border bg-black text-white" data-act="inc" ${isOff?'disabled':''}>+</button>
-              </div>
-            </div>
-            <img src="${item.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
-          </div>
-        `);
-        const qEl=card.querySelector('[data-q]');
-        card.addEventListener('click',(e)=>{
-          if(isOff){ showToast('Этот товар недоступен'); return; }
-          if(e.target.dataset.act==='inc'){ counts[item.name]=(counts[item.name]||0)+1; qEl.textContent=counts[item.name]; recalcTotal(); }
-          if(e.target.dataset.act==='dec'){ counts[item.name]=Math.max(0,(counts[item.name]||0)-1); qEl.textContent=counts[item.name]; recalcTotal(); }
-        });
-        sec.appendChild(card);
-      });
-
-      sections.appendChild(sec);
-    });
-    // пересчёт высоты после рендера
-    setTimeout(fitHeights, 0);
-    // обновим подсветку
-    highlightActiveChip(activeKey);
-    buildObservers();
-  }
-
   function recalcTotal(){
-    let sum=0;
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{
-      const q=counts[item.name]||0; sum += item.price*q;
-    }));
-    totalVal.textContent = money(sum);
+    let sum = 0;
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const q = counts[item.name] || 0;
+        sum += item.price * q;
+      }
+    }
+    totalEl.textContent = money(sum);
     return sum;
   }
 
-  // клик по чипсам → скроллим внутренний контейнер до секции
-  categoryBar.addEventListener('click',(e)=>{
-    const btn=e.target.closest('button[data-cat]'); if(!btn) return;
-    const key=btn.dataset.cat;
-    const sec = sections.querySelector('#sec-'+key);
-    if(sec){
-      menuScroll.scrollTo({ top: sec.offsetTop, behavior: 'smooth' });
-      activeKey = key;
-      highlightActiveChip(key);
-    }
-  });
-
-  function highlightActiveChip(key){
+  function renderCategory(catKey){
+    currentCategory = catKey;
     categoryBar.querySelectorAll('button').forEach(b=>{
-      const on = b.dataset.cat === key;
-      b.classList.toggle('bg-black', on);
-      b.classList.toggle('text-white', on);
-      b.classList.toggle('border-black', on);
+      b.classList.toggle('active', b.dataset.cat === catKey);
     });
-  }
-
-  // === синхронизация при прокрутке (IntersectionObserver с root=menuScroll)
-  let io=null;
-  function buildObservers(){
-    if(io){ io.disconnect(); }
-    io = new IntersectionObserver((entries)=>{
-      // берём самую видимую секцию
-      let best=null, bestRatio=0;
-      entries.forEach(ent=>{
-        if(ent.isIntersecting && ent.intersectionRatio>bestRatio){
-          best=ent; bestRatio=ent.intersectionRatio;
+    const cat = MENU_CATEGORIES.find(c=>c.key===catKey);
+    menuGrid.innerHTML = '';
+    cat.items.forEach(item=>{
+      const q = counts[item.name] || 0;
+      const isOff = unavailable.has(item.name);
+      const card = el(`
+        <div class="menu-card ${isOff ? 'disabled' : ''}">
+          <div class="menu-card-body">
+            <div class="text-base sm:text-lg font-medium">${item.name}</div>
+            <div class="inline-flex items-center mt-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${money(item.price)}</div>
+            <div class="flex items-center gap-3 mt-3">
+              <button type="button" class="w-9 h-9 rounded-xl border flex items-center justify-center" data-act="dec" ${isOff?'disabled':''}>−</button>
+              <div class="w-6 text-center" data-q>${q}</div>
+              <button type="button" class="w-9 h-9 rounded-xl border bg-black text-white flex items-center justify-center" data-act="inc" ${isOff?'disabled':''}>+</button>
+            </div>
+            ${isOff ? '<small>нет в наличии</small>' : ''}
+          </div>
+          <img src="${item.img || 'https://placehold.co/110x70?text=food'}" alt="" class="menu-card-img">
+        </div>
+      `);
+      const qEl = card.querySelector('[data-q]');
+      card.addEventListener('click', e=>{
+        if (isOff) {
+          showToast('Этот товар сейчас нет в наличии');
+          return;
+        }
+        if (e.target.dataset.act === 'inc'){
+          counts[item.name] = (counts[item.name] || 0) + 1;
+          qEl.textContent = counts[item.name];
+          recalcTotal();
+        }
+        if (e.target.dataset.act === 'dec'){
+          counts[item.name] = Math.max(0, (counts[item.name] || 0) - 1);
+          qEl.textContent = counts[item.name];
+          recalcTotal();
         }
       });
-      if(best){
-        const id = best.target.id; // "sec-KEY"
-        const key = id.replace(/^sec-/,'');
-        if(key && key!==activeKey){
-          activeKey=key;
-          highlightActiveChip(key);
-        }
-      }
-    }, { root: menuScroll, threshold:[0.15,0.3,0.6] });
-
-    sections.querySelectorAll('[id^="sec-"]').forEach(sec=> io.observe(sec));
+      menuGrid.appendChild(card);
+    });
   }
 
-  // оформление — берём данные из профиля, как и раньше
-  checkoutBtn.addEventListener('click', async ()=>{
-    // собрать позиции
-    const items=[];
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{
-      const qty=counts[item.name]||0; if(qty>0) items.push({ name:item.name, qty, price:item.price });
-    }));
-    if(!items.length){ showToast('Выберите товары'); return; }
-    const total = recalcTotal();
+  renderCategory(currentCategory);
 
-    const prof = loadProfile();
-    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль (имя, телефон, адрес)'); location.hash='#/profile'; return; }
-    if(!prof.paymentMethod){ showToast('Выберите способ оплаты в профиле'); location.hash='#/profile'; return; }
+  categoryBar.addEventListener('click', e=>{
+    const btn = e.target.closest('button[data-cat]');
+    if (!btn) return;
+    renderCategory(btn.dataset.cat);
+  });
 
-    const payload={ clientId:getClientId(), name:prof.name, phone:prof.phone, address:prof.address,
-      deliverByTime:!!prof.deliverByTime, deliverTime:prof.deliverTime||null, paymentMethod:prof.paymentMethod, items, total };
+  deliverChk.addEventListener('change', ()=>{
+    deliverTime.classList.toggle('hidden', !deliverChk.checked);
+    if (!deliverChk.checked) deliverTime.value='';
+  });
 
-    orderConfirm.open({
-      items, total, client:prof,
-      onOk: async ()=>{
-        checkoutBtn.disabled=true;
+  function resetAll(){
+    for (const key in counts) delete counts[key];
+    renderCategory(currentCategory);
+    totalEl.textContent = '0 руб.';
+    form.reset();
+    deliverTime.classList.add('hidden');
+  }
 
-        const res=await ycCall("create",{ data:payload });
-        if(res.error){
-          const data=store.load(); const id='L'+(data.nextLocalId++); const now=Date.now();
-          const order={ id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local', localUid:'local-'+id };
-          data.orders.unshift(order); store.save(data); addToClientHistory(clientId, order); renderHistoryGlobal();
-          showToast('Заказ сохранён локально (сервер недоступен)'); resetCounts(); checkoutBtn.disabled=false; return;
+  function renderHistory(){
+    const list = loadClientHistory(clientId);
+    myOrdersBox.innerHTML = '';
+    if (!list.length){
+      myOrdersBox.innerHTML = '<div class="text-sm text-gray-400">Пока нет заказов.</div>';
+      return;
+    }
+    list.forEach(o=>{
+      const tot = typeof o.total === 'number' ? o.total : calcTotalFromItems(o);
+      const card = el(`
+        <div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white">
+          <div>
+            <div class="text-sm font-semibold">#${o.id || '—'} ${o.status ? '· '+o.status : ''}</div>
+            <div class="text-xs text-gray-500">${o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}</div>
+            <div class="text-sm mt-1">${tot ? tot+' руб.' : ''}</div>
+          </div>
+          <button type="button" class="text-xs text-red-500" data-del>Удалить</button>
+        </div>
+      `);
+      card.querySelector('[data-del]').addEventListener('click', ()=>{
+        const cur = loadClientHistory(clientId).filter(x => x.localUid !== o.localUid);
+        saveClientHistory(clientId, cur);
+        renderHistory();
+      });
+      myOrdersBox.appendChild(card);
+    });
+  }
+
+  // первый прогон истории + пробуем подтянуть с сервера
+  (async ()=>{
+    const res = await ycCall("list");
+    if (!res.error && Array.isArray(res.orders)) {
+      const mine = res.orders.filter(o => o.clientId === clientId);
+      if (mine.length){
+        const local = loadClientHistory(clientId);
+        const ids = new Set(local.map(x => String(x.id)));
+        const merged = [
+          ...mine.map(o => ({ ...o, localUid: 'srv-'+o.id })),
+          ...local.filter(x => !ids.has(String(x.id)))
+        ];
+        saveClientHistory(clientId, merged.slice(0, 20));
+      }
+    }
+    renderHistory();
+  })();
+
+  renderHistory();
+
+  // === главное: сабмит → сначала модалка, потом реальный отправ
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    if (sendBtn.disabled) return;
+
+    // собрали товары
+    const items = [];
+    for (const cat of MENU_CATEGORIES){
+      for (const item of cat.items){
+        const qty = counts[item.name] || 0;
+        if (qty > 0){
+          items.push({ name: item.name, qty, price: item.price });
         }
-        const o=res.order||{ id:'—', status:'новый', items, total };
-        const shownTotal=Math.max(typeof o.total==='number'?o.total:0, total, calcTotalFromItems(o));
-        const now=Date.now(); addToClientHistory(clientId,{ ...o, createdAt:o.createdAt||now, localUid:'srv-'+o.id }); renderHistoryGlobal();
-        showToast(res.dedup?'Заказ уже был, показали его':'Заказ отправлен');
-        resetCounts(); checkoutBtn.disabled=false;
+      }
+    }
+
+    if (!items.length){
+      alert('Выберите товары');
+      return;
+    }
+
+    const total = recalcTotal();
+    const payload = {
+      clientId,
+      name: form.name.value.trim(),
+      phone: form.phone.value.trim(),
+      address: form.address.value.trim(),
+      deliverByTime: form.deliverByTime.checked,
+      deliverTime: form.deliverTime.value || null,
+      items,
+      total
+    };
+
+    // показываем подтверждение
+    orderConfirm.open({
+      items,
+      total,
+      client: {
+        name: payload.name,
+        phone: payload.phone,
+        address: payload.address,
+        deliverByTime: payload.deliverByTime,
+        deliverTime: payload.deliverTime
+      },
+      onOk: async ()=>{
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Отправляем...';
+
+        const res = await ycCall("create", { data: payload });
+
+        if (res.error){
+          const data = store.load();
+          const id = 'L' + (data.nextLocalId++);
+          const now = Date.now();
+          const order = { id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local', localUid: 'local-'+id };
+          data.orders.unshift(order); store.save(data);
+          addToClientHistory(clientId, order);
+          renderHistory();
+          showToast('Заказ сохранён локально (сервер недоступен)');
+          root.querySelector('#result').innerHTML = `
+            <div class="section-card mt-0">
+              <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${order.id} принят (локально).</div>
+              <div class="text-gray-700">
+                Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${order.status}</span>
+                · Итог: <b>${order.total} руб.</b>
+              </div>
+            </div>`;
+          resetAll();
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Отправить заказ';
+          return;
+        }
+
+        const o = res.order || { id: '—', status: 'новый', items, total };
+        const serverTotal = typeof o.total === 'number' ? o.total : 0;
+        const clientTotalBefore = typeof total === 'number' ? total : 0;
+        const clientTotalFromResp = calcTotalFromItems(o);
+        const shownTotal = Math.max(serverTotal, clientTotalBefore, clientTotalFromResp);
+        const now = Date.now();
+
+        addToClientHistory(clientId, {
+          ...o,
+          createdAt: o.createdAt || now,
+          localUid: 'srv-'+o.id
+        });
+        renderHistory();
+
+        root.querySelector('#result').innerHTML = `
+          <div class="section-card mt-0">
+            <div class="text-lg sm:text-xl font-semibold mb-2">Спасибо! Заказ #${o.id} принят.</div>
+            <div class="text-gray-700">
+              Статус: <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status || 'новый'}</span>
+              · Итог: <b>${shownTotal} руб.</b>
+            </div>
+          </div>`;
+
+        showToast(res.dedup ? 'Заказ уже был, показали его' : 'Заказ отправлен');
+
+        resetAll();
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Отправить заказ';
+      },
+      onCancel: ()=>{
+        // ничего, просто закрыли
       }
     });
   });
 
-  function resetCounts(){ for(const k in counts) delete counts[k]; renderSections(); totalVal.textContent='0 руб.' }
-
-  // первичный рендер
-  renderSections();
   return root;
 }
 
-/* ===== Dashboard (табло) — как было ===== */
+/* ===== табло ===== */
 function DashboardView(){
-  const root=el(`
+  const root = el(`
     <div class="grid gap-4 max-w-6xl">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Текущие заказы</h2>
         <div class="flex gap-2">
           <button type="button" class="px-3 py-2 rounded-xl border" id="enableSound">🔊 Включить звук</button>
+          <button type="button" class="px-3 py-2 rounded-xl border" id="refresh">Обновить</button>
         </div>
       </div>
 
@@ -610,49 +768,110 @@ function DashboardView(){
         <h3 class="font-semibold mb-3">Наличие товаров</h3>
         <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне клиента товар станет серым и его нельзя будет добавить.</p>
         <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-        <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>
+        <div class="mt-3">
+          <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
+        </div>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
     </div>
   `);
 
-  const list=root.querySelector('#list'); let audioCtx=null; let soundEnabled=false; const seenIds=new Set(); let lastOrdersMap=new Map();
-  const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailableFromLS());
+  const list = root.querySelector('#list');
+  let audioCtx = null;
+  let soundEnabled = false;
+  const seenIds = new Set();
+  let lastOrdersMap = new Map();   // чтобы не исчезало
 
-  function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{
-    const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`);
-    stockList.appendChild(row);
-  })) }
+  const stockList = root.querySelector('#stockList');
+  let unavailable = new Set(loadUnavailableFromLS());
+
+  function renderStock(){
+    stockList.innerHTML = '';
+    ALL_ITEMS.forEach(item => {
+      const row = el(`
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} />
+          <span>${item.name}</span>
+        </label>
+      `);
+      stockList.appendChild(row);
+    });
+  }
   renderStock();
 
-  (async()=>{ const srv=await fetchUnavailableFromServer(); if(Array.isArray(srv)){ unavailable=new Set(srv); renderStock(); saveUnavailableToLS(srv); } })();
+  (async ()=>{
+    const srv = await fetchUnavailableFromServer();
+    if (Array.isArray(srv)) {
+      unavailable = new Set(srv);
+      renderStock();
+      saveUnavailableToLS(srv);
+    }
+  })();
 
-  root.querySelector('#saveStock').onclick=async()=>{
-    const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
-    saveUnavailableToLS(checked); const ok=await saveUnavailableToServer(checked);
-    showToast(ok?'Наличие сохранено':'Сохранено только локально'); unavailable=new Set(checked);
-  };
+  root.querySelector('#saveStock').addEventListener('click', async ()=>{
+    const checked = Array.from(stockList.querySelectorAll('input[type=checkbox]:checked'))
+      .map(i=>i.value);
+    saveUnavailableToLS(checked);
+    const ok = await saveUnavailableToServer(checked);
+    if (ok) showToast('Наличие сохранено');
+    else showToast('Сохранено только локально');
+    unavailable = new Set(checked);
+  });
 
-  function playBeep(d=0.35,f=880){ if(!audioCtx||!soundEnabled) return; const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
-    osc.type='square'; osc.frequency.value=f; g.gain.setValueAtTime(0.35,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);
-    osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+d) }
+  function playBeep(duration = 0.35, freq = 880) {
+    if (!audioCtx || !soundEnabled) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
 
-  root.querySelector('#enableSound').onclick=async()=>{ try{ if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; audioCtx=new AC() }
-    if(audioCtx.state==='suspended') await audioCtx.resume(); soundEnabled=true; playBeep(); setTimeout(()=>playBeep(),200); showToast('Звук новых заказов включён') }catch{ showToast('Браузер не дал включить звук') } };
+  root.querySelector('#enableSound').addEventListener('click', async () => {
+    try {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      soundEnabled = true;
+      playBeep(); setTimeout(()=>playBeep(), 200);
+      showToast("Звук новых заказов включён");
+      root.querySelector('#enableSound').textContent = "🔔 Звук включён";
+    } catch (e) {
+      showToast("Браузер не дал включить звук");
+    }
+  });
+
+  root.querySelector('#refresh').addEventListener('click', ()=> location.reload());
 
   function orderCard(o){
-    const clientTotal=calcTotalFromItems(o); const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
-    const created=o.createdAt? new Date(o.createdAt): new Date(); const itemLines=(o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(', ');
-    const card=el(`
+    const clientTotal = calcTotalFromItems(o);
+    const total = Math.max(
+      typeof o.total === 'number' ? o.total : 0,
+      clientTotal
+    );
+
+    const created = o.createdAt ? new Date(o.createdAt) : new Date();
+    const itemLines = (o.items || []).map(i=>`${i.name} ×${i.qty}`).join(', ');
+    const card = el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
         <div class="flex items-center justify-between gap-4">
           <div class="text-lg font-semibold">#${o.id} — ${o.name}</div>
           <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</div>
         </div>
-        <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}</div>
-        <div>📍 ${o.address}</div><div>☎️ ${o.phone}</div><div>🧾 ${itemLines||'—'}</div>
-        <div>⏰ ${o.deliverByTime&&o.deliverTime?('к '+o.deliverTime):'как можно скорее'}</div>
+        <div class="text-sm text-gray-600">
+          ${created.toLocaleString()} · Итог: <b>${total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}
+        </div>
+        <div>📍 ${o.address}</div>
+        <div>☎️ ${o.phone}</div>
+        <div>🧾 ${itemLines || '—'}</div>
+        <div>⏰ ${o.deliverByTime && o.deliverTime ? ('к ' + o.deliverTime) : 'как можно скорее'}</div>
         <div class="mt-3 flex flex-wrap gap-2 items-center">
           <label class="text-sm">Статус:</label>
           <select class="border rounded-xl p-2" data-k="status">
@@ -665,79 +884,130 @@ function DashboardView(){
           <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
           <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
         </div>
-        <div class="mt-2 text-right"><button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button></div>
-      </div>`);
+        <div class="mt-2 text-right">
+          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+        </div>
+      </div>
+    `);
+
     card.addEventListener('click', async (e)=>{
-      const act=e.target.dataset.act; if(!act) return;
-      if(act==='save'){ const status=card.querySelector('[data-k="status"]').value; await ycCall("update",{id:o.id, patch:{status}}); showToast(`Статус заказа #${o.id} обновлён`) }
-      if(act==='set-eta'){ const etaMinutes=Number(card.querySelector('[data-k="eta"]').value||0); await ycCall("update",{id:o.id, patch:{etaMinutes}}); showToast(`ETA заказа #${o.id} обновлён`) }
-      if(act==='delete'){ if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card && card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
-        await ycCall("delete",{id:o.id}); card.remove(); showToast(`Заказ #${o.id} удалён`) }
+      const act = e.target.dataset.act;
+      if (!act) return;
+      if (act === 'save'){
+        const status = card.querySelector('[data-k="status"]').value;
+        await ycCall("update", { id: o.id, patch: { status } });
+        showToast(`Статус заказа #${o.id} обновлён`);
+      }
+      if (act === 'set-eta'){
+        const etaMinutes = Number(card.querySelector('[data-k="eta"]').value || 0);
+        await ycCall("update", { id: o.id, patch: { etaMinutes } });
+        showToast(`ETA заказа #${o.id} обновлён`);
+      }
+      if (act === 'delete'){
+        if (!card.dataset.confirm){
+          card.dataset.confirm = '1';
+          e.target.textContent = 'Точно удалить?';
+          setTimeout(()=>{
+            if (card && card.dataset.confirm === '1'){
+              delete card.dataset.confirm;
+              e.target.textContent = 'Удалить';
+            }
+          }, 3000);
+          return;
+        }
+        await ycCall("delete", { id: o.id });
+        card.remove();
+        showToast(`Заказ #${o.id} удалён`);
+      }
     });
+
     return card;
   }
 
   async function load(){
-    const res=await ycCall("list"); const unique=new Map();
-    if(!res.error && Array.isArray(res.orders) && res.orders.length>0){ res.orders.forEach(o=>unique.set(String(o.id),o)); lastOrdersMap=new Map(unique) }
-    else if(lastOrdersMap.size>0){ lastOrdersMap.forEach((v,k)=>unique.set(k,v)) }
-    else { const data=store.load(); data.orders.forEach(o=>unique.set(String(o.id),o)) }
-    list.innerHTML=''; if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
-    const currentIds=new Set(); [...unique.values()].forEach(o=>{ const idStr=String(o.id); currentIds.add(idStr); if(!seenIds.has(idStr)){ showToast("Новый заказ #"+o.id); if(soundEnabled){ playBeep(); setTimeout(()=>playBeep(),250) } } list.appendChild(orderCard(o)) });
-    seenIds.clear(); currentIds.forEach(id=>seenIds.add(id));
+    const res = await ycCall("list");
+
+    const unique = new Map();
+
+    if (!res.error && Array.isArray(res.orders) && res.orders.length > 0) {
+      res.orders.forEach(o => unique.set(String(o.id), o));
+      lastOrdersMap = new Map(unique);
+    } else if (lastOrdersMap.size > 0) {
+      lastOrdersMap.forEach((v,k)=> unique.set(k,v));
+    } else {
+      const data = store.load();
+      data.orders.forEach(o => unique.set(String(o.id), o));
+    }
+
+    list.innerHTML = '';
+    if (unique.size === 0) {
+      list.innerHTML = `<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`;
+      return;
+    }
+
+    const currentIds = new Set();
+    [...unique.values()].forEach(o => {
+      const idStr = String(o.id);
+      currentIds.add(idStr);
+      if (!seenIds.has(idStr)) {
+        showToast("Новый заказ #" + o.id);
+        if (soundEnabled){ playBeep(); setTimeout(()=>playBeep(), 250); }
+      }
+      list.appendChild(orderCard(o));
+    });
+
+    seenIds.clear();
+    currentIds.forEach(id => seenIds.add(id));
   }
-  load(); setInterval(()=>{ if(location.hash==='#/dashboard') load() }, 5000);
+
+  load();
+  setInterval(()=>{ if (location.hash === '#/dashboard') load(); }, 5000);
+
   return root;
 }
 
-/* ===== Router ===== */
 function router(){
-  const app=document.getElementById('app'); app.innerHTML='';
-  const hash=location.hash;
-  if(hash==='#/dashboard'){ app.classList.remove('phone-shell'); app.appendChild(DashboardView()) }
-  else if(hash==='#/profile'){ app.classList.add('phone-shell'); app.appendChild(ProfileView()) }
-  else if(hash==='#/order'){ app.classList.add('phone-shell'); app.appendChild(OrderView()) }
-  else { app.classList.add('phone-shell'); app.appendChild(HomeView()) }
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  if (location.hash === '#/dashboard') {
+    app.classList.remove('phone-shell');
+    app.appendChild(DashboardView());
+  } else {
+    app.classList.add('phone-shell');
+    app.appendChild(OrderView());
+  }
 }
-window.addEventListener('hashchange', router); router();
+window.addEventListener('hashchange', router);
+router();
 
-/* ===== Drawer ===== */
-const drawer=document.getElementById('drawer');
-document.getElementById('burgerBtn').onclick=()=> drawer.style.display='block';
-document.getElementById('drawerClose').onclick=()=> drawer.style.display='none';
-drawer.onclick=(e)=>{ if(e.target===drawer) drawer.style.display='none' };
-document.getElementById('drawerPay').onclick=()=>{ drawer.style.display='none'; openPaymentModal() };
-document.getElementById('drawerLegal').onclick=()=>{ drawer.style.display='none'; alert('Здесь будет юридическая информация') };
+/* пин */
+const dashBtn  = document.getElementById('openDashboard');
+const pinModal = document.getElementById('pinModal');
+const pinInput = document.getElementById('pinInput');
+const pinOk    = document.getElementById('pinOk');
+const pinCancel= document.getElementById('pinCancel');
+const pinError = document.getElementById('pinError');
 
-/* ===== History sheet ===== */
-const historySheet=document.getElementById('historySheet');
-document.getElementById('historyHandle').onclick=()=>{ renderHistoryGlobal(); historySheet.classList.add('open') };
-document.getElementById('historyClose').onclick=()=> historySheet.classList.remove('open');
-historySheet.onclick=(e)=>{ if(e.target===historySheet) historySheet.classList.remove('open') };
+function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0); }
+function hidePin(){ pinModal.classList.add('hidden'); pinModal.classList.remove('flex'); }
 
-function renderHistoryGlobal(){
-  const clientId=getClientId(); const box=document.getElementById('historyList'); const list=loadClientHistory(clientId);
-  box.innerHTML=''; if(!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
-  list.forEach(o=>{
-    const tot=typeof o.total==='number'?o.total:calcTotalFromItems(o);
-    const card=el(`<div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white"><div>
-      <div class="text-sm font-semibold">#${o.id||'—'} ${o.status? '· '+o.status:''}</div>
-      <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-      <div class="text-sm mt-1">${tot? tot+' руб.':''}</div>
-    </div><button type="button" class="text-xs text-red-500" data-del>Удалить</button></div>`);
-    card.querySelector('[data-del]').onclick=()=>{ const cur=loadClientHistory(clientId).filter(x=>x.localUid!==o.localUid); saveClientHistory(clientId,cur); renderHistoryGlobal() };
-    box.appendChild(card);
-  });
+function tryEnter(){
+  if (pinInput.value === ALLOWED_PIN){
+    hidePin();
+    location.hash = '#/dashboard';
+  } else {
+    pinError.classList.remove('hidden');
+    pinInput.focus();
+  }
 }
 
-/* ===== Pin / Tablo ===== */
-const pinModal=document.getElementById('pinModal'), pinInput=document.getElementById('pinInput'),
-      pinOk=document.getElementById('pinOk'), pinCancel=document.getElementById('pinCancel'), pinError=document.getElementById('pinError');
-function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0) }
-function hidePin(){ pinModal.classList.add('hidden'); pinModal.classList.remove('flex') }
-function tryEnter(){ if(pinInput.value===ALLOWED_PIN){ hidePin(); location.hash='#/dashboard' } else { pinError.classList.remove('hidden'); pinInput.focus() } }
-pinOk.onclick=tryEnter; pinCancel.onclick=hidePin; pinInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter') tryEnter(); if(e.key==='Escape') hidePin() });
-pinModal.addEventListener('click',(e)=>{ if(e.target===pinModal) hidePin() });
+dashBtn.addEventListener('click', (e)=>{ e.preventDefault(); showPin(); });
+pinOk.addEventListener('click', tryEnter);
+pinCancel.addEventListener('click', hidePin);
+pinInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') tryEnter(); if (e.key==='Escape') hidePin(); });
+pinModal.addEventListener('click', (e)=>{ if (e.target===pinModal) hidePin(); });
+
+document.getElementById('hardRefresh').addEventListener('click', ()=> location.reload());
 </script>
 </body>
 </html>
