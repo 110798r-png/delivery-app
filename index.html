@@ -11,54 +11,98 @@
     img { max-width:100%; display:block; }
     .hidden{ display:none }
     .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
-    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
 
-    /* Glass */
-    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
+    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px;
+      box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
 
-    /* Bottom nav (чёрные кнопки) */
-    .bottom-nav{ position:fixed; bottom:.75rem; left:50%; transform:translateX(-50%); width:min(540px,96vw); z-index:60; display:flex; gap:.5rem; justify-content:space-between; }
-    .bottom-nav button{ flex:1 1 0; background:#000; color:#fff; border:1px solid #000; border-radius:14px; padding:.6rem 0; font-size:.9rem; font-weight:600 }
-    .bottom-nav button.active{ background:#111; border-color:#111 }
+    /* Glass + UI */
+    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%);
+      backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
+    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
+    .sticky-top{ position:sticky; top:.5rem; z-index:40 }
 
-    /* Drawer (правый нижний ≡) */
+    .bottom-nav{ position:fixed; bottom:.75rem; left:50%; transform:translateX(-50%); width:min(540px,96vw);
+      background:rgba(248,250,252,.55); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.4); border-radius:1.25rem;
+      display:flex; gap:.5rem; justify-content:space-around; padding:.4rem; z-index:60 }
+    .bottom-nav button{ flex:1 1 0; border-radius:1rem; padding:.45rem .1rem .3rem; font-size:.75rem; display:flex; flex-direction:column; gap:.1rem; align-items:center }
+    .bottom-nav button.active{ background:rgba(15,23,42,.12) }
+
+    .floating-total{ position:fixed; bottom:4.5rem; right:max(1rem, calc((100vw - 540px)/2 + 1rem)); background:#0f172a; color:#fff;
+      border-radius:9999px; padding:.55rem 1.1rem; font-weight:600; display:flex; gap:.45rem; align-items:center; z-index:55;
+      box-shadow:0 14px 35px rgba(15,23,42,.35); cursor:pointer }
+
+    /* Drawer (burger) */
     .drawer{ position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.35); display:none; }
     .drawer.open{ display:block }
-    .drawer-panel{ position:absolute; top:0; right:0; height:100%; width:min(88vw,320px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2) }
+    .drawer-panel{ position:absolute; top:0; left:0; height:100%; width:min(88vw,320px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2) }
 
-    /* История — слева */
+    /* Right history sheet */
     .sheet{ position:fixed; inset:0; z-index:85; background:rgba(0,0,0,.2); display:none; }
     .sheet.open{ display:block }
-    .sheet-panel{ position:absolute; top:0; left:0; height:100%; width:min(92vw,360px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2); overflow:auto }
-    .history-handle{ position:fixed; top:40%; left:max(0, calc((100vw - 540px)/2 - 2px)); transform:translateY(-50%); writing-mode:vertical-rl; text-orientation:mixed; background:#0f172a; color:#fff; border-radius:0 10px 10px 0; padding:.5rem .35rem; z-index:70; font-size:.8rem }
+    .sheet-panel{ position:absolute; top:0; right:0; height:100%; width:min(92vw,360px); background:#fff; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.2); overflow:auto }
+    .history-handle{ position:fixed; top:40%; right:max(0, calc((100vw - 540px)/2 - 2px)); transform:translateY(-50%);
+      writing-mode:vertical-rl; text-orientation:mixed; background:#0f172a; color:#fff; border-radius:10px 0 0 10px; padding:.5rem .35rem; z-index:70; font-size:.8rem }
 
-    /* Меню — отдельный скролл для списка */
-    .menu-screen{ display:flex; flex-direction:column; height:calc(100vh - 110px); /* примерно высота хедера + нижних кнопок */ }
-    .menu-block{ display:flex; flex-direction:column; gap:.75rem; flex:1 1 auto; }
-    .menu-items{ flex:1 1 auto; overflow:auto; padding-bottom:.25rem; }
-    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
-
+    /* Menu cards */
     #menuGrid{ display:flex; flex-direction:column; gap:.75rem }
     .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:1.25rem; padding:1rem; min-height:6.4rem }
     .menu-card.disabled{ opacity:.5 }
     .menu-card-img{ width:110px; height:70px; border-radius:.75rem; background:#eee; object-fit:cover }
+
+    @media (min-width:900px){ .bottom-nav{ bottom:1rem } .floating-total{ bottom:5rem } }
   </style>
 </head>
 <body>
   <div class="w-full py-6">
-    <!-- Хеддер: слева маленький заголовок -->
-    <header class="phone-shell flex items-center justify-start mb-4 sm:mb-6">
-      <h1 class="text-base sm:text-lg font-semibold text-gray-700">🍟 Онлайн-заказ</h1>
+    <!-- Header -->
+    <header class="phone-shell flex items-center justify-between mb-4 sm:mb-6 gap-3">
+      <div class="flex items-center gap-3">
+        <button id="burgerBtn" class="px-3 py-2 rounded-xl border" aria-label="menu">☰</button>
+        <h1 class="text-xl sm:text-2xl font-bold">🍟 Онлайн-заказ</h1>
+      </div>
+      <nav class="flex gap-2 items-center">
+        <!-- убрал: Клиент / Табло / Обновить -->
+      </nav>
     </header>
 
-    <!-- Основной контейнер -->
+    <!-- Drawer -->
+    <div id="drawer" class="drawer">
+      <div class="drawer-panel">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-lg font-semibold">Меню</div>
+          <button id="drawerClose" class="px-2 py-1 rounded-lg border">✕</button>
+        </div>
+        <div class="grid gap-2">
+          <a href="#/profile" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Личный кабинет</a>
+          <button id="drawerPay" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Способ оплаты</button>
+          <button id="drawerLegal" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Юридическая информация</button>
+          <a href="tel:+798989932108" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Техподдержка: +7 989 899 32 108</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pin modal (tablo) -->
+    <div id="pinModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow">
+        <h3 class="text-lg font-semibold mb-3">Вход в табло</h3>
+        <p class="text-sm text-gray-600 mb-3">Введите пин-код администратора</p>
+        <input id="pinInput" type="password" class="w-full border rounded-xl p-3 mb-4" placeholder="Пин-код" />
+        <div class="flex gap-2 justify-end">
+          <button id="pinCancel" type="button" class="px-3 py-2 rounded-xl border">Отмена</button>
+          <button id="pinOk" type="button" class="px-3 py-2 rounded-xl border bg-black text-white">Войти</button>
+        </div>
+        <p id="pinError" class="text-sm text-red-600 mt-2 hidden">Неверный пин</p>
+      </div>
+    </div>
+
+    <!-- Screens -->
     <main id="app" class="phone-shell"></main>
   </div>
 
   <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Модалка подтверждения -->
+  <!-- Order confirm modal -->
   <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99]">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
       <h3 class="text-lg font-semibold">Подтвердите заказ</h3>
@@ -72,7 +116,7 @@
     </div>
   </div>
 
-  <!-- Модалка оплаты -->
+  <!-- Payment modal -->
   <div id="paymentModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[98]">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-lg space-y-3">
       <h3 class="text-lg font-semibold">Способ оплаты</h3>
@@ -87,7 +131,7 @@
     </div>
   </div>
 
-  <!-- Левая шторка истории -->
+  <!-- Right history sheet -->
   <button id="historyHandle" class="history-handle">История</button>
   <div id="historySheet" class="sheet">
     <div class="sheet-panel">
@@ -99,40 +143,33 @@
     </div>
   </div>
 
-  <!-- Правый выезжающий «бургер» (от нижней кнопки ≡) -->
-  <div id="drawer" class="drawer">
-    <div class="drawer-panel">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-lg font-semibold">Меню</div>
-        <button id="drawerClose" class="px-2 py-1 rounded-lg border">✕</button>
-      </div>
-      <div class="grid gap-2">
-        <a href="#/profile" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Личный кабинет</a>
-        <button id="drawerPay" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Способ оплаты</button>
-        <button id="drawerLegal" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Юридическая информация</button>
-        <a href="tel:+798989932108" class="px-3 py-3 rounded-xl border hover:bg-gray-50">Техподдержка: +7 989 899 32 108</a>
-      </div>
-    </div>
-  </div>
-
 <script>
-/* ===== Конфиг / Хелперы ===== */
+/* ===== Config ===== */
 const ALLOWED_PIN = "65Vafuza";
 const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const PROFILE_LS_KEY = 'client_profile_v1';
 
-if (!location.hash || location.hash === "#/" || location.hash === "#") { location.hash = "#/home"; }
+if (!location.hash || location.hash === "#/" || location.hash === "#") {
+  location.hash = "#/home";
+}
 
-function getClientId(){ const KEY='yc_client_id_v1'; let cid=localStorage.getItem(KEY); if(!cid){ cid='cid-'+Math.random().toString(36).slice(2)+Date.now(); localStorage.setItem(KEY,cid) } return cid }
-function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500) }
-function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild }
+/* ===== Helpers ===== */
+function getClientId(){
+  const KEY='yc_client_id_v1';
+  let cid=localStorage.getItem(KEY);
+  if(!cid){ cid='cid-'+Math.random().toString(36).slice(2)+Date.now(); localStorage.setItem(KEY,cid); }
+  return cid;
+}
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500); }
+function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function money(x){ return x+' руб.' }
+
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_KEY))||{} }catch{ return {} } }
 function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})) }
 
-/* офлайн стор */
+/* offline store */
 const LS_KEY='orders_yc_fallback_v1';
 const store={ load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY))||{orders:[], nextLocalId:1} }catch{ return {orders:[], nextLocalId:1} } },
               save(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)) } };
@@ -143,11 +180,12 @@ async function ycCall(op, extra={}){
   try{
     const res=await fetch(API_BASE,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
     const text=await res.text(); let data={}; if(text){ try{ data=JSON.parse(text) }catch{ return {error:"bad-json", status:res.status, raw:text} } }
-    if(!res.ok) return { error:"http", status:res.status, data }; return data;
+    if(!res.ok) return { error:"http", status:res.status, data };
+    return data;
   }catch(e){ return { error:"network", message:e.message } }
 }
 
-/* Меню */
+/* Menu data */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -165,18 +203,18 @@ const MENU_CATEGORIES = [
 function findPriceByName(name){ for(const cat of MENU_CATEGORIES){ const f=cat.items.find(i=>i.name===name); if(f) return f.price } return 0 }
 function calcTotalFromItems(order){ let sum=0; (order.items||[]).forEach(i=>{ const p=typeof i.price==='number'?i.price:findPriceByName(i.name); sum += p*(i.qty||0) }); return sum }
 
-/* недоступные */
+/* unavailable */
 async function fetchUnavailableFromServer(){ const res=await ycCall("getUnavailable",{}); if(!res.error && res && Array.isArray(res.items)) return res.items; return null }
 async function saveUnavailableToServer(items){ const res=await ycCall("setUnavailable",{items}); return !res.error }
 function loadUnavailableFromLS(){ try{ const raw=localStorage.getItem(UNAVAILABLE_LS_KEY); if(!raw) return []; const arr=JSON.parse(raw); return Array.isArray(arr)?arr:[] }catch{ return [] } }
 function saveUnavailableToLS(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(items)) }
 
-/* история */
+/* client history */
 function loadClientHistory(clientId){ try{ const all=JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||{}; return Array.isArray(all[clientId])?all[clientId]:[] }catch{ return [] } }
 function saveClientHistory(clientId, list){ const all=(()=>{ try{ return JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||{} }catch{ return {} } })(); all[clientId]=list; localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(all)) }
 function addToClientHistory(clientId, order){ const list=loadClientHistory(clientId); list.unshift(order); saveClientHistory(clientId, list.slice(0,20)) }
 
-/* модалки */
+/* confirm modal */
 const orderConfirm={ _ok:null,_cancel:null,
   open(data){
     const wrap=document.getElementById('orderConfirmModal');
@@ -184,22 +222,32 @@ const orderConfirm={ _ok:null,_cancel:null,
     const totalEl=document.getElementById('orderConfirmTotal');
     const clientEl=document.getElementById('orderConfirmClient');
     list.innerHTML='';
-    data.items.forEach(it=>{ const row=document.createElement('div'); row.className='flex justify-between gap-2'; row.innerHTML=`<span>${it.name} ×${it.qty}</span><span>${it.price*it.qty} руб.</span>`; list.appendChild(row) });
+    data.items.forEach(it=>{
+      const row=document.createElement('div');
+      row.className='flex justify-between gap-2';
+      row.innerHTML=`<span>${it.name} ×${it.qty}</span><span>${it.price*it.qty} руб.</span>`;
+      list.appendChild(row);
+    });
     totalEl.textContent='Итого: '+data.total+' руб.';
-    const p=data.client||{}; clientEl.textContent=(p.name? p.name+' · ':'')+(p.phone? p.phone+' · ':'')+(p.address||'')+(p.paymentMethod? ' · '+nicePay(p.paymentMethod):'');
-    this._ok=data.onOk||null; this._cancel=data.onCancel||null; wrap.classList.remove('hidden'); wrap.classList.add('flex');
+    const p = data.client||{};
+    clientEl.textContent = (p.name? p.name+' · ':'')+(p.phone? p.phone+' · ':'')+(p.address||'')+(p.paymentMethod? ' · '+nicePay(p.paymentMethod):'');
+    this._ok=data.onOk||null; this._cancel=data.onCancel||null;
+    wrap.classList.remove('hidden'); wrap.classList.add('flex');
   },
   close(){ const wrap=document.getElementById('orderConfirmModal'); wrap.classList.add('hidden'); wrap.classList.remove('flex') }
 };
-(function(){ const wrap=document.getElementById('orderConfirmModal');
+(function(){
+  const wrap=document.getElementById('orderConfirmModal');
   document.getElementById('orderConfirmOk').onclick=()=>{ const cb=orderConfirm._ok; orderConfirm.close(); if(cb) cb() };
   document.getElementById('orderConfirmCancel').onclick=()=>{ const cb=orderConfirm._cancel; orderConfirm.close(); if(cb) cb() };
   wrap.addEventListener('click',(e)=>{ if(e.target===wrap) orderConfirm.close() });
 })();
 
+/* payment modal */
 function nicePay(k){ return k==='cash'?'Наличные':k==='card'?'Банковская карта':k==='transfer'?'Перевод':'' }
 function openPaymentModal(updateLabel){
-  const wrap=document.getElementById('paymentModal'), close=document.getElementById('paymentClose');
+  const wrap=document.getElementById('paymentModal');
+  const close=document.getElementById('paymentClose');
   wrap.classList.remove('hidden'); wrap.classList.add('flex');
   function setPay(k){ const cur=loadProfile(); cur.paymentMethod=k; saveProfile(cur); if(updateLabel) updateLabel(nicePay(k)); wrap.classList.add('hidden'); wrap.classList.remove('flex') }
   wrap.querySelector('[data-pay="cash"]').onclick=()=>setPay('cash');
@@ -209,14 +257,20 @@ function openPaymentModal(updateLabel){
   wrap.onclick=(e)=>{ if(e.target===wrap) close.onclick() };
 }
 
-/* ===== Вьюшки ===== */
+/* ===== Views ===== */
 function HomeView(){
   const root=el(`
-    <div class="grid gap-6 pb-20">
-      <section class="glass-panel rounded-2xl p-6 mt-2 text-center">
+    <div class="grid gap-6 pb-24">
+      <section class="glass-panel rounded-2xl p-6 mt-2 flex flex-col items-center text-center">
         <div class="text-3xl">🍔</div>
         <h2 class="text-xl font-semibold mt-2">Добро пожаловать!</h2>
         <p class="text-sm text-gray-600 mt-1">Онлайн-заказ в пару кликов</p>
+        <button class="mt-4 px-4 py-3 rounded-xl bg-black text-white" id="goMenu">Перейти к меню</button>
+      </section>
+
+      <section class="rounded-2xl p-6 bg-white border">
+        <h3 class="font-semibold mb-2">О нас</h3>
+        <p class="text-sm text-gray-600">Логотип и коллаж добавим позже. Выберите блюда, оформите заказ — остальное мы сделаем сами.</p>
       </section>
 
       <footer class="rounded-2xl p-6 bg-white border">
@@ -226,28 +280,45 @@ function HomeView(){
           <button id="legalBtn" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-left">Юридическая информация</button>
           <button id="devBtn" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-left">Сотрудничество с разработчиком</button>
           <div class="text-xs text-gray-500 mt-2">Дата создания веб-приложения: 2025</div>
+
+          <div class="border-t my-3"></div>
+          <div class="text-xs text-gray-500">Быстрые ссылки:</div>
+          <div class="flex flex-wrap gap-2">
+            <a href="#/order" class="px-3 py-2 rounded-xl border text-sm">Клиент</a>
+            <button id="tabloOpen" class="px-3 py-2 rounded-xl border text-sm">Табло</button>
+          </div>
         </div>
       </footer>
 
       <div class="bottom-nav">
-        <button type="button" class="active" data-nav="home">Главная</button>
-        <button type="button" data-nav="order">Меню</button>
-        <button type="button" id="openDrawerBtn">≡</button>
+        <button type="button" class="active" data-nav="home"><span class="text-lg">🏠</span>Главная</button>
+        <button type="button" data-nav="order"><span class="text-lg">🍔</span>Меню</button>
+        <button type="button" data-nav="profile"><span class="text-lg">👤</span>Личный кабинет</button>
       </div>
     </div>
   `);
+
+  root.querySelector('#goMenu').onclick=()=>{ location.hash='#/order' };
   root.querySelector('#legalBtn').onclick=()=> alert('Здесь будет юридическая информация');
   root.querySelector('#devBtn').onclick=()=> alert('Почта разработчика: sabirbis@bk.ru');
-  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{ const b=e.target.closest('button[data-nav]'); if(!b) return; location.hash = b.dataset.nav==='home'?'#/home':b.dataset.nav==='order'?'#/order':'#/profile' });
-  root.querySelector('#openDrawerBtn').onclick=()=> document.getElementById('drawer').classList.add('open');
+  root.querySelector('#tabloOpen').onclick=()=> showPin();
+
+  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{
+    const b=e.target.closest('button[data-nav]'); if(!b) return;
+    const v=b.dataset.nav; if(v==='home') location.hash='#/home';
+    if(v==='order') location.hash='#/order';
+    if(v==='profile') location.hash='#/profile';
+  });
+
   return root;
 }
 
+/* Личный кабинет */
 function ProfileView(){
   const prof=Object.assign({ name:'', phone:'', address:'', deliverByTime:false, deliverTime:'', paymentMethod:'' }, loadProfile());
   const root=el(`
-    <div class="grid gap-6 pb-20">
-      <section class="glass-panel rounded-2xl p-5">
+    <div class="grid gap-6 pb-24">
+      <section class="section-card glass-panel rounded-2xl p-5">
         <h2 class="text-lg font-semibold mb-3">Личный кабинет</h2>
         <div class="grid gap-3">
           <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${prof.name||''}">
@@ -266,15 +337,15 @@ function ProfileView(){
         </div>
       </section>
 
-      <section class="glass-panel rounded-2xl p-5">
+      <section class="section-card glass-panel rounded-2xl p-5">
         <h3 class="text-lg font-semibold mb-3">История заказов</h3>
         <div id="pHistory" class="grid gap-2"></div>
       </section>
 
       <div class="bottom-nav">
-        <button type="button" data-nav="home">Главная</button>
-        <button type="button" data-nav="order">Меню</button>
-        <button type="button" id="openDrawerBtn">≡</button>
+        <button type="button" data-nav="home"><span class="text-lg">🏠</span>Главная</button>
+        <button type="button" data-nav="order"><span class="text-lg">🍔</span>Меню</button>
+        <button type="button" class="active" data-nav="profile"><span class="text-lg">👤</span>Личный кабинет</button>
       </div>
     </div>
   `);
@@ -284,69 +355,88 @@ function ProfileView(){
 
   pByTime.addEventListener('change', ()=>{ pTime.classList.toggle('hidden', !pByTime.checked); if(!pByTime.checked) pTime.value='' });
   root.querySelector('#pPayBtn').onclick=()=> openPaymentModal((txt)=> pPayVal.textContent=txt||'не выбран');
-  root.querySelector('#pSave').onclick=()=>{ saveProfile({ name:pName.value.trim(), phone:pPhone.value.trim(), address:pAddr.value.trim(), deliverByTime:pByTime.checked, deliverTime:pTime.value||'', paymentMethod:(loadProfile().paymentMethod||'') }); showToast('Профиль сохранён') };
+  root.querySelector('#pSave').onclick=()=>{
+    saveProfile({ name:pName.value.trim(), phone:pPhone.value.trim(), address:pAddr.value.trim(),
+      deliverByTime:pByTime.checked, deliverTime:pTime.value||'', paymentMethod:(loadProfile().paymentMethod||'') });
+    showToast('Профиль сохранён');
+  };
 
   // история
-  const clientId=getClientId(), box=root.querySelector('#pHistory'); const hist=loadClientHistory(clientId);
+  const clientId=getClientId(); const box=root.querySelector('#pHistory');
+  const hist=loadClientHistory(clientId);
   if(!hist.length) box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>';
   hist.forEach(o=>{
     const tot=typeof o.total==='number'?o.total:calcTotalFromItems(o);
-    const card=el(`<div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white"><div>
-      <div class="text-sm font-semibold">#${o.id||'—'} ${o.status? '· '+o.status:''}</div>
-      <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-      <div class="text-sm mt-1">${tot? tot+' руб.':''}</div>
-    </div><button type="button" class="text-xs text-red-500" data-del>Удалить</button></div>`);
+    const card=el(`
+      <div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white">
+        <div>
+          <div class="text-sm font-semibold">#${o.id||'—'} ${o.status? '· '+o.status:''}</div>
+          <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
+          <div class="text-sm mt-1">${tot? tot+' руб.':''}</div>
+        </div>
+        <button type="button" class="text-xs text-red-500" data-del>Удалить</button>
+      </div>`);
     card.querySelector('[data-del]').onclick=()=>{ const cur=loadClientHistory(clientId).filter(x=>x.localUid!==o.localUid); saveClientHistory(clientId,cur); card.remove() };
     box.appendChild(card);
   });
 
-  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{ const b=e.target.closest('button[data-nav]'); if(!b) return; location.hash = b.dataset.nav==='home'?'#/home':'#/order' });
-  root.querySelector('#openDrawerBtn').onclick=()=> document.getElementById('drawer').classList.add('open');
+  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{
+    const b=e.target.closest('button[data-nav]'); if(!b) return; const v=b.dataset.nav;
+    if(v==='home') location.hash='#/home'; if(v==='order') location.hash='#/order'; if(v==='profile') location.hash='#/profile';
+  });
 
   return root;
 }
 
-/* Экран «Меню» — список в своём скролле, категории под списком, кнопка отправки ниже */
+/* Экран меню (без формы доставки, оформление из профиля) */
 function OrderView(){
   const root=el(`
-    <div class="menu-screen pb-20">
-      <div class="menu-block">
-        <div class="menu-items no-scrollbar" id="menuItems"><div id="menuGrid"></div></div>
+    <div class="relative pb-24">
+      <section class="sticky-top mb-4">
         <div class="glass-panel rounded-2xl px-3 py-3">
+          <h2 class="text-base font-semibold mb-2">🥘 Меню</h2>
           <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
         </div>
-        <button id="sendBtn" class="mt-2 px-4 py-3 rounded-xl bg-black text-white w-full shadow">Отправить заказ</button>
-        <div id="result" class="mt-2"></div>
-      </div>
+      </section>
+
+      <section class="mb-4"><div id="menuGrid"></div></section>
 
       <div class="bottom-nav">
-        <button type="button" data-nav="home">Главная</button>
-        <button type="button" class="active" data-nav="order">Меню</button>
-        <button type="button" id="openDrawerBtn">≡</button>
+        <button type="button" class="active" data-nav="order"><span class="text-lg">🍔</span>Меню</button>
+        <button type="button" data-nav="home"><span class="text-lg">🏠</span>Главная</button>
+        <button type="button" data-nav="profile"><span class="text-lg">👤</span>Личный кабинет</button>
       </div>
+
+      <button type="button" id="floatingTotal" class="floating-total hidden">
+        <span id="floatingTotalVal">0 руб.</span>
+        <span class="text-xs opacity-80">оформить</span>
+      </button>
     </div>
   `);
 
   const categoryBar=root.querySelector('#categoryBar');
   const menuGrid=root.querySelector('#menuGrid');
-  const sendBtn=root.querySelector('#sendBtn');
-
+  const floatingBtn=root.querySelector('#floatingTotal');
   const clientId=getClientId();
   const counts={}; let currentCategory=MENU_CATEGORIES[0].key;
 
-  // недоступные
+  // unavailable sync
   let unavailable=new Set(loadUnavailableFromLS());
   async function syncUnavailable(){ const srv=await fetchUnavailableFromServer(); if(Array.isArray(srv)){ const srvSet=new Set(srv);
-    if(srv.length!==unavailable.size || srv.some(n=>!unavailable.has(n))){ unavailable=srvSet; saveUnavailableToLS(srv); renderCategory(currentCategory) } } }
+    if(srv.length!==unavailable.size || srv.some(n=>!unavailable.has(n))){ unavailable=srvSet; saveUnavailableToLS(srv); renderCategory(currentCategory); } } }
   syncUnavailable(); setInterval(syncUnavailable, 10000);
 
-  // категории
+  // categories chips
   MENU_CATEGORIES.forEach((cat,idx)=>{
     const btn=el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-cat="${cat.key}">${cat.title}</button>`);
     categoryBar.appendChild(btn);
   });
 
-  function recalcTotal(){ let sum=0; for(const cat of MENU_CATEGORIES){ for(const item of cat.items){ const q=counts[item.name]||0; sum+=item.price*q } } return sum }
+  function recalcTotal(){
+    let sum=0; for(const cat of MENU_CATEGORIES){ for(const item of cat.items){ const q=counts[item.name]||0; sum+=item.price*q } }
+    if(sum>0){ floatingBtn.classList.remove('hidden'); floatingBtn.querySelector('#floatingTotalVal').textContent=money(sum) } else { floatingBtn.classList.add('hidden') }
+    return sum;
+  }
 
   function renderCategory(catKey){
     currentCategory=catKey;
@@ -356,7 +446,7 @@ function OrderView(){
     cat.items.forEach(item=>{
       const q=counts[item.name]||0; const isOff=unavailable.has(item.name);
       const card=el(`
-        <div class="menu-card ${isOff?'disabled':''}">
+        <div class="glass-panel rounded-2xl p-3 flex gap-3 items-center ${isOff?'opacity-50':''}">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <div class="font-medium text-sm">${item.name}</div>
@@ -369,13 +459,13 @@ function OrderView(){
               <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-act="inc" ${isOff?'disabled':''}>+</button>
             </div>
           </div>
-          <img src="${item.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+          <img src="${item.img||'https://placehold.co/80x80?text=food'}" class="w-20 h-16 rounded-xl object-cover" alt="">
         </div>`);
       const qEl=card.querySelector('[data-q]');
       card.addEventListener('click', e=>{
         if(isOff){ showToast('Этот товар недоступен'); return }
-        if(e.target.dataset.act==='inc'){ counts[item.name]=(counts[item.name]||0)+1; qEl.textContent=counts[item.name]; }
-        if(e.target.dataset.act==='dec'){ counts[item.name]=Math.max(0,(counts[item.name]||0)-1); qEl.textContent=counts[item.name]; }
+        if(e.target.dataset.act==='inc'){ counts[item.name]=(counts[item.name]||0)+1; qEl.textContent=counts[item.name]; recalcTotal() }
+        if(e.target.dataset.act==='dec'){ counts[item.name]=Math.max(0,(counts[item.name]||0)-1); qEl.textContent=counts[item.name]; recalcTotal() }
       });
       menuGrid.appendChild(card);
     });
@@ -384,62 +474,200 @@ function OrderView(){
 
   categoryBar.addEventListener('click', (e)=>{ const btn=e.target.closest('button[data-cat]'); if(!btn) return; renderCategory(btn.dataset.cat) });
 
-  // отправка заказа (через профиль)
-  sendBtn.addEventListener('click', async ()=>{
+  // bottom nav
+  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{
+    const b=e.target.closest('button[data-nav]'); if(!b) return; const v=b.dataset.nav;
+    if(v==='home') location.hash='#/home'; if(v==='order') location.hash='#/order'; if(v==='profile') location.hash='#/profile';
+  });
+
+  // checkout via profile
+  floatingBtn.addEventListener('click', async ()=>{
     const items=[]; for(const cat of MENU_CATEGORIES){ for(const item of cat.items){ const qty=counts[item.name]||0; if(qty>0) items.push({name:item.name, qty, price:item.price}) } }
     if(!items.length){ showToast('Выберите товары'); return }
+    const total=recalcTotal();
+
     const prof=loadProfile();
     if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль: имя, телефон, адрес'); location.hash='#/profile'; return }
     if(!prof.paymentMethod){ showToast('Выберите способ оплаты в профиле'); location.hash='#/profile'; return }
 
     const payload={ clientId:getClientId(), name:prof.name, phone:prof.phone, address:prof.address,
-      deliverByTime:!!prof.deliverByTime, deliverTime:prof.deliverTime||null, paymentMethod:prof.paymentMethod,
-      items, total:recalcTotal() };
+      deliverByTime:!!prof.deliverByTime, deliverTime:prof.deliverTime||null, paymentMethod:prof.paymentMethod, items, total };
 
     orderConfirm.open({
-      items, total:payload.total, client:prof,
+      items, total, client:prof,
       onOk: async ()=>{
-        sendBtn.disabled=true; sendBtn.textContent='Отправляем...';
+        const btn=floatingBtn; btn.disabled=true;
         const res=await ycCall("create",{ data:payload });
         if(res.error){
           const data=store.load(); const id='L'+(data.nextLocalId++); const now=Date.now();
           const order={ id, ...payload, status:'новый', createdAt:now, updatedAt:now, _source:'local', localUid:'local-'+id };
-          data.orders.unshift(order); store.save(data); addToClientHistory(getClientId(), order); renderHistoryGlobal();
-          showToast('Заказ сохранён локально (сервер недоступен)'); resetCounts(); sendBtn.disabled=false; sendBtn.textContent='Отправить заказ'; return;
+          data.orders.unshift(order); store.save(data); addToClientHistory(clientId, order); renderHistorySheet();
+          showToast('Заказ сохранён локально (сервер недоступен)'); resetCounts();
+          btn.disabled=false; return;
         }
-        const o=res.order||{ id:'—', status:'новый', items, total:payload.total };
-        const shownTotal=Math.max(typeof o.total==='number'?o.total:0, payload.total, calcTotalFromItems(o));
-        const now=Date.now(); addToClientHistory(getClientId(), { ...o, createdAt:o.createdAt||now, localUid:'srv-'+o.id }); renderHistoryGlobal();
-        document.getElementById('result').innerHTML = `
-          <div class="glass-panel rounded-2xl px-4 py-4 mt-2">
-            <div class="text-base font-semibold mb-1">Спасибо! Заказ #${o.id} принят.</div>
-            <div class="text-sm text-gray-600">Статус: ${o.status||'новый'} · Итог: <b>${shownTotal} руб.</b></div>
-          </div>`;
-        showToast(res.dedup?'Заказ уже был, показали его':'Заказ отправлен'); resetCounts(); sendBtn.disabled=false; sendBtn.textContent='Отправить заказ';
+        const o=res.order||{ id:'—', status:'новый', items, total };
+        const serverTotal=typeof o.total==='number'?o.total:0; const shownTotal=Math.max(serverTotal,total,calcTotalFromItems(o));
+        const now=Date.now(); addToClientHistory(clientId,{ ...o, createdAt:o.createdAt||now, localUid:'srv-'+o.id }); renderHistorySheet();
+        showToast(res.dedup?'Заказ уже был, показали его':'Заказ отправлен'); resetCounts(); btn.disabled=false;
       }
     });
   });
 
-  function resetCounts(){ for(const k in counts) delete counts[k]; renderCategory(currentCategory) }
+  function resetCounts(){ for(const k in counts) delete counts[k]; renderCategory(currentCategory); floatingBtn.classList.add('hidden') }
 
-  // нижняя навигация
-  root.querySelector('.bottom-nav').addEventListener('click',(e)=>{ const b=e.target.closest('button[data-nav]'); if(!b) return; location.hash = b.dataset.nav==='home'?'#/home':'#/order' });
-  root.querySelector('#openDrawerBtn').onclick=()=> document.getElementById('drawer').classList.add('open');
+  // history sheet render for this view
+  function renderHistorySheet(){
+    const box=document.getElementById('historyList'); const list=loadClientHistory(clientId);
+    box.innerHTML=''; if(!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
+    list.forEach(o=>{
+      const tot=typeof o.total==='number'?o.total:calcTotalFromItems(o);
+      const card=el(`
+        <div class="p-3 rounded-xl border flex items-start justify-between gap-3 bg-white">
+          <div>
+            <div class="text-sm font-semibold">#${o.id||'—'} ${o.status? '· '+o.status:''}</div>
+            <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
+            <div class="text-sm mt-1">${tot? tot+' руб.':''}</div>
+          </div>
+          <button type="button" class="text-xs text-red-500" data-del>Удалить</button>
+        </div>`);
+      card.querySelector('[data-del]').onclick=()=>{ const cur=loadClientHistory(clientId).filter(x=>x.localUid!==o.localUid); saveClientHistory(clientId,cur); renderHistorySheet() };
+      box.appendChild(card);
+    });
+  }
+
+  // initial server sync for history
+  (async ()=>{
+    const res=await ycCall("list");
+    if(!res.error && Array.isArray(res.orders)){
+      const mine=res.orders.filter(o=>o.clientId===clientId);
+      if(mine.length){
+        const local=loadClientHistory(clientId);
+        const ids=new Set(local.map(x=>String(x.id)));
+        const merged=[...mine.map(o=>({...o, localUid:'srv-'+o.id})), ...local.filter(x=>!ids.has(String(x.id)))];
+        saveClientHistory(clientId, merged.slice(0,20));
+      }
+    }
+    renderHistorySheet();
+  })();
 
   return root;
 }
 
-/* Роутер */
+/* ===== Dashboard (табло) — без изменений, только открытие из главной и burger ===== */
+function DashboardView(){
+  const root=el(`
+    <div class="grid gap-4 max-w-6xl">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Текущие заказы</h2>
+        <div class="flex gap-2">
+          <button type="button" class="px-3 py-2 rounded-xl border" id="enableSound">🔊 Включить звук</button>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-white border">
+        <h3 class="font-semibold mb-3">Наличие товаров</h3>
+        <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне клиента товар станет серым и его нельзя будет добавить.</p>
+        <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
+        <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
+    </div>
+  `);
+
+  const list=root.querySelector('#list'); let audioCtx=null; let soundEnabled=false; const seenIds=new Set(); let lastOrdersMap=new Map();
+  const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailableFromLS());
+
+  function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{
+    const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`);
+    stockList.appendChild(row);
+  })) }
+  renderStock();
+
+  (async()=>{ const srv=await fetchUnavailableFromServer(); if(Array.isArray(srv)){ unavailable=new Set(srv); renderStock(); saveUnavailableToLS(srv); } })();
+
+  root.querySelector('#saveStock').onclick=async()=>{
+    const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+    saveUnavailableToLS(checked); const ok=await saveUnavailableToServer(checked);
+    showToast(ok?'Наличие сохранено':'Сохранено только локально'); unavailable=new Set(checked);
+  };
+
+  function playBeep(d=0.35,f=880){ if(!audioCtx||!soundEnabled) return; const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+    osc.type='square'; osc.frequency.value=f; g.gain.setValueAtTime(0.35,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);
+    osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+d) }
+
+  root.querySelector('#enableSound').onclick=async()=>{ try{ if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; audioCtx=new AC() }
+    if(audioCtx.state==='suspended') await audioCtx.resume(); soundEnabled=true; playBeep(); setTimeout(()=>playBeep(),200); showToast('Звук новых заказов включён') }catch{ showToast('Браузер не дал включить звук') } };
+
+  function orderCard(o){
+    const clientTotal=calcTotalFromItems(o); const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
+    const created=o.createdAt? new Date(o.createdAt): new Date(); const itemLines=(o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(', ');
+    const card=el(`
+      <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
+        <div class="flex items-center justify-between gap-4">
+          <div class="text-lg font-semibold">#${o.id} — ${o.name}</div>
+          <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status}</div>
+        </div>
+        <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}</div>
+        <div>📍 ${o.address}</div><div>☎️ ${o.phone}</div><div>🧾 ${itemLines||'—'}</div>
+        <div>⏰ ${o.deliverByTime&&o.deliverTime?('к '+o.deliverTime):'как можно скорее'}</div>
+        <div class="mt-3 flex flex-wrap gap-2 items-center">
+          <label class="text-sm">Статус:</label>
+          <select class="border rounded-xl p-2" data-k="status">
+            ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
+        </div>
+        <div class="flex gap-2 items-center">
+          <label class="text-sm">Ожидание (мин):</label>
+          <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
+          <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
+        </div>
+        <div class="mt-2 text-right"><button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button></div>
+      </div>`);
+    card.addEventListener('click', async (e)=>{
+      const act=e.target.dataset.act; if(!act) return;
+      if(act==='save'){ const status=card.querySelector('[data-k="status"]').value; await ycCall("update",{id:o.id, patch:{status}}); showToast(`Статус заказа #${o.id} обновлён`) }
+      if(act==='set-eta'){ const etaMinutes=Number(card.querySelector('[data-k="eta"]').value||0); await ycCall("update",{id:o.id, patch:{etaMinutes}}); showToast(`ETA заказа #${o.id} обновлён`) }
+      if(act==='delete'){ if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card && card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
+        await ycCall("delete",{id:o.id}); card.remove(); showToast(`Заказ #${o.id} удалён`) }
+    });
+    return card;
+  }
+
+  async function load(){
+    const res=await ycCall("list"); const unique=new Map();
+    if(!res.error && Array.isArray(res.orders) && res.orders.length>0){ res.orders.forEach(o=>unique.set(String(o.id),o)); lastOrdersMap=new Map(unique) }
+    else if(lastOrdersMap.size>0){ lastOrdersMap.forEach((v,k)=>unique.set(k,v)) }
+    else { const data=store.load(); data.orders.forEach(o=>unique.set(String(o.id),o)) }
+    list.innerHTML=''; if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
+    const currentIds=new Set(); [...unique.values()].forEach(o=>{ const idStr=String(o.id); currentIds.add(idStr); if(!seenIds.has(idStr)){ showToast("Новый заказ #"+o.id); if(soundEnabled){ playBeep(); setTimeout(()=>playBeep(),250) } } list.appendChild(orderCard(o)) });
+    seenIds.clear(); currentIds.forEach(id=>seenIds.add(id));
+  }
+  load(); setInterval(()=>{ if(location.hash==='#/dashboard') load() }, 5000);
+  return root;
+}
+
+/* ===== Router ===== */
 function router(){
   const app=document.getElementById('app'); app.innerHTML='';
   const hash=location.hash;
-  if(hash==='#/profile'){ app.classList.add('phone-shell'); app.appendChild(ProfileView()) }
+  if(hash==='#/dashboard'){ app.classList.remove('phone-shell'); app.appendChild(DashboardView()) }
+  else if(hash==='#/profile'){ app.classList.add('phone-shell'); app.appendChild(ProfileView()) }
   else if(hash==='#/order'){ app.classList.add('phone-shell'); app.appendChild(OrderView()) }
   else { app.classList.add('phone-shell'); app.appendChild(HomeView()) }
 }
 window.addEventListener('hashchange', router); router();
 
-/* Шторка истории (левая) — глобальные обработчики */
+/* ===== Burger drawer ===== */
+const drawer=document.getElementById('drawer');
+document.getElementById('burgerBtn').onclick=()=> drawer.classList.add('open');
+document.getElementById('drawerClose').onclick=()=> drawer.classList.remove('open');
+drawer.onclick=(e)=>{ if(e.target===drawer) drawer.classList.remove('open') };
+document.getElementById('drawerPay').onclick=()=>{ drawer.classList.remove('open'); openPaymentModal() };
+document.getElementById('drawerLegal').onclick=()=>{ drawer.classList.remove('open'); alert('Здесь будет юридическая информация') };
+
+/* ===== History sheet (right) — global open/close + render refresh on route change ===== */
 const historySheet=document.getElementById('historySheet');
 document.getElementById('historyHandle').onclick=()=>{ renderHistoryGlobal(); historySheet.classList.add('open') };
 document.getElementById('historyClose').onclick=()=> historySheet.classList.remove('open');
@@ -460,12 +688,19 @@ function renderHistoryGlobal(){
   });
 }
 
-/* Drawer (нижняя правая ≡) */
-const drawer=document.getElementById('drawer');
-document.getElementById('drawerClose').onclick=()=> drawer.classList.remove('open');
-drawer.onclick=(e)=>{ if(e.target===drawer) drawer.classList.remove('open') };
-document.getElementById('drawerPay').onclick=()=>{ drawer.classList.remove('open'); openPaymentModal() };
-document.getElementById('drawerLegal').onclick=()=>{ drawer.classList.remove('open'); alert('Здесь будет юридическая информация') };
+/* ===== Pin / Tablo ===== */
+const pinModal=document.getElementById('pinModal'), pinInput=document.getElementById('pinInput'),
+      pinOk=document.getElementById('pinOk'), pinCancel=document.getElementById('pinCancel'), pinError=document.getElementById('pinError');
+function showPin(){ pinError.classList.add('hidden'); pinInput.value=''; pinModal.classList.remove('hidden'); pinModal.classList.add('flex'); setTimeout(()=>pinInput.focus(),0) }
+function hidePin(){ pinModal.classList.add('hidden'); pinModal.classList.remove('flex') }
+function tryEnter(){ if(pinInput.value===ALLOWED_PIN){ hidePin(); location.hash='#/dashboard' } else { pinError.classList.remove('hidden'); pinInput.focus() } }
+pinOk.onclick=tryEnter; pinCancel.onclick=hidePin; pinInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter') tryEnter(); if(e.key==='Escape') hidePin() });
+pinModal.addEventListener('click',(e)=>{ if(e.target===pinModal) hidePin() });
+
+/* Home footer quick link opens pin modal */
+function showPinFromHome(){ showPin() }
+
+/* Remove legacy hardRefresh, Клиент/Табло buttons — уже не используются */
 </script>
 </body>
 </html>
