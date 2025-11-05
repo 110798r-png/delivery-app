@@ -49,7 +49,8 @@
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
-      touch-action: pan-y;              /* вертикальная прокрутка внутри */
+      /* важно: разрешаем X и Y, чтобы свайп по списку мог увести страницу по X */
+      touch-action: pan-x pan-y;
     }
   </style>
 </head>
@@ -104,6 +105,38 @@ const MENU_CATEGORIES = [
   { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 } ]},
   { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
 ];
+
+/* ===== Утилита: мост свайпа из вертикального списка к горизонтальному пейджеру ===== */
+function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
+  let startX=0, startY=0, isTracking=false, hasSwiped=false;
+  const THRESH = 40; // порог пикселей для срабатывания
+
+  vbox.addEventListener('pointerdown', (e)=>{
+    isTracking = true; hasSwiped=false;
+    startX = e.clientX; startY = e.clientY;
+  });
+
+  vbox.addEventListener('pointermove', (e)=>{
+    if(!isTracking || hasSwiped) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    // горизонтальный жест заметнее вертикального
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESH){
+      hasSwiped = true; e.preventDefault(); // «забираем» жест у вертикального скролла
+      const w = catPager.getBoundingClientRect().width || 1;
+      const cur = getActiveIndex();
+      const next = dx < 0 ? cur + 1 : cur - 1;
+      if (next >= 0 && next < MENU_CATEGORIES.length){
+        setActiveIndex(next);
+        catPager.scrollTo({ left: w * next, behavior: 'smooth' });
+      }
+    }
+  }, { passive:false });
+
+  ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
+    vbox.addEventListener(evt, ()=>{ isTracking=false; hasSwiped=false; });
+  });
+}
 
 /* ===== Order View ===== */
 function OrderView(){
@@ -163,7 +196,7 @@ function OrderView(){
   /* рендер панелей */
   function buildPanels(){
     catPager.innerHTML='';
-    MENU_CATEGORIES.forEach((cat)=>{
+    MENU_CATEGORIES.forEach((cat, idx)=>{
       const panel=el(`<div class="cat-panel"></div>`);
       const vbox =el(`<div class="v-scroll px-0.5"></div>`);
       const list =el(`<div class="grid gap-3"></div>`);
@@ -190,6 +223,15 @@ function OrderView(){
 
       vbox.appendChild(list);
       panel.appendChild(vbox);
+
+      /* подключаем мост свайпа для этой панели */
+      setupSwipeBridge(
+        vbox,
+        ()=>activeIdx,
+        (i)=>setActiveCatByIdx(i),
+        catPager
+      );
+
       catPager.appendChild(panel);
     });
 
@@ -217,7 +259,6 @@ function OrderView(){
     const confirmH= confirmBar.getBoundingClientRect().height;
     const availH  = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
 
-    // берём высоту карточки с отступами (gap-3 ~ 12px)
     const firstCard = catPager.querySelector('.menu-card');
     const cardH = firstCard ? Math.ceil(firstCard.getBoundingClientRect().height) : 104;
     const gap = 12; // Tailwind gap-3
@@ -228,7 +269,7 @@ function OrderView(){
   }
   window.addEventListener('resize', applyHeights);
 
-  /* синхронизация пейджера и чипов */
+  /* синхронизация пейджера и чипов при прокрутке */
   let snapTimer=null;
   catPager.addEventListener('scroll', ()=>{
     if(snapTimer) clearTimeout(snapTimer);
@@ -270,7 +311,7 @@ function OrderView(){
     const total = items.reduce((s,i)=>s+i.price*i.qty,0);
     const prof=loadProfile();
     if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль: имя, телефон, адрес'); return }
-    alert('Заказ сформирован: '+total+' руб. (демо)'); // здесь можно вернуть твою модалку
+    alert('Заказ сформирован: '+total+' руб. (демо)');
   });
 
   buildPanels();
