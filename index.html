@@ -37,6 +37,7 @@
       scroll-snap-type:x mandatory;
       -webkit-overflow-scrolling:touch;
       touch-action: pan-x pinch-zoom;   /* свайп по X */
+      scroll-behavior:smooth;           /* нативная плавность при программном скролле */
     }
     .cat-panel{
       flex:0 0 100%;
@@ -50,7 +51,7 @@
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
-      touch-action: pan-y;              /* только вертикаль; горизонталь отдаём JS */
+      touch-action: pan-y;              /* вертикаль — нативно; горизонталь отдаём JS-мосту */
     }
   </style>
 </head>
@@ -102,15 +103,16 @@ const MENU_CATEGORIES = [
   { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 } ]},
   { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 } ]},
   { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
+  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
 ];
 
 /* ===== Мост свайпа: вертикальный список -> горизонтальный пейджер ===== */
 function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
   const width = ()=> catPager.getBoundingClientRect().width || 1;
-  const DIST = ()=> width()*0.18;                   // 18% ширины — порог
+  const DIST = ()=> Math.max(40, width()*0.18);    // порог: 18% ширины, но не меньше 40px
   const isHoriz = (dx,dy)=> Math.abs(dx) > Math.abs(dy)*1.2;
 
-  // Pointer Events (Chrome/Android и т.п.)
+  // Pointer Events (Android/Chrome)
   let pDown=false, pSwiped=false, sx=0, sy=0;
   vbox.addEventListener('pointerdown', (e)=>{ pDown=true; pSwiped=false; sx=e.clientX; sy=e.clientY; });
   vbox.addEventListener('pointermove', (e)=>{
@@ -121,7 +123,7 @@ function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
       const cur=getActiveIndex();
       const next=dx<0?cur+1:cur-1;
       if(next>=0 && next<MENU_CATEGORIES.length){
-        setActiveIndex(next);
+        setActiveIndex(next, true); // программный переход (синхронность)
         catPager.scrollTo({ left: width()*next, behavior:'smooth' });
       }
     }
@@ -144,7 +146,7 @@ function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
       const cur=getActiveIndex();
       const next=dx<0?cur+1:cur-1;
       if(next>=0 && next<MENU_CATEGORIES.length){
-        setActiveIndex(next);
+        setActiveIndex(next, true);
         catPager.scrollTo({ left: width()*next, behavior:'smooth' });
       }
     }
@@ -186,6 +188,7 @@ function OrderView(){
 
   /* состояние */
   const counts={}; const scrollMemory=new Map(); let activeIdx=0;
+  let isProgrammaticScroll=false; // блокируем реакцию scroll-обработчика во время плавного перехода
 
   /* чипы */
   MENU_CATEGORIES.forEach((cat,idx)=>{
@@ -193,17 +196,33 @@ function OrderView(){
       `<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`
     ));
   });
-  function setActiveCatByIdx(idx){
+
+  function setActiveCatByIdx(idx, programmatic=false){
+    // кламп на всякий
+    idx = Math.max(0, Math.min(idx, MENU_CATEGORIES.length-1));
     activeIdx=idx;
+    isProgrammaticScroll = programmatic;
+
     categoryBar.querySelectorAll('button').forEach((b,i)=>{
       const on=i===idx;
-      b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on);
+      b.classList.toggle('bg-black',on);
+      b.classList.toggle('text-white',on);
+      b.classList.toggle('border-black',on);
       if(on){ b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }
     });
+
+    // сбросим защитный флаг после окончания «smooth» (≈300мс)
+    if(programmatic){
+      clearTimeout(setActiveCatByIdx._t);
+      setActiveCatByIdx._t = setTimeout(()=>{ isProgrammaticScroll=false; }, 350);
+    }
   }
+
   categoryBar.addEventListener('click', (e)=>{
     const btn=e.target.closest('button[data-idx]'); if(!btn) return;
     const idx=Number(btn.dataset.idx);
+    if(idx===activeIdx) return;
+    setActiveCatByIdx(idx, true);
     const panelW=catPager.getBoundingClientRect().width||1;
     catPager.scrollTo({ left: panelW*idx, behavior:'smooth' });
   });
@@ -243,7 +262,7 @@ function OrderView(){
       setupSwipeBridge(
         vbox,
         ()=>activeIdx,
-        (i)=>setActiveCatByIdx(i),
+        (i, programmatic=true)=>setActiveCatByIdx(i, programmatic),
         catPager
       );
 
@@ -288,10 +307,14 @@ function OrderView(){
   /* синхронизация пейджера и чипов при прокрутке */
   let snapTimer=null;
   catPager.addEventListener('scroll', ()=>{
+    if(isProgrammaticScroll) return; // игнорим во время программной анимации
     if(snapTimer) clearTimeout(snapTimer);
     snapTimer=setTimeout(()=>{
       const w = catPager.getBoundingClientRect().width||1;
-      const idx = Math.round(catPager.scrollLeft / w);
+      // аккуратно округляем и клампим индекс
+      let idx = Math.round(catPager.scrollLeft / w);
+      idx = Math.max(0, Math.min(idx, MENU_CATEGORIES.length-1));
+
       if(idx!==activeIdx){
         // сохранить положение вертикального скролла старой панели
         const oldPanel = catPager.children[activeIdx];
@@ -301,13 +324,13 @@ function OrderView(){
           scrollMemory.set(key, oldBox.scrollTop);
         }
         // активировать новую
-        setActiveCatByIdx(idx);
+        setActiveCatByIdx(idx, false);
         const newPanel = catPager.children[idx];
         const newBox = newPanel.querySelector('.v-scroll');
         const key = MENU_CATEGORIES[idx].key;
         newBox.scrollTop = scrollMemory.get(key)||0;
       }
-    }, 60);
+    }, 40); // пониже задержку — меньше лаг и «догоняния»
   });
 
   function recalcTotal(){
@@ -331,7 +354,7 @@ function OrderView(){
   });
 
   buildPanels();
-  setActiveCatByIdx(0);
+  setActiveCatByIdx(0, true);
   recalcTotal();
 
   root.cleanup = ()=> setBodyScrollLock(false);
