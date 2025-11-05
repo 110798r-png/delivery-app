@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum=1, user-scalable=no" />
   <title>ЯмаМото — онлайн-заказ</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
@@ -25,7 +25,7 @@
 
     .confirm-bar{
       position:fixed; left:50%; transform:translateX(-50%); bottom:0;
-      width:min(540px, 100vw); background:#fff; border-top:1px solid #e5e7eb;
+      width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb;
       padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06);
     }
 
@@ -33,19 +33,15 @@
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
 
-    /* Лист истории (sheet) */
-    .sheet{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:80; }
-    .sheet.open{ display:block }
-    .sheet-panel{ position:absolute; top:0; right:0; width:min(92vw,420px); height:100%; background:#fff; padding:16px; overflow:auto; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-
-    /* Блок-кнопки */
-    .block-btn{ border-radius:1.25rem; padding:1rem; box-shadow:0 8px 24px rgba(15,23,42,.08); transition:transform .12s ease; }
+    .block-btn{ border-radius:1.25rem; padding:1rem; box-shadow:0 8px 24px rgba(15,23,42,.08); transition:transform .12s ease; background:#fff; border:1px solid #eef2f7; }
     .block-btn:active{ transform:scale(.98); }
-    .soft{ background:linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%); border:1px solid #eef2f7; }
 
-    /* Рекламный баннер */
     .promo{ border-radius:1.25rem; background:linear-gradient(135deg,#1f2937 0%,#111827 100%); color:#fff; padding:16px;
             box-shadow:0 12px 32px rgba(17,24,39,.35) }
+
+    /* simple modal */
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
+    .modal.open{ display:flex }
   </style>
 </head>
 <body>
@@ -60,31 +56,41 @@
     <main id="app" class="phone-shell"></main>
   </div>
 
+  <!-- modal: выбор оплаты перед подтверждением -->
+  <div id="payModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl">
+      <h3 class="text-lg font-semibold">Способ оплаты</h3>
+      <div class="grid gap-2" id="payOptions">
+        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="cash"> <span>Наличные</span></label>
+        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="card"> <span>Банковская карта</span></label>
+        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="transfer"> <span>Перевод</span></label>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button id="payCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
+        <button id="payOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ===== Base ===== */
+/* ===== storage / helpers ===== */
 const PROFILE_LS_KEY = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
-const SUPPORT_CHAT_KEY = 'support_chat_v1';
-
 if (!location.hash || location.hash === "#/" || location.hash === "#") location.hash = "#/order";
 
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
-const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2200); };
+const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
 const money = (x)=> `${x} руб.`;
 const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
 
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_KEY))||{} }catch{ return {} } }
 function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})) }
-
 function loadHistory(){ try{ return JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||[] }catch{ return [] } }
 function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(list||[])) }
 
-function loadChat(){ try{ return JSON.parse(localStorage.getItem(SUPPORT_CHAT_KEY))||[] }catch{ return [] } }
-function saveChat(list){ localStorage.setItem(SUPPORT_CHAT_KEY, JSON.stringify(list||[])) }
-
-/* ===== Menu data (включая «Полуфабрикаты») ===== */
+/* ===== menu data (с «Полуфабрикатами») ===== */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -99,16 +105,16 @@ const MENU_CATEGORIES = [
   { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
 ];
 
-/* ===== Анимация скролла по X (из предыдущего шага) ===== */
+/* ===== easing + scroll helper ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
-function animateScrollX(el, to, {duration=280, onStart, onEnd}={}){
-  const from = el.scrollLeft; const diff = to - from; if (diff===0){ onStart&&onStart(); onEnd&&onEnd(); return; }
-  const startTs = performance.now(); onStart&&onStart();
-  function step(ts){ const t=Math.min(1,(ts-startTs)/duration); el.scrollLeft = from + diff*easeInOutCubic(t); t<1?requestAnimationFrame(step):onEnd&&onEnd(); }
+function animateScrollX(el, to, {duration=280, onEnd}={}){
+  const from = el.scrollLeft; const diff = to - from; if (!diff){ onEnd&&onEnd(); return; }
+  const start = performance.now();
+  function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft = from + diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); }
   requestAnimationFrame(step);
 }
 
-/* ===== ORDER (как ты просил: 1 свайп = 1 категория) ===== */
+/* ===== ORDER (как настроили ранее) ===== */
 function OrderView(){
   const root=el(`
     <div class="relative">
@@ -139,7 +145,6 @@ function OrderView(){
   let activeIdx=0, isAnimating=false;
   const panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
-  // чипы
   MENU_CATEGORIES.forEach((cat,idx)=>{
     categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`));
   });
@@ -163,7 +168,7 @@ function OrderView(){
   }
   categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
 
-  // панели
+  // build panels
   function buildPanels(){
     catPager.innerHTML='';
     MENU_CATEGORIES.forEach((cat, idx)=>{
@@ -187,10 +192,10 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
-      // Pointer-свайп: 1 жест = ±1 индекс
+      // swipe 1:1
       let down=false, used=false, sx=0, sy=0, locked=null;
       const PIX_LOCK=10, THRESH = ()=> Math.max(40, panelW()*0.25);
-      vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture(e.pointerId); });
+      vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
       vbox.addEventListener('pointermove',e=>{
         if(!down||used||isAnimating) return;
         const dx=e.clientX-sx, dy=e.clientY-sy;
@@ -203,11 +208,10 @@ function OrderView(){
           if(Math.abs(dx)>=THRESH()){ used=true; const next = dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); }
         }
       }, {passive:false});
-      const endPtr = (e)=>{ down=false; used=false; locked=null; try{ vbox.releasePointerCapture?.(e.pointerId); }catch{} };
-      ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,endPtr));
+      ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,()=>{ down=false; used=false; locked=null; }));
     });
 
-    if(!catPager._plusMinusBound){
+    if(!catPager._pmBound){
       catPager.addEventListener('click', e=>{
         const act=e.target?.dataset?.act; if(!act) return;
         const name=e.target.dataset.name;
@@ -215,7 +219,7 @@ function OrderView(){
         catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0);
         recalcTotal();
       });
-      catPager._plusMinusBound=true;
+      catPager._pmBound=true;
     }
 
     applyHeights(); setTimeout(applyHeights,60);
@@ -247,171 +251,58 @@ function OrderView(){
     totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum;
   }
 
+  // подтверждение: сначала спросим оплату (по умолчанию — из профиля)
   confirmBtn.addEventListener('click', ()=>{
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
     if(!items.length){ showToast('Выберите товары'); return }
     const total = items.reduce((s,i)=>s+i.price*i.qty,0);
     const prof=loadProfile();
-    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль: имя, телефон, адрес'); location.hash='#/profile'; return }
-    // Добавим в локальную историю
-    const list=loadHistory();
-    list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items, total, status:'новый' });
-    saveHistory(list.slice(0,50));
-    showToast('Заказ сохранён');
-    // обнулим выбор
-    Object.keys(counts).forEach(k=> counts[k]=0); catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0'); recalcTotal();
+    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; return }
+
+    const m=document.getElementById('payModal');
+    const def=prof.paymentMethod||'cash';
+    m.querySelectorAll('input[name="pay"]').forEach(r=> r.checked = (r.value===def));
+    m.classList.add('open');
+
+    const close=()=> m.classList.remove('open');
+    m.querySelector('#payCancel').onclick = close;
+    m.onclick = (e)=>{ if(e.target===m) close(); };
+    m.querySelector('#payOk').onclick = ()=>{
+      const sel = m.querySelector('input[name="pay"]:checked')?.value || def;
+      // заказ (демо) + запись в историю
+      const list=loadHistory();
+      list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items, total, pay: sel, status:'новый' });
+      saveHistory(list.slice(0,50));
+      close();
+      showToast('Заказ сохранён');
+    };
   });
 
-  buildPanels(); highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false})); recalcTotal();
+  buildPanels(); highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
   root.cleanup = ()=> setBodyScrollLock(false);
   return root;
 }
 
-/* ===== Лист истории (общий компонент) ===== */
-function openHistorySheet(){
-  let sheet=document.getElementById('historySheet');
-  if(!sheet){
-    sheet = el(`<div id="historySheet" class="sheet">
-      <div class="sheet-panel">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-lg font-semibold">История заказов</h3>
-          <div class="flex gap-2">
-            <button id="histClear" class="px-3 py-1.5 rounded-xl border text-sm">Очистить всё</button>
-            <button id="histClose" class="px-3 py-1.5 rounded-xl border text-sm">Закрыть</button>
-          </div>
-        </div>
-        <div id="historyList" class="grid gap-2"></div>
-      </div>
-    </div>`);
-    document.body.appendChild(sheet);
-    sheet.addEventListener('click',e=>{ if(e.target===sheet) sheet.classList.remove('open') });
-    sheet.querySelector('#histClose').onclick=()=> sheet.classList.remove('open');
-    sheet.querySelector('#histClear').onclick=()=>{
-      if(confirm('Очистить всю историю?')){
-        saveHistory([]); renderHistory();
-      }
-    };
-  }
-  function renderHistory(){
-    const box=sheet.querySelector('#historyList'); const list=loadHistory();
-    box.innerHTML='';
-    if(!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
-    list.forEach((o,idx)=>{
-      const items=o.items?.map(i=>`${i.name} ×${i.qty}`).join(', ')||'—';
-      const card=el(`<div class="p-3 rounded-xl border bg-white flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="text-sm font-semibold">#${o.id||'—'} · ${o.status||''}</div>
-          <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-          <div class="text-sm mt-1">${money(o.total||0)}</div>
-          <div class="text-xs text-gray-600 mt-1 truncate">${items}</div>
-        </div>
-        <button class="text-xs text-red-500" data-del>Удалить</button>
-      </div>`);
-      card.querySelector('[data-del]').onclick=()=>{
-        const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); renderHistory();
-      };
-      box.appendChild(card);
-    });
-  }
-  renderHistory();
-  sheet.classList.add('open');
-}
-
-/* ===== ПОДДЕРЖКА (чат с вложениями, локально) ===== */
-function SupportView(){
-  const root=el(`
-    <div class="grid gap-3 pb-24">
-      <section class="glass-panel rounded-2xl p-4">
-        <h2 class="text-lg font-semibold">Поддержка</h2>
-        <p class="text-xs text-gray-600">Пишите нам и прикрепляйте фото. Тел.: <a href="tel:+798989932108" class="underline">+7 989 899 32 108</a>, почта: <a href="mailto:sabirbis@bk.ru" class="underline">sabirbis@bk.ru</a></p>
-      </section>
-      <section class="rounded-2xl bg-white border p-0 overflow-hidden">
-        <div id="chatList" class="p-3 space-y-2 max-h-[55vh] overflow-auto"></div>
-        <div class="border-t p-2 flex items-center gap-2">
-          <input type="file" id="chatAttach" accept="image/*" multiple class="hidden">
-          <button id="attachBtn" class="px-3 py-2 rounded-xl border">📎</button>
-          <input id="chatInput" class="flex-1 border rounded-xl p-2" placeholder="Сообщение…">
-          <button id="sendBtn" class="px-3 py-2 rounded-xl bg-black text-white">Отправить</button>
-        </div>
-      </section>
-    </div>
-  `);
-
-  const chatList=root.querySelector('#chatList');
-  const input=root.querySelector('#chatInput');
-  const send=root.querySelector('#sendBtn');
-  const attachBtn=root.querySelector('#attachBtn');
-  const attach=root.querySelector('#chatAttach');
-
-  function render(){
-    const msgs=loadChat();
-    chatList.innerHTML='';
-    msgs.forEach(m=>{
-      const bubble=el(`<div class="max-w-[85%] ${m.role==='user'?'ml-auto':''}">
-        <div class="rounded-2xl px-3 py-2 ${m.role==='user'?'bg-black text-white':'bg-gray-100'} shadow">
-          <div class="text-sm whitespace-pre-wrap">${m.text||''}</div>
-          ${m.images?.length? `<div class="mt-2 grid grid-cols-3 gap-2">${m.images.map(src=>`<img src="${src}" class="w-full h-20 object-cover rounded-xl border">`).join('')}</div>`:''}
-          <div class="text-[10px] opacity-70 mt-1">${new Date(m.ts).toLocaleTimeString()}</div>
-        </div>
-      </div>`);
-      chatList.appendChild(bubble);
-    });
-    chatList.scrollTop = chatList.scrollHeight;
-  }
-
-  attachBtn.onclick=()=> attach.click();
-  send.onclick=()=>{
-    const text=(input.value||'').trim(); const files=[...attach.files||[]];
-    if(!text && !files.length){ return }
-    const images=[];
-    if(files.length){
-      // читаем как dataURL, чтобы показать превью и хранить локально
-      let pending=files.length;
-      files.forEach(f=>{
-        const fr=new FileReader();
-        fr.onload=()=>{ images.push(fr.result); if(--pending===0) commit(); };
-        fr.readAsDataURL(f);
-      });
-    }else commit();
-
-    function commit(){
-      const msgs=loadChat();
-      msgs.push({ role:'user', text, images, ts:Date.now() });
-      saveChat(msgs); input.value=''; attach.value=''; render();
-      // эмулируем авто-ответ (можно убрать)
-      setTimeout(()=>{
-        const ms=loadChat(); ms.push({ role:'agent', text:'Спасибо! Мы ответим в ближайшее время 👌', images:[], ts:Date.now() }); saveChat(ms); render();
-      }, 600);
-    }
-  };
-
-  render();
-  return root;
-}
-
-/* ===== ПРОФИЛЬ: две блок-кнопки + баннер + строки ===== */
-function ProfileView(){
-  const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'' }, loadProfile());
+/* ===== ПРОФИЛЬ: хаб (две кнопки) + нижняя секция с «камерой» и инфо ===== */
+function ProfileHubView(){
+  const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const last4 = loadHistory().slice(0,4);
 
   const root=el(`
     <div class="grid gap-4 pb-24">
       <div class="grid grid-cols-2 gap-3">
-        <!-- Блок профиля -->
-        <button class="block-btn soft text-left" id="profileEdit">
+        <button class="block-btn text-left" id="profileEditBtn">
           <div class="text-2xl mb-1">👤</div>
           <div class="text-sm font-semibold mb-1">Мой профиль</div>
           <div class="text-xs text-gray-600 leading-snug">
-            ${p.name? `Имя: ${p.name}<br>`:''}
-            ${p.phone? `Тел.: ${p.phone}<br>`:''}
-            ${p.address? `Адрес: ${p.address}<br>`:''}
-            ${p.paymentMethod? `Оплата: ${p.paymentMethod}`:''}
-            ${(!p.name&&!p.phone&&!p.address&&!p.paymentMethod)?'Не заполнен — нажмите для редактирования':''}
+            ${p.name? `Имя: ${p.name}<br>`:'Не заполнен — нажмите'}
+            ${p.phone? `<br>Тел.: ${p.phone}`:''}
+            ${p.address? `<br>Адрес: ${p.address}`:''}
+            ${p.paymentMethod? `<br>Оплата: ${p.paymentMethod}`:''}
           </div>
         </button>
 
-        <!-- Блок истории -->
-        <button class="block-btn soft text-left" id="historyOpen">
+        <button class="block-btn text-left" id="historyBtn">
           <div class="text-2xl mb-1">🧾</div>
           <div class="text-sm font-semibold mb-1">История заказов</div>
           <div class="space-y-1">
@@ -422,76 +313,159 @@ function ProfileView(){
         </button>
       </div>
 
-      <!-- Рекламный баннер -->
       <section class="promo">
         <div class="text-sm opacity-80">Технологичный вкус</div>
         <div class="text-xl font-semibold mt-1">Скидка 10% на первые роллы</div>
         <div class="text-xs opacity-80 mt-1">Оформите заказ онлайн — быстрее и выгоднее.</div>
       </section>
 
-      <!-- Три строки -->
-      <section class="rounded-2xl bg-white border">
-        <button id="goSupport" class="w-full text-left px-4 py-3 border-b">Поддержка</button>
-        <button id="goLegal"   class="w-full text-left px-4 py-3 border-b">Юридическая информация</button>
-        <button id="goDev"     class="w-full text-left px-4 py-3">О разработчике</button>
-      </section>
+      <!-- Нижняя двухколоночная секция -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- live camera (плейсхолдер) -->
+        <div class="rounded-2xl border bg-black text-white aspect-video flex items-center justify-center">
+          <div class="text-center">
+            <div class="text-xs opacity-70 mb-1">LIVE</div>
+            <div class="text-sm opacity-90">Камера кухни (скоро)</div>
+          </div>
+        </div>
 
-      <!-- Редактор профиля -->
+        <!-- блок с кнопками и контактами -->
+        <div class="rounded-2xl border bg-white p-3 flex flex-col gap-2">
+          <button id="openTablo" class="px-3 py-2 rounded-xl border">Открыть табло</button>
+          <button id="coopBtn" class="px-3 py-2 rounded-xl border">Сотрудничество</button>
+          <div class="mt-1 text-sm">
+            <div class="font-semibold mb-1">Обратная связь</div>
+            <div><a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
+            <div><a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `);
+
+  root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
+  root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
+  root.querySelector('#openTablo').onclick      = ()=> location.hash = '#/dashboard';
+  root.querySelector('#coopBtn').onclick        = ()=> alert('Пишите на почту или в поддержку — обсудим детали сотрудничества.');
+
+  return root;
+}
+
+/* ===== ПРОФИЛЬ: редактор (ВКЛЮЧИЛ способ оплаты) ===== */
+function ProfileEditView(){
+  const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
+  const root=el(`
+    <div class="grid gap-4 pb-24">
       <section class="glass-panel rounded-2xl p-5">
         <h2 class="text-lg font-semibold mb-3">Редактировать профиль</h2>
         <div class="grid gap-3">
           <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${p.name||''}">
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
           <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
-          <select id="pPay" class="border rounded-xl p-3">
-            <option value="">Способ оплаты…</option>
-            <option value="Наличные" ${p.paymentMethod==='Наличные'?'selected':''}>Наличные</option>
-            <option value="Банковская карта" ${p.paymentMethod==='Банковская карта'?'selected':''}>Банковская карта</option>
-            <option value="Перевод" ${p.paymentMethod==='Перевод'?'selected':''}>Перевод</option>
-          </select>
-          <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white">Сохранить</button>
+
+          <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
+          <div class="grid gap-2">
+            <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="cash"> Наличные</label>
+            <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="card"> Банковская карта</label>
+            <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="transfer"> Перевод</label>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
+            <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
+          </div>
+          <div class="text-xs text-gray-500">При заказе оплату можно изменить — по умолчанию будет то, что выбрано здесь.</div>
         </div>
       </section>
     </div>
   `);
 
-  // Навигации
-  root.querySelector('#historyOpen').onclick = ()=> openHistorySheet();
-  root.querySelector('#profileEdit').onclick = ()=>{
-    root.querySelector('#pName').focus();
-    showToast('Отредактируйте данные ниже и нажмите «Сохранить»');
-  };
-  root.querySelector('#goSupport').onclick = ()=> { location.hash = '#/support' };
-  root.querySelector('#goLegal').onclick = ()=> alert('Юридическая информация: реквизиты и политика будут добавлены позже.');
-  root.querySelector('#goDev').onclick   = ()=> alert('Контакты разработчика: sabirbis@bk.ru');
+  // выбрать текущее значение оплаты
+  root.querySelectorAll('input[name="paydef"]').forEach(r=> r.checked = (r.value === p.paymentMethod));
 
-  // Сохранение профиля
-  root.querySelector('#pSave').onclick = ()=>{
+  root.querySelector('#pSave').onclick=()=>{
+    const paymentMethod = root.querySelector('input[name="paydef"]:checked')?.value || 'cash';
     const p2={ name:root.querySelector('#pName').value.trim(),
                phone:root.querySelector('#pPhone').value.trim(),
                address:root.querySelector('#pAddr').value.trim(),
-               paymentMethod:root.querySelector('#pPay').value||'' };
-    saveProfile(p2); showToast('Профиль сохранён');
+               paymentMethod };
+    saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile';
   };
-
+  root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
 
+/* ===== ИСТОРИЯ ===== */
+function HistoryView(){
+  const root=el(`
+    <div class="grid gap-3 pb-24">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">История заказов</h2>
+        <div class="flex gap-2">
+          <button id="clearAll" class="px-3 py-2 rounded-xl border">Очистить всё</button>
+          <button id="back" class="px-3 py-2 rounded-xl border">Назад</button>
+        </div>
+      </div>
+      <div id="historyList" class="grid gap-2"></div>
+    </div>
+  `);
+
+  const box=root.querySelector('#historyList');
+  function render(){
+    const list=loadHistory();
+    box.innerHTML='';
+    if(!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
+    list.forEach((o,idx)=>{
+      const items=o.items?.map(i=>`${i.name} ×${i.qty}`).join(', ')||'—';
+      const card=el(`<div class="p-3 rounded-xl border bg-white flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold">#${o.id||'—'} · ${o.status||''}</div>
+          <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
+          <div class="text-sm mt-1">${money(o.total||0)}${o.pay? ' · '+o.pay:''}</div>
+          <div class="text-xs text-gray-600 mt-1 truncate">${items}</div>
+        </div>
+        <button class="text-xs text-red-500" data-del>Удалить</button>
+      </div>`);
+      card.querySelector('[data-del]').onclick=()=>{
+        const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render();
+      };
+      box.appendChild(card);
+    });
+  }
+  root.querySelector('#clearAll').onclick=()=>{ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); } };
+  root.querySelector('#back').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
+  render();
+  return root;
+}
+
+/* ===== Табло — заглушка (подключим реальный позже) ===== */
+function DashboardView(){
+  return el(`<div class="grid gap-3 pb-24">
+    <h2 class="text-lg font-semibold">Табло (демо)</h2>
+    <div class="rounded-2xl border bg-white p-4 text-sm text-gray-600">Здесь подключим прежний экран табло.</div>
+    <button class="px-3 py-2 rounded-xl border w-max" onclick="location.hash='#/profile'">Назад</button>
+  </div>`);
+}
+
 /* ===== Router ===== */
-function router(){
+function mount(view){
   const app=document.getElementById('app');
   if (app.firstChild && typeof app.firstChild.cleanup === 'function') { try{ app.firstChild.cleanup(); }catch{} }
-  app.innerHTML='';
-  const hash=location.hash;
-  if(hash==='#/profile'){ app.classList.add('phone-shell'); app.appendChild(ProfileView()) }
-  else if(hash==='#/support'){ app.classList.add('phone-shell'); app.appendChild(SupportView()) }
-  else { app.classList.add('phone-shell'); app.appendChild(OrderView()) }
+  app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view);
+}
+function router(){
+  const h = location.hash.split('?')[0];
+  if(h==='#/profile')         mount(ProfileHubView());
+  else if(h==='#/profile-edit') mount(ProfileEditView());
+  else if(h==='#/history')    mount(HistoryView());
+  else if(h==='#/dashboard')  mount(DashboardView());
+  else                        mount(OrderView()); // #/order и всё остальное
 }
 window.addEventListener('hashchange', router);
 router();
 
-/* Header actions */
-document.getElementById('profileBtn').onclick=()=>{ location.hash='#/profile' };
+/* Header: всегда открывает профиль-хаб */
+document.getElementById('profileBtn').addEventListener('click', ()=>{ location.hash='#/profile' });
 </script>
 </body>
 </html>
