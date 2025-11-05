@@ -41,6 +41,7 @@
     .cat-panel{
       flex:0 0 100%;
       scroll-snap-align:start;
+      scroll-snap-stop: always;         /* не перескакивать через панель */
       padding:0;
     }
 
@@ -49,8 +50,7 @@
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
-      /* важно: разрешаем X и Y, чтобы свайп по списку мог увести страницу по X */
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;              /* только вертикаль; горизонталь отдаём JS */
     }
   </style>
 </head>
@@ -70,8 +70,6 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-
-  <!-- (модалки оплаты/подтверждения можно вернуть позже) -->
 
 <script>
 /* ===== Config & helpers ===== */
@@ -106,36 +104,53 @@ const MENU_CATEGORIES = [
   { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
 ];
 
-/* ===== Утилита: мост свайпа из вертикального списка к горизонтальному пейджеру ===== */
+/* ===== Мост свайпа: вертикальный список -> горизонтальный пейджер ===== */
 function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
-  let startX=0, startY=0, isTracking=false, hasSwiped=false;
-  const THRESH = 40; // порог пикселей для срабатывания
+  const width = ()=> catPager.getBoundingClientRect().width || 1;
+  const DIST = ()=> width()*0.18;                   // 18% ширины — порог
+  const isHoriz = (dx,dy)=> Math.abs(dx) > Math.abs(dy)*1.2;
 
-  vbox.addEventListener('pointerdown', (e)=>{
-    isTracking = true; hasSwiped=false;
-    startX = e.clientX; startY = e.clientY;
-  });
-
+  // Pointer Events (Chrome/Android и т.п.)
+  let pDown=false, pSwiped=false, sx=0, sy=0;
+  vbox.addEventListener('pointerdown', (e)=>{ pDown=true; pSwiped=false; sx=e.clientX; sy=e.clientY; });
   vbox.addEventListener('pointermove', (e)=>{
-    if(!isTracking || hasSwiped) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    // горизонтальный жест заметнее вертикального
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESH){
-      hasSwiped = true; e.preventDefault(); // «забираем» жест у вертикального скролла
-      const w = catPager.getBoundingClientRect().width || 1;
-      const cur = getActiveIndex();
-      const next = dx < 0 ? cur + 1 : cur - 1;
-      if (next >= 0 && next < MENU_CATEGORIES.length){
+    if(!pDown || pSwiped) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(isHoriz(dx,dy) && Math.abs(dx)>=DIST()){
+      pSwiped=true; e.preventDefault();
+      const cur=getActiveIndex();
+      const next=dx<0?cur+1:cur-1;
+      if(next>=0 && next<MENU_CATEGORIES.length){
         setActiveIndex(next);
-        catPager.scrollTo({ left: w * next, behavior: 'smooth' });
+        catPager.scrollTo({ left: width()*next, behavior:'smooth' });
       }
     }
-  }, { passive:false });
-
+  }, {passive:false});
   ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
-    vbox.addEventListener(evt, ()=>{ isTracking=false; hasSwiped=false; });
+    vbox.addEventListener(evt, ()=>{ pDown=false; pSwiped=false; });
   });
+
+  // Touch fallback (iOS Safari)
+  let tDown=false, tSwiped=false, tx=0, ty=0;
+  vbox.addEventListener('touchstart', (e)=>{
+    if(e.touches.length!==1) return;
+    const t=e.touches[0]; tDown=true; tSwiped=false; tx=t.clientX; ty=t.clientY;
+  }, {passive:true});
+  vbox.addEventListener('touchmove', (e)=>{
+    if(!tDown || tSwiped || e.touches.length!==1) return;
+    const t=e.touches[0]; const dx=t.clientX-tx, dy=t.clientY-ty;
+    if(isHoriz(dx,dy) && Math.abs(dx)>=DIST()){
+      tSwiped=true; e.preventDefault();             // важно: passive:false
+      const cur=getActiveIndex();
+      const next=dx<0?cur+1:cur-1;
+      if(next>=0 && next<MENU_CATEGORIES.length){
+        setActiveIndex(next);
+        catPager.scrollTo({ left: width()*next, behavior:'smooth' });
+      }
+    }
+  }, {passive:false});
+  vbox.addEventListener('touchend', ()=>{ tDown=false; tSwiped=false; }, {passive:true});
+  vbox.addEventListener('touchcancel', ()=>{ tDown=false; tSwiped=false; }, {passive:true});
 }
 
 /* ===== Order View ===== */
@@ -224,7 +239,7 @@ function OrderView(){
       vbox.appendChild(list);
       panel.appendChild(vbox);
 
-      /* подключаем мост свайпа для этой панели */
+      /* мост свайпа для этой панели */
       setupSwipeBridge(
         vbox,
         ()=>activeIdx,
@@ -235,24 +250,25 @@ function OrderView(){
       catPager.appendChild(panel);
     });
 
-    /* обработка +/− */
-    catPager.addEventListener('click', (e)=>{
-      const act=e.target?.dataset?.act; if(!act) return;
-      const name=e.target.dataset.name;
-      const cat = MENU_CATEGORIES.find(c=>c.items.some(i=>i.name===name));
-      const price = cat?.items.find(i=>i.name===name)?.price ?? 0;
-      if(act==='inc') counts[name]=(counts[name]||0)+1;
-      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
-      const qEl=catPager.querySelector(`[data-q="${CSS.escape(name)}"]`);
-      if(qEl) qEl.textContent=counts[name]||0;
-      recalcTotal();
-    });
+    /* делегирование +/− — один раз на пейджер */
+    if(!catPager._plusMinusBound){
+      catPager.addEventListener('click', (e)=>{
+        const act=e.target?.dataset?.act; if(!act) return;
+        const name=e.target.dataset.name;
+        if(act==='inc') counts[name]=(counts[name]||0)+1;
+        if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
+        const qEl=catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`);
+        qEl.forEach(el=> el.textContent=counts[name]||0);
+        recalcTotal();
+      });
+      catPager._plusMinusBound=true;
+    }
 
     applyHeights();              // сразу
     setTimeout(applyHeights,60); // после layout
   }
 
-  /* высота: ровно ~4 карточки, но не больше доступного окна */
+  /* высота: ~4 карточки, но не больше доступного окна */
   function applyHeights(){
     const headerH = document.getElementById('appHeader').getBoundingClientRect().height;
     const chipsH  = root.querySelector('.sticky-top').getBoundingClientRect().height;
