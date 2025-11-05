@@ -36,22 +36,21 @@
       overflow-x:auto;
       scroll-snap-type:x mandatory;
       -webkit-overflow-scrolling:touch;
-      touch-action: pan-x pinch-zoom;   /* свайп по X */
-      scroll-behavior:smooth;           /* нативная плавность при программном скролле */
+      touch-action: pan-x pinch-zoom;   /* жест по X разрешаем на самом пейджере */
     }
     .cat-panel{
       flex:0 0 100%;
       scroll-snap-align:start;
-      scroll-snap-stop: always;         /* не перескакивать через панель */
+      scroll-snap-stop: always;         /* исключаем «перепрыг» через панель для нативного свайпа */
       padding:0;
     }
 
-    /* Вертикальный скролл внутри панели */
+    /* Вертикальный скролл внутри панели — здесь мы ловим Pointer и решаем, когда «увезти» пейджер */
     .v-scroll{
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
-      touch-action: pan-y;              /* вертикаль — нативно; горизонталь отдаём JS-мосту */
+      touch-action: pan-y;              /* вертикаль — нативная; горизонталь отдаём JS */
     }
   </style>
 </head>
@@ -74,7 +73,6 @@
 
 <script>
 /* ===== Config & helpers ===== */
-const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 const PROFILE_LS_KEY = 'client_profile_v1';
 if (!location.hash || location.hash === "#/" || location.hash === "#") location.hash = "#/order";
 
@@ -85,13 +83,7 @@ function money(x){ return x+' руб.' }
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_KEY))||{} }catch{ return {} } }
 function setBodyScrollLock(on){ document.body.style.overflow = on ? 'hidden' : ''; }
 
-/* API stub */
-async function ycCall(op, extra={}){ try{
-  const res=await fetch(API_BASE,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({op,...extra}) });
-  return await res.json();
-}catch(e){ return {error:'network'} } }
-
-/* Menu data */
+/* Menu data (добавил «Полуфабрикаты») */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -100,59 +92,39 @@ const MENU_CATEGORIES = [
     { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
     { name:'Чизбургер', price:220 }
   ]},
-  { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 } ]},
-  { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 } ]},
-  { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
+  { key:'twisters', title:'Твистеры', items:[
+    { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 }
+  ]},
+  { key:'drinks',  title:'Напитки', items:[
+    { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 },
+    { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 }
+  ]},
+  { key:'sushi',   title:'Суши / роллы', items:[
+    { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 }
+  ]},
+  { key:'semi',   title:'Полуфабрикаты', items:[
+    { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 }
+  ]},
 ];
 
-/* ===== Мост свайпа: вертикальный список -> горизонтальный пейджер ===== */
-function setupSwipeBridge(vbox, getActiveIndex, setActiveIndex, catPager){
-  const width = ()=> catPager.getBoundingClientRect().width || 1;
-  const DIST = ()=> Math.max(40, width()*0.18);    // порог: 18% ширины, но не меньше 40px
-  const isHoriz = (dx,dy)=> Math.abs(dx) > Math.abs(dy)*1.2;
-
-  // Pointer Events (Android/Chrome)
-  let pDown=false, pSwiped=false, sx=0, sy=0;
-  vbox.addEventListener('pointerdown', (e)=>{ pDown=true; pSwiped=false; sx=e.clientX; sy=e.clientY; });
-  vbox.addEventListener('pointermove', (e)=>{
-    if(!pDown || pSwiped) return;
-    const dx=e.clientX-sx, dy=e.clientY-sy;
-    if(isHoriz(dx,dy) && Math.abs(dx)>=DIST()){
-      pSwiped=true; e.preventDefault();
-      const cur=getActiveIndex();
-      const next=dx<0?cur+1:cur-1;
-      if(next>=0 && next<MENU_CATEGORIES.length){
-        setActiveIndex(next, true); // программный переход (синхронность)
-        catPager.scrollTo({ left: width()*next, behavior:'smooth' });
-      }
-    }
-  }, {passive:false});
-  ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
-    vbox.addEventListener(evt, ()=>{ pDown=false; pSwiped=false; });
-  });
-
-  // Touch fallback (iOS Safari)
-  let tDown=false, tSwiped=false, tx=0, ty=0;
-  vbox.addEventListener('touchstart', (e)=>{
-    if(e.touches.length!==1) return;
-    const t=e.touches[0]; tDown=true; tSwiped=false; tx=t.clientX; ty=t.clientY;
-  }, {passive:true});
-  vbox.addEventListener('touchmove', (e)=>{
-    if(!tDown || tSwiped || e.touches.length!==1) return;
-    const t=e.touches[0]; const dx=t.clientX-tx, dy=t.clientY-ty;
-    if(isHoriz(dx,dy) && Math.abs(dx)>=DIST()){
-      tSwiped=true; e.preventDefault();             // важно: passive:false
-      const cur=getActiveIndex();
-      const next=dx<0?cur+1:cur-1;
-      if(next>=0 && next<MENU_CATEGORIES.length){
-        setActiveIndex(next, true);
-        catPager.scrollTo({ left: width()*next, behavior:'smooth' });
-      }
-    }
-  }, {passive:false});
-  vbox.addEventListener('touchend', ()=>{ tDown=false; tSwiped=false; }, {passive:true});
-  vbox.addEventListener('touchcancel', ()=>{ tDown=false; tSwiped=false; }, {passive:true});
+/* ===== Анимация скролла по X без инерции браузера ===== */
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
+function animateScrollX(el, to, {duration=280, onStart, onEnd}={}){
+  const from = el.scrollLeft;
+  const diff = to - from;
+  if (diff===0){ onStart&&onStart(); onEnd&&onEnd(); return; }
+  const startTs = performance.now();
+  let rafId = null;
+  onStart && onStart();
+  const step = (ts)=>{
+    const t = Math.min(1, (ts - startTs)/duration);
+    const v = from + diff * easeInOutCubic(t);
+    el.scrollLeft = v;
+    if (t < 1){ rafId = requestAnimationFrame(step); }
+    else { onEnd && onEnd(); }
+  };
+  rafId = requestAnimationFrame(step);
+  return ()=> cancelAnimationFrame(rafId);
 }
 
 /* ===== Order View ===== */
@@ -186,48 +158,82 @@ function OrderView(){
 
   setBodyScrollLock(true);
 
-  /* состояние */
-  const counts={}; const scrollMemory=new Map(); let activeIdx=0;
-  let isProgrammaticScroll=false; // блокируем реакцию scroll-обработчика во время плавного перехода
+  /* ===== Состояние и FSM ===== */
+  const counts={}; const scrollMemory=new Map();
+  let activeIdx=0;
+  let isAnimating=false;
+  let panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
-  /* чипы */
+  /* Чипы */
   MENU_CATEGORIES.forEach((cat,idx)=>{
     categoryBar.appendChild(el(
       `<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`
     ));
   });
 
-  function setActiveCatByIdx(idx, programmatic=false){
-    // кламп на всякий
-    idx = Math.max(0, Math.min(idx, MENU_CATEGORIES.length-1));
-    activeIdx=idx;
-    isProgrammaticScroll = programmatic;
-
+  function highlightChip(idx){
     categoryBar.querySelectorAll('button').forEach((b,i)=>{
       const on=i===idx;
-      b.classList.toggle('bg-black',on);
-      b.classList.toggle('text-white',on);
-      b.classList.toggle('border-black',on);
+      b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on);
       if(on){ b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }
     });
-
-    // сбросим защитный флаг после окончания «smooth» (≈300мс)
-    if(programmatic){
-      clearTimeout(setActiveCatByIdx._t);
-      setActiveCatByIdx._t = setTimeout(()=>{ isProgrammaticScroll=false; }, 350);
-    }
   }
 
+  function goToIndex(idx, {animate=true}={}){
+    idx = Math.max(0, Math.min(MENU_CATEGORIES.length-1, idx));
+    if (idx===activeIdx && !animate) return;
+    const targetLeft = Math.round(panelW()*idx);
+
+    // мгновенно подсветить чип (визуальная синхронизация)
+    highlightChip(idx);
+
+    if (!animate){
+      catPager.scrollSnapType = 'x mandatory';
+      catPager.scrollLeft = targetLeft;
+      activeIdx = idx;
+      return;
+    }
+
+    // блокируем снап и скролл-обработки на время анимации
+    isAnimating = true;
+    const prevSnap = catPager.style.scrollSnapType;
+    catPager.style.scrollSnapType = 'none';
+
+    // сохранить вертикальную позицию старой панели
+    const oldPanel = catPager.children[activeIdx];
+    if (oldPanel){
+      const oldBox = oldPanel.querySelector('.v-scroll');
+      scrollMemory.set(MENU_CATEGORIES[activeIdx].key, oldBox.scrollTop);
+    }
+
+    // анимируем
+    animateScrollX(catPager, targetLeft, {
+      duration: 280,
+      onStart(){},
+      onEnd(){
+        // восстановить scrollTop на новой панели
+        const newPanel = catPager.children[idx];
+        const newBox = newPanel?.querySelector('.v-scroll');
+        if (newBox){
+          const key = MENU_CATEGORIES[idx].key;
+          newBox.scrollTop = scrollMemory.get(key) || 0;
+        }
+        activeIdx = idx;
+        isAnimating = false;
+        catPager.style.scrollSnapType = prevSnap || 'x mandatory';
+      }
+    });
+  }
+
+  // клик по чипам — строго к индексу с нашей анимацией
   categoryBar.addEventListener('click', (e)=>{
     const btn=e.target.closest('button[data-idx]'); if(!btn) return;
     const idx=Number(btn.dataset.idx);
-    if(idx===activeIdx) return;
-    setActiveCatByIdx(idx, true);
-    const panelW=catPager.getBoundingClientRect().width||1;
-    catPager.scrollTo({ left: panelW*idx, behavior:'smooth' });
+    if (isAnimating) return;
+    goToIndex(idx, {animate:true});
   });
 
-  /* рендер панелей */
+  /* Рендер панелей */
   function buildPanels(){
     catPager.innerHTML='';
     MENU_CATEGORIES.forEach((cat, idx)=>{
@@ -235,6 +241,7 @@ function OrderView(){
       const vbox =el(`<div class="v-scroll px-0.5"></div>`);
       const list =el(`<div class="grid gap-3"></div>`);
 
+      // карточки
       cat.items.forEach(it=>{
         const q=counts[it.name]||0;
         list.appendChild(el(`
@@ -251,43 +258,63 @@ function OrderView(){
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`));
       });
-
-      /* нижний буфер под фикс-панель */
       list.appendChild(el(`<div class="h-24"></div>`));
 
       vbox.appendChild(list);
       panel.appendChild(vbox);
-
-      /* мост свайпа для этой панели */
-      setupSwipeBridge(
-        vbox,
-        ()=>activeIdx,
-        (i, programmatic=true)=>setActiveCatByIdx(i, programmatic),
-        catPager
-      );
-
       catPager.appendChild(panel);
+
+      /* === Pointer-only «мост» свайпа: ровно одна категория за жест === */
+      let down=false, used=false, sx=0, sy=0, lockedDir=null; // 'x' | 'y' | null
+      const PIX_LOCK = 10;                     // после 10px — «замок» направления
+      const THRESH   = ()=> Math.max(40, panelW()*0.25); // порог для переключения
+
+      vbox.addEventListener('pointerdown',(e)=>{
+        if (isAnimating) return;
+        down=true; used=false; sx=e.clientX; sy=e.clientY; lockedDir=null;
+        vbox.setPointerCapture(e.pointerId);
+      });
+      vbox.addEventListener('pointermove',(e)=>{
+        if(!down || isAnimating || used) return;
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+        if (lockedDir===null){
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) lockedDir='x';
+          else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) lockedDir='y';
+        }
+        if (lockedDir==='x'){
+          // берём управление: не даём вертикальному скроллу «съесть» жест
+          e.preventDefault();
+          if (Math.abs(dx) >= THRESH()){
+            used=true;
+            const next = dx<0 ? activeIdx+1 : activeIdx-1;
+            goToIndex(next, {animate:true});
+          }
+        }
+      }, {passive:false});
+      const endPtr = (e)=>{ down=false; used=false; lockedDir=null; try{ vbox.releasePointerCapture?.(e.pointerId); }catch{} };
+      vbox.addEventListener('pointerup', endPtr);
+      vbox.addEventListener('pointercancel', endPtr);
+      vbox.addEventListener('pointerleave', endPtr);
     });
 
-    /* делегирование +/− — один раз на пейджер */
+    // делегирование +/− — один раз
     if(!catPager._plusMinusBound){
       catPager.addEventListener('click', (e)=>{
         const act=e.target?.dataset?.act; if(!act) return;
         const name=e.target.dataset.name;
         if(act==='inc') counts[name]=(counts[name]||0)+1;
         if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
-        const qEl=catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`);
-        qEl.forEach(el=> el.textContent=counts[name]||0);
+        catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(el=> el.textContent=counts[name]||0);
         recalcTotal();
       });
       catPager._plusMinusBound=true;
     }
 
-    applyHeights();              // сразу
-    setTimeout(applyHeights,60); // после layout
+    applyHeights();
+    setTimeout(applyHeights,60);
   }
 
-  /* высота: ~4 карточки, но не больше доступного окна */
+  /* Высота: ~4 карточки (или меньше, если экран короткий) */
   function applyHeights(){
     const headerH = document.getElementById('appHeader').getBoundingClientRect().height;
     const chipsH  = root.querySelector('.sticky-top').getBoundingClientRect().height;
@@ -301,36 +328,26 @@ function OrderView(){
 
     const h = Math.min(availH, desired);
     root.querySelectorAll('.v-scroll').forEach(el=> el.style.height = h+'px');
+
+    // держим текущую панель выровненной
+    goToIndex(activeIdx, {animate:false});
   }
   window.addEventListener('resize', applyHeights);
 
-  /* синхронизация пейджера и чипов при прокрутке */
-  let snapTimer=null;
+  /* Во время нативного скролла пейджера — не пересчитываем индекс, если идёт наша анимация */
   catPager.addEventListener('scroll', ()=>{
-    if(isProgrammaticScroll) return; // игнорим во время программной анимации
-    if(snapTimer) clearTimeout(snapTimer);
-    snapTimer=setTimeout(()=>{
-      const w = catPager.getBoundingClientRect().width||1;
-      // аккуратно округляем и клампим индекс
-      let idx = Math.round(catPager.scrollLeft / w);
-      idx = Math.max(0, Math.min(idx, MENU_CATEGORIES.length-1));
-
-      if(idx!==activeIdx){
-        // сохранить положение вертикального скролла старой панели
-        const oldPanel = catPager.children[activeIdx];
-        if(oldPanel){
-          const oldBox = oldPanel.querySelector('.v-scroll');
-          const key = MENU_CATEGORIES[activeIdx].key;
-          scrollMemory.set(key, oldBox.scrollTop);
-        }
-        // активировать новую
-        setActiveCatByIdx(idx, false);
-        const newPanel = catPager.children[idx];
-        const newBox = newPanel.querySelector('.v-scroll');
-        const key = MENU_CATEGORIES[idx].key;
-        newBox.scrollTop = scrollMemory.get(key)||0;
+    if (isAnimating) return;
+    // когда пользователь свайпнул по самому catPager (не по списку), снап довезёт до ближнего.
+    // Ограничим пересчёт до ближайшего целого индекса после окончания инерции:
+    if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer);
+    catPager._scrollTimer = setTimeout(()=>{
+      const idx = Math.round(catPager.scrollLeft / panelW());
+      if (idx !== activeIdx){
+        // мгновенно подсветить чип и зафиксировать индекс (без анимации, снап уже выровнял)
+        highlightChip(idx);
+        activeIdx = idx;
       }
-    }, 40); // пониже задержку — меньше лаг и «догоняния»
+    }, 80);
   });
 
   function recalcTotal(){
@@ -341,7 +358,7 @@ function OrderView(){
     return sum;
   }
 
-  confirmBtn.addEventListener('click', async ()=>{
+  confirmBtn.addEventListener('click', ()=>{
     const items=[];
     MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
       const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price});
@@ -354,7 +371,9 @@ function OrderView(){
   });
 
   buildPanels();
-  setActiveCatByIdx(0, true);
+  highlightChip(0);
+  // выравниваем старт
+  requestAnimationFrame(()=> goToIndex(0,{animate:false}));
   recalcTotal();
 
   root.cleanup = ()=> setBodyScrollLock(false);
