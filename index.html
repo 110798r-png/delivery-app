@@ -21,7 +21,6 @@
     .sticky-top{ position:sticky; top:.5rem; z-index:30 }
 
     .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:1.25rem; padding:1rem; min-height:6.4rem }
-    .menu-card.disabled{ opacity:.5 }
     .menu-card-img{ width:110px; height:70px; border-radius:.75rem; background:#eee; object-fit:cover }
 
     /* фиксированная панель подтверждения */
@@ -31,24 +30,26 @@
       padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06);
     }
 
-    /* H-пейджер категорий */
+    /* Горизонтальный пейджер категорий */
     #catPager{
       display:flex;
       overflow-x:auto;
       scroll-snap-type:x mandatory;
       -webkit-overflow-scrolling:touch;
+      touch-action: pan-x pinch-zoom;   /* свайп по X */
     }
     .cat-panel{
       flex:0 0 100%;
       scroll-snap-align:start;
-      padding:0;           /* контент самостоятельно задаёт отступы */
+      padding:0;
     }
 
-    /* вертикальный скролл внутри панели */
+    /* Вертикальный скролл внутри панели */
     .v-scroll{
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       overscroll-behavior:contain;
+      touch-action: pan-y;              /* вертикальная прокрутка внутри */
     }
   </style>
 </head>
@@ -67,86 +68,44 @@
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Order confirm modal -->
-  <div id="orderConfirmModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99]">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-lg space-y-4">
-      <h3 class="text-lg font-semibold">Подтвердите заказ</h3>
-      <div id="orderConfirmList" class="space-y-2 text-sm"></div>
-      <div id="orderConfirmTotal" class="text-base font-medium pt-1"></div>
-      <div id="orderConfirmClient" class="text-sm text-gray-500"></div>
-      <div class="flex gap-2 justify-end pt-2">
-        <button id="orderConfirmCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
-        <button id="orderConfirmOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">Подтвердить</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payment modal -->
-  <div id="paymentModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[98]">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-lg space-y-3">
-      <h3 class="text-lg font-semibold">Способ оплаты</h3>
-      <div class="grid gap-2">
-        <button data-pay="cash" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Наличные</button>
-        <button data-pay="card" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Банковская карта</button>
-        <button data-pay="transfer" class="px-3 py-3 rounded-xl border hover:bg-gray-50 text-left">Перевод</button>
-      </div>
-      <div class="flex justify-end pt-1">
-        <button id="paymentClose" class="px-3 py-2 rounded-xl border">Закрыть</button>
-      </div>
-    </div>
-  </div>
+  <!-- (модалки оплаты/подтверждения можно вернуть позже) -->
 
 <script>
-/* ===== Config ===== */
+/* ===== Config & helpers ===== */
 const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
-const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
-const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const PROFILE_LS_KEY = 'client_profile_v1';
-
-/* сразу открываем меню */
 if (!location.hash || location.hash === "#/" || location.hash === "#") location.hash = "#/order";
 
-/* ===== Helpers ===== */
 function getClientId(){ const KEY='yc_client_id_v1'; let cid=localStorage.getItem(KEY); if(!cid){ cid='cid-'+Math.random().toString(36).slice(2)+Date.now(); localStorage.setItem(KEY,cid); } return cid; }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500); }
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function money(x){ return x+' руб.' }
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_KEY))||{} }catch{ return {} } }
-function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})) }
 function setBodyScrollLock(on){ document.body.style.overflow = on ? 'hidden' : ''; }
 
-/* API */
-async function ycCall(op, extra={}){
-  const payload={ op, ...extra };
-  try{
-    const res=await fetch(API_BASE,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload) });
-    const text=await res.text(); let data={}; if(text){ try{ data=JSON.parse(text) }catch{ return {error:"bad-json", status:res.status, raw:text} } }
-    if(!res.ok) return { error:"http", status:res.status, data };
-    return data;
-  }catch(e){ return { error:"network", message:e.message } }
-}
+/* API stub */
+async function ycCall(op, extra={}){ try{
+  const res=await fetch(API_BASE,{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({op,...extra}) });
+  return await res.json();
+}catch(e){ return {error:'network'} } }
 
 /* Menu data */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
     { name:'Говяжий двойной', price:340, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-    { name:'Куриный бургер', price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+    { name:'Куриный бургер',  price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
     { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
+    { name:'Чизбургер', price:220 }
   ]},
   { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 } ]},
-  { key:'drinks', title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 }, { name:'Банановый раф', price:180 }, { name:'Чай чёрный', price:70 } ]},
-  { key:'sushi', title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'potato', title:'Картошка', items:[ { name:'Фри маленький', price:150 }, { name:'Фри большой', price:180 }, { name:'По-деревенски маленький', price:160 }, { name:'По-деревенски большой', price:200 } ]},
-  { key:'semi', title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
+  { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 } ]},
+  { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
 ];
 
-function findPriceByName(name){ for(const cat of MENU_CATEGORIES){ const f=cat.items.find(i=>i.name===name); if(f) return f.price } return 0 }
-
-/* ===== Order (пейджер+верт.скролл) ===== */
+/* ===== Order View ===== */
 function OrderView(){
   const root=el(`
     <div class="relative">
@@ -156,7 +115,6 @@ function OrderView(){
         </div>
       </section>
 
-      <!-- Горизонтальный пейджер по категориям -->
       <section>
         <div id="catPager" class="no-scrollbar"></div>
       </section>
@@ -178,75 +136,56 @@ function OrderView(){
 
   setBodyScrollLock(true);
 
-  /* — высота вертикального окна так, чтобы влезало ≈3 карточки — */
-  function calcPanelHeight(){
-    const headerH = document.getElementById('appHeader').getBoundingClientRect().height;
-    const chipsH  = root.querySelector('.sticky-top').getBoundingClientRect().height;
-    const confirmH= confirmBar.getBoundingClientRect().height;
-    const vh = window.innerHeight;
-    const h  = Math.max(260, vh - headerH - chipsH - confirmH - 8);
-    return h;
-  }
-  function applyPanelHeights(){
-    const h = calcPanelHeight();
-    root.querySelectorAll('.v-scroll').forEach(el=> el.style.height = h+'px');
-  }
-  window.addEventListener('resize', applyPanelHeights);
-
   /* состояние */
-  const counts={}; const scrollMemory=new Map(); // catKey -> scrollTop
-  let activeIdx=0;
+  const counts={}; const scrollMemory=new Map(); let activeIdx=0;
 
   /* чипы */
   MENU_CATEGORIES.forEach((cat,idx)=>{
-    const btn=el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-cat="${cat.key}" data-idx="${idx}">${cat.title}</button>`);
-    categoryBar.appendChild(btn);
+    categoryBar.appendChild(el(
+      `<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`
+    ));
   });
   function setActiveCatByIdx(idx){
     activeIdx=idx;
-    const key=MENU_CATEGORIES[idx].key;
-    categoryBar.querySelectorAll('button').forEach(b=>{
-      const on=Number(b.dataset.idx)===idx;
+    categoryBar.querySelectorAll('button').forEach((b,i)=>{
+      const on=i===idx;
       b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on);
+      if(on){ b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }
     });
   }
   categoryBar.addEventListener('click', (e)=>{
     const btn=e.target.closest('button[data-idx]'); if(!btn) return;
     const idx=Number(btn.dataset.idx);
-    const panelWidth=catPager.getBoundingClientRect().width;
-    catPager.scrollTo({ left: panelWidth*idx, behavior:'smooth' });
+    const panelW=catPager.getBoundingClientRect().width||1;
+    catPager.scrollTo({ left: panelW*idx, behavior:'smooth' });
   });
 
-  /* рендер панелей категорий */
+  /* рендер панелей */
   function buildPanels(){
     catPager.innerHTML='';
-    MENU_CATEGORIES.forEach((cat,idx)=>{
+    MENU_CATEGORIES.forEach((cat)=>{
       const panel=el(`<div class="cat-panel"></div>`);
       const vbox =el(`<div class="v-scroll px-0.5"></div>`);
       const list =el(`<div class="grid gap-3"></div>`);
 
-      // Заголовок секции (как в макете) можно скрыть, оставил компактнее
-      // list.appendChild(el(`<div class="text-sm font-semibold text-gray-700 px-1">${cat.title}</div>`));
-
-      cat.items.forEach(item=>{
-        const q=counts[item.name]||0;
-        const card=el(`
+      cat.items.forEach(it=>{
+        const q=counts[it.name]||0;
+        list.appendChild(el(`
           <div class="menu-card">
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-sm">${item.name}</div>
-              <div class="text-xs text-gray-500 mt-1">${money(item.price)}</div>
+              <div class="font-medium text-sm">${it.name}</div>
+              <div class="text-xs text-gray-500 mt-1">${money(it.price)}</div>
               <div class="flex items-center gap-3 mt-3">
-                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${item.name}" data-act="dec">−</button>
-                <div class="w-6 text-center text-sm" data-q="${item.name}">${q}</div>
-                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${item.name}" data-act="inc">+</button>
+                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${it.name}" data-act="dec">−</button>
+                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc">+</button>
               </div>
             </div>
-            <img src="${item.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
-          </div>`);
-        list.appendChild(card);
+            <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+          </div>`));
       });
 
-      // нижний отступ, чтобы кнопка подтверждения не перекрывала
+      /* нижний буфер под фикс-панель */
       list.appendChild(el(`<div class="h-24"></div>`));
 
       vbox.appendChild(list);
@@ -254,91 +193,99 @@ function OrderView(){
       catPager.appendChild(panel);
     });
 
-    // делегирование +/−
+    /* обработка +/− */
     catPager.addEventListener('click', (e)=>{
-      const act = e.target?.dataset?.act; if(!act) return;
-      const name= e.target.dataset.name;
-      const price=findPriceByName(name);
-      if(act==='inc'){ counts[name]=(counts[name]||0)+1 }
-      if(act==='dec'){ counts[name]=Math.max(0,(counts[name]||0)-1) }
-      const qEl = catPager.querySelector(`[data-q="${CSS.escape(name)}"]`);
-      if(qEl) qEl.textContent = counts[name]||0;
+      const act=e.target?.dataset?.act; if(!act) return;
+      const name=e.target.dataset.name;
+      const cat = MENU_CATEGORIES.find(c=>c.items.some(i=>i.name===name));
+      const price = cat?.items.find(i=>i.name===name)?.price ?? 0;
+      if(act==='inc') counts[name]=(counts[name]||0)+1;
+      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
+      const qEl=catPager.querySelector(`[data-q="${CSS.escape(name)}"]`);
+      if(qEl) qEl.textContent=counts[name]||0;
       recalcTotal();
     });
 
-    applyPanelHeights();
-    // гарантированно после отрисовки
-    setTimeout(applyPanelHeights,100);
-    setTimeout(applyPanelHeights,400);
+    applyHeights();              // сразу
+    setTimeout(applyHeights,60); // после layout
   }
+
+  /* высота: ровно ~4 карточки, но не больше доступного окна */
+  function applyHeights(){
+    const headerH = document.getElementById('appHeader').getBoundingClientRect().height;
+    const chipsH  = root.querySelector('.sticky-top').getBoundingClientRect().height;
+    const confirmH= confirmBar.getBoundingClientRect().height;
+    const availH  = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+
+    // берём высоту карточки с отступами (gap-3 ~ 12px)
+    const firstCard = catPager.querySelector('.menu-card');
+    const cardH = firstCard ? Math.ceil(firstCard.getBoundingClientRect().height) : 104;
+    const gap = 12; // Tailwind gap-3
+    const desired = cardH*4 + gap*3 + 4; // 4 карточки + 3 промежутка
+
+    const h = Math.min(availH, desired);
+    root.querySelectorAll('.v-scroll').forEach(el=> el.style.height = h+'px');
+  }
+  window.addEventListener('resize', applyHeights);
+
+  /* синхронизация пейджера и чипов */
+  let snapTimer=null;
+  catPager.addEventListener('scroll', ()=>{
+    if(snapTimer) clearTimeout(snapTimer);
+    snapTimer=setTimeout(()=>{
+      const w = catPager.getBoundingClientRect().width||1;
+      const idx = Math.round(catPager.scrollLeft / w);
+      if(idx!==activeIdx){
+        // сохранить положение вертикального скролла старой панели
+        const oldPanel = catPager.children[activeIdx];
+        if(oldPanel){
+          const oldBox = oldPanel.querySelector('.v-scroll');
+          const key = MENU_CATEGORIES[activeIdx].key;
+          scrollMemory.set(key, oldBox.scrollTop);
+        }
+        // активировать новую
+        setActiveCatByIdx(idx);
+        const newPanel = catPager.children[idx];
+        const newBox = newPanel.querySelector('.v-scroll');
+        const key = MENU_CATEGORIES[idx].key;
+        newBox.scrollTop = scrollMemory.get(key)||0;
+      }
+    }, 60);
+  });
 
   function recalcTotal(){
     let sum=0;
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
-      const q=counts[it.name]||0; sum+=q*it.price;
-    }));
+    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ sum += (counts[it.name]||0) * it.price; }));
     totalEl.textContent = money(sum);
     confirmBtn.disabled = sum<=0;
     return sum;
   }
 
-  /* синхронизация пейджера и чипов */
-  let snapTimer=null;
-  catPager.addEventListener('scroll', ()=>{
-    // запоминаем вертикальные скроллы активной панели
-    const panels=[...catPager.children];
-    const idx=activeIdx;
-    if(panels[idx]){
-      const vbox=panels[idx].querySelector('.v-scroll');
-      scrollMemory.set(MENU_CATEGORIES[idx].key, vbox.scrollTop);
-    }
-    if(snapTimer) clearTimeout(snapTimer);
-    snapTimer=setTimeout(()=>{
-      const w = catPager.getBoundingClientRect().width;
-      const idx = Math.round(catPager.scrollLeft / Math.max(1,w));
-      if(idx!==activeIdx){
-        setActiveCatByIdx(idx);
-        // восстановить сохранённый scrollTop новой панели
-        const vbox=catPager.children[idx].querySelector('.v-scroll');
-        const key=MENU_CATEGORIES[idx].key;
-        const saved=scrollMemory.get(key)||0;
-        vbox.scrollTop = saved;
-      }
-    }, 80);
-  });
-
-  /* confirm (как было — по профилю) */
   confirmBtn.addEventListener('click', async ()=>{
-    const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}) }));
+    const items=[];
+    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
+      const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price});
+    }));
     if(!items.length){ showToast('Выберите товары'); return }
+    const total = items.reduce((s,i)=>s+i.price*i.qty,0);
     const prof=loadProfile();
-    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль: имя, телефон, адрес'); location.hash='#/profile'; return }
-    if(!prof.paymentMethod){ showToast('Выберите способ оплаты в профиле'); location.hash='#/profile'; return }
-
-    const payload={ clientId:getClientId(), name:prof.name, phone:prof.phone, address:prof.address,
-      deliverByTime:!!prof.deliverByTime, deliverTime:prof.deliverTime||null, paymentMethod:prof.paymentMethod, items,
-      total: items.reduce((s,i)=>s+i.price*i.qty,0) };
-
-    // простое подтверждение (можно вернуть твою модалку)
-    alert('Заказ сформирован: '+payload.total+' руб. (демо)');
+    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль: имя, телефон, адрес'); return }
+    alert('Заказ сформирован: '+total+' руб. (демо)'); // здесь можно вернуть твою модалку
   });
 
-  /* init */
   buildPanels();
   setActiveCatByIdx(0);
   recalcTotal();
 
-  /* cleanup при уходе */
   root.cleanup = ()=> setBodyScrollLock(false);
   return root;
 }
 
-/* Профиль (минимально, чтобы открыть/выйти) */
+/* Профиль (заглушка) */
 function ProfileView(){
   const root=el(`<div class="grid gap-4 pb-24">
     <div class="glass-panel rounded-2xl p-5">
       <h2 class="font-semibold mb-2">Личный кабинет</h2>
-      <p class="text-sm text-gray-600">Форма профиля — как в предыдущей версии (опустил здесь, чтобы не раздувать код).</p>
       <button class="mt-3 px-4 py-2 rounded-xl border" id="backToMenu">Назад к меню</button>
     </div>
   </div>`);
@@ -349,10 +296,8 @@ function ProfileView(){
 
 /* ===== Router ===== */
 function router(){
-  const app=document.getElementById('app'); 
-  if (app.firstChild && typeof app.firstChild.cleanup === 'function') {
-    try{ app.firstChild.cleanup(); }catch{}
-  }
+  const app=document.getElementById('app');
+  if (app.firstChild && typeof app.firstChild.cleanup === 'function') { try{ app.firstChild.cleanup(); }catch{} }
   app.innerHTML='';
   const hash=location.hash;
   if(hash==='#/profile'){ app.classList.add('phone-shell'); app.appendChild(ProfileView()) }
