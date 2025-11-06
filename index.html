@@ -27,9 +27,6 @@
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
 
-    .block-btn{ border-radius:1.25rem; padding:1rem; box-shadow:0 8px 24px rgba(15,23,42,.08); transition:transform .12s ease; background:#fff; border:1px solid #eef2f7; }
-    .block-btn:active{ transform:scale(.98); }
-
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
     .modal.open{ display:flex }
 
@@ -38,15 +35,16 @@
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
-    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.1rem .45rem; border-radius:999px; font-size:11px; background:#f1f5f9; color:#334155 }
-
     .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
-    .card-tall{ min-height: 180px; } /* повыше */
+    .card-tall{ min-height: 164px; } /* длиннее по просьбе */
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
 
     /* зона 4-тапов (невидимая) */
     #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
-    #tabloTapHot{ width:120px; height:48px; border-radius:12px; }
+    #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
+
+    /* чип для статуса */
+    .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
   </style>
 </head>
 <body>
@@ -55,13 +53,18 @@
       <div class="leading-tight">
         <div class="text-2xl font-extrabold tracking-tight">ЯмаМото</div>
       </div>
-      <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button">👤</a>
-      <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад">←</button>
+      <!-- SVG: профиль -->
+      <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button" title="Профиль">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
+      </a>
+      <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад" title="Назад">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </header>
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- Подтверждение + выбор оплаты -->
+  <!-- Оплата -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
@@ -81,7 +84,7 @@
     </div>
   </div>
 
-  <!-- «Ключ» перед табло -->
+  <!-- Ключ для табло -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
       <h3 class="text-lg font-semibold">Введите ключ</h3>
@@ -96,6 +99,7 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
+/* дефолтный маршрут */
 document.addEventListener('DOMContentLoaded', ()=>{ if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order'; });
 
 /* ===== Хранилища ===== */
@@ -104,7 +108,6 @@ const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-const CART_PRESELECT_KEY = 'cart_preselect_v1';
 
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
@@ -122,25 +125,16 @@ function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.s
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
-/* синхронизация статуса между табло и историей клиента */
+/* синхронизация статусов между табло и историей клиента */
 function syncOrderStatus(id, status){
-  let hist = loadHistory();
-  let changed = false;
+  let hist = loadHistory(); let changed = false;
   for (let i=0;i<hist.length;i++){
     if (String(hist[i].id) === String(id)){
-      if (hist[i].status !== status){
-        hist[i] = { ...hist[i], status };
-        changed = true;
-      }
+      if (hist[i].status !== status){ hist[i] = { ...hist[i], status }; changed = true; }
       break;
     }
   }
   if (changed) saveHistory(hist);
-}
-
-function countActiveOrders(){
-  const list = loadHistory();
-  return (Array.isArray(list)?list:[]).filter(o => !['завершён','отменён'].includes(o.status||'новый')).length;
 }
 
 /* ===== Меню ===== */
@@ -161,16 +155,22 @@ const MENU_CATEGORIES = [
 /* ===== анимация/тапы (+/−) ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 function animateScrollX(el, to, {duration=280, onEnd}={}){ const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; } const start=performance.now(); function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); } requestAnimationFrame(step); }
+
 function bindTapIncDec(catPager, counts, recalcTotal){
   let downX=0, downY=0, pressedEl=null;
   catPager.addEventListener('pointerdown',(e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; pressedEl=btn; downX=e.clientX; downY=e.clientY; });
-  catPager.addEventListener('pointerup',(e)=>{ if(!pressedEl) return; const dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); const btn=pressedEl; if(dx<6&&dy<6){ const act=btn.dataset.act, name=btn.dataset.name; if(act==='inc') counts[name]=(counts[name]||0)+1; if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1); catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=>n.textContent=counts[name]||0); recalcTotal(); catPager._ignoreNextClickTs=Date.now(); } pressedEl=null; });
+  catPager.addEventListener('pointerup',(e)=>{ if(!pressedEl) return; const dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); const btn=pressedEl;
+    if(dx<6&&dy<6){ const act=btn.dataset.act, name=btn.dataset.name;
+      if(act==='inc') counts[name]=(counts[name]||0)+1;
+      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
+      catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=>n.textContent=counts[name]||0);
+      recalcTotal(); catPager._ignoreNextClickTs=Date.now();
+    } pressedEl=null; });
   ['pointercancel','pointerleave'].forEach(evt=> catPager.addEventListener(evt, ()=>{ pressedEl=null; }));
 }
 
 /* ===== Order ===== */
 function OrderView(){
-  const preselect = safeParse(CART_PRESELECT_KEY, null);
   const root=el(`
     <div class="relative">
       <section class="sticky-top mb-2">
@@ -181,32 +181,31 @@ function OrderView(){
       <section><div id="catPager" class="no-scrollbar"></div></section>
       <div id="confirmBar" class="confirm-bar">
         <div class="flex items-center justify-between gap-3">
-          <div class="text-base flex items-center gap-2">
+          <div class="text-base">
             <span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b>
+            <!-- плашка корзины -->
+            <button id="cartBadge" class="ml-3 align-middle text-xs px-2 py-1 rounded-lg border hidden">
+              <span class="inline-flex items-center gap-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9h-12L6 6Zm0 0L5 3H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.5" fill="currentColor"/><circle cx="18" cy="20" r="1.5" fill="currentColor"/></svg>
+                <span id="cartActiveInfo"></span>
+              </span>
+            </button>
           </div>
-          <button id="cartBtn" class="relative px-3 py-2 rounded-xl border bg-white" aria-label="Корзина">🛒
-            <span id="cartBadge" class="hidden absolute -top-1 -right-1 chip"></span>
-          </button>
           <button id="confirmBtn" class="px-4 py-3 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>Подтвердить заказ</button>
         </div>
       </div>
     </div>
   `);
-  const categoryBar=root.querySelector('#categoryBar'); const catPager=root.querySelector('#catPager'); const confirmBar=root.querySelector('#confirmBar'); const totalEl=root.querySelector('#totalVal'); const confirmBtn=root.querySelector('#confirmBtn');
-  const cartBtn=root.querySelector('#cartBtn'); const cartBadge=root.querySelector('#cartBadge');
-  setBodyScrollLock(true);
 
+  const categoryBar=root.querySelector('#categoryBar'); const catPager=root.querySelector('#catPager');
+  const confirmBar=root.querySelector('#confirmBar'); const totalEl=root.querySelector('#totalVal');
+  const confirmBtn=root.querySelector('#confirmBtn'); const cartBadge=root.querySelector('#cartBadge');
+
+  setBodyScrollLock(true);
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
   const panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
-  function updateCartBadge(){
-    const n = countActiveOrders();
-    if(n>0){ cartBadge.textContent=n; cartBadge.classList.remove('hidden'); }
-    else cartBadge.classList.add('hidden');
-  }
-  updateCartBadge();
-  cartBtn.onclick = ()=> location.hash = '#/orders';
-
+  // chips
   MENU_CATEGORIES.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(MENU_CATEGORIES.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(MENU_CATEGORIES[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(MENU_CATEGORIES[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -235,10 +234,12 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
-      // свайп панели
+      // свайп панелей
       let down=false, used=false, sx=0, sy=0, locked=null; const PIX_LOCK=10, THRESH=()=>Math.max(40, panelW()*0.25);
       vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
-      vbox.addEventListener('pointermove',e=>{ if(!down||used||isAnimating) return; const dx=e.clientX-sx, dy=e.clientY-sy; if(locked===null){ if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>PIX_LOCK) locked='y'; } if(locked==='x'){ e.preventDefault(); if(Math.abs(dx)>=THRESH()){ used=true; const next=dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } } }, {passive:false});
+      vbox.addEventListener('pointermove',e=>{ if(!down||used||isAnimating) return; const dx=e.clientX-sx, dy=e.clientY-sy;
+        if(locked===null){ if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>PIX_LOCK) locked='y'; }
+        if(locked==='x'){ e.preventDefault(); if(Math.abs(dx)>=THRESH()){ used=true; const next=dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } } }, {passive:false});
       ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,()=>{ down=false; used=false; locked=null; }));
     });
 
@@ -251,27 +252,40 @@ function OrderView(){
     applyHeights(); setTimeout(applyHeights,60);
   }
 
-  function applyHeights(){ const headerH=document.getElementById('appHeader').getBoundingClientRect().height; const chipsH=root.querySelector('.sticky-top').getBoundingClientRect().height; const confirmH=confirmBar.getBoundingClientRect().height; const availH=Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8); const first=catPager.querySelector('.menu-card'); const cardH=first?Math.ceil(first.getBoundingClientRect().height):104; const h=Math.min(availH, cardH*4 + 12*3 + 4); root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px'); goToIndex(activeIdx,{animate:false}); }
+  function applyHeights(){ const headerH=document.getElementById('appHeader').getBoundingClientRect().height; const chipsH=root.querySelector('.sticky-top')?.getBoundingClientRect().height||0; const confirmH=document.getElementById('confirmBar').getBoundingClientRect().height; const availH=Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8); const first=catPager.querySelector('.menu-card'); const cardH=first?Math.ceil(first.getBoundingClientRect().height):104; const h=Math.min(availH, cardH*4 + 12*3 + 4); root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px'); goToIndex(activeIdx,{animate:false}); }
   window.addEventListener('resize', applyHeights);
 
   catPager.addEventListener('scroll', ()=>{ if (isAnimating) return; if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer); catPager._scrollTimer = setTimeout(()=>{ const idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width||1)); if(idx!==activeIdx){ highlightChip(idx); activeIdx=idx; } }, 80); });
 
   function recalcTotal(){ let sum=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*it.price )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
 
-  // Применяем предзаполнение от "Повторить заказ"
-  function applyPreselect(){
-    if (!preselect) return;
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> counts[it.name]=0 ));
-    preselect.forEach(it => { counts[it.name] = (counts[it.name]||0) + (it.qty||0); });
-    catPager.querySelectorAll('[data-q]').forEach(n=>{
-      const name=n.getAttribute('data-q');
-      n.textContent = counts[name]||0;
-    });
-    recalcTotal();
-    localStorage.removeItem(CART_PRESELECT_KEY);
-  }
+  // заполнение из "Повторить заказ"
+  (function applyPreselect(){
+    const payload = sessionStorage.getItem('repeat_order_items');
+    if(!payload) return;
+    try{
+      const items=JSON.parse(payload)||[];
+      items.forEach(it=>{ counts[it.name]= (counts[it.name]||0) + (it.qty||0); });
+      catPager.querySelectorAll('[data-q]').forEach(q=>{
+        const name=q.getAttribute('data-q'); q.textContent = counts[name]||0;
+      });
+      recalcTotal();
+      sessionStorage.removeItem('repeat_order_items');
+      if(sessionStorage.getItem('open_pay_after_repeat')==='1'){ sessionStorage.removeItem('open_pay_after_repeat'); setTimeout(()=>confirmBtn.click(), 150); }
+    }catch{}
+  })();
 
-  // строгая защита: без позиций окно оплаты не открываем
+  function updateCartBadge(){
+    const list = loadHistory();
+    const active = (Array.isArray(list)?list:[]).find(o=>!['завершён','отменён'].includes(o.status||''));
+    const info = root.querySelector('#cartActiveInfo');
+    if(active){ info.textContent = `№ ${active.id} — ${active.status||'новый'}`; cartBadge.classList.remove('hidden'); }
+    else { cartBadge.classList.add('hidden'); }
+  }
+  cartBadge.addEventListener('click', ()=> location.hash='#/history');
+  updateCartBadge();
+
+  // подтверждение
   confirmBtn.addEventListener('click', ()=>{
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
     if(!items.length){ showToast(TOST_SELECT); return; }
@@ -285,18 +299,39 @@ function OrderView(){
     document.getElementById('payModal').classList.add('open');
   });
 
-  buildPanels(); bindTapIncDec(catPager, counts, recalcTotal); highlightChip(0); requestAnimationFrame(()=> { goToIndex(0,{animate:false}); applyPreselect(); });
+  // вспомогательное: обнуление
+  function resetCounts(){ Object.keys(counts).forEach(k=>counts[k]=0); catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0'); recalcTotal(); }
+
+  // события модалки оплаты
+  (function bindPayModal(){
+    const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
+    const close=()=> m.classList.remove('open');
+    const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
+
+    const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
+    const onOk = (e)=>{
+      if(e){ e.preventDefault(); e.stopPropagation(); }
+      // проверка корзины
+      const itemsSel=[]; let total=0;
+      MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
+        const q=counts[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
+      }));
+      if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
+
+      const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
+      const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
+      const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
+      const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
+
+      close(); finalize(); resetCounts(); updateCartBadge();
+    };
+    ['click','pointerup','touchend'].forEach(ev=> ok.addEventListener(ev, onOk, {passive:false}));
+    ['click','pointerup','touchend'].forEach(ev=> cancel.addEventListener(ev, onCancel, {passive:false}));
+    m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
+  })();
+
+  buildPanels(); bindTapIncDec(catPager, counts, recalcTotal); highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
   root.cleanup = ()=> setBodyScrollLock(false);
-
-  // очистка корзины после подтверждения
-  root.clearCartUI = ()=>{
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> counts[it.name]=0 ));
-    catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
-    recalcTotal();
-    updateCartBadge();
-  };
-
-  document._orderViewRef = root;
   return root;
 }
 
@@ -304,39 +339,63 @@ function OrderView(){
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
 
-  const rightCardContent = `
-    <div class="flex items-center justify-between">
-      <div class="text-sm font-semibold">Мои заказы</div>
-      <div class="text-xl">🍟 ➜</div>
-    </div>
-  `;
-
   const root=el(`
-    <div class="grid gap-4 pb-24">
+    <div class="grid gap-4 pb-28">
 
+      <!-- верхние длинные карточки -->
       <section class="grid grid-cols-2 gap-3">
+        <!-- профиль: имя + телефон, без "Я" -->
         <button class="card card-tall p-4 text-left" id="profileEditBtn">
-          <div class="min-w-0">
-            <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
-            <div class="text-[12px] text-gray-600 mt-2 truncate">${p.phone ? p.phone : 'Телефон: не указан'}</div>
+          <div class="flex items-start justify-between">
+            <div class="min-w-0">
+              <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
+              <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
+            </div>
+            <!-- шестерёнка -->
+            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29v2l1.73.29c.16.62.41 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.32 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.41 1.76-.73l1.46 1 1.41-1.41-1-1.46c.32-.55.57-1.14.73-1.76l1.73-.29Z" fill="currentColor"/></svg>
           </div>
         </button>
 
-        <button class="card card-tall p-4 text-left" id="ordersBtn">
-          ${rightCardContent}
+        <!-- Мои заказы: иконка картошки + стрелка -->
+        <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
+          <div class="text-base font-semibold">Мои заказы</div>
+          <div class="flex items-center gap-3">
+            <!-- картошка -->
+            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6l1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
+            <!-- стрелка -->
+            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
         </button>
       </section>
 
+      <!-- рекламный блок -->
       <section class="card p-5">
         <div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div>
       </section>
 
-      <section class="grid gap-2">
-        <button class="rowlink text-left" id="reviewsBtn">Отзывы</button>
-        <button class="rowlink text-left" id="supportBtn">Техподдержка</button>
-        <button class="rowlink text-left" id="feedbackBtn">Обратная связь</button>
+      <!-- лайв-камера -->
+      <section class="card p-4 flex flex-col items-center gap-2">
+        <div class="text-xl font-bold">🎥 Лайв-камера</div>
+        <div class="rounded-2xl overflow-hidden border w-full">
+          <img id="liveCam" class="w-full object-cover" src="https://placehold.co/540x300?text=Live+Camera" alt="camera">
+        </div>
+        <button id="reloadCam" class="px-3 py-2 rounded-xl border bg-white">Обновить</button>
       </section>
 
+      <!-- строки-кнопки -->
+      <section class="grid gap-2">
+        <button class="rowlink text-left flex items-center justify-between" id="reviewsBtn">Отзывы
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="rowlink text-left flex items-center justify-between" id="supportBtn">Техподдержка
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">Обратная связь
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </section>
+
+      <!-- Юр информация -->
       <section class="card p-4 text-sm leading-relaxed">
         <div class="text-base font-semibold mb-2">Юридическая информация</div>
         <div class="text-xs text-gray-600">
@@ -345,6 +404,7 @@ function ProfileHubView(){
         </div>
       </section>
 
+      <!-- невидимая 4-тап зона -->
       <section id="tabloTapZone">
         <div id="tabloTapHot" aria-label="tablo-tap-hot"></div>
       </section>
@@ -353,78 +413,16 @@ function ProfileHubView(){
   `);
 
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
-  root.querySelector('#ordersBtn').onclick      = ()=> location.hash = '#/orders';
+  root.querySelector('#ordersBtn').onclick      = ()=> location.hash = '#/history';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
   root.querySelector('#reviewsBtn').onclick     = ()=> alert('Позже подключим экран отзывов.');
   root.querySelector('#feedbackBtn').onclick    = ()=> location.hash = '#/contact';
+  root.querySelector('#reloadCam').onclick      = ()=>{ const img=root.querySelector('#liveCam'); const url=img.src.split('?')[0]; img.src = `${url}?t=${Date.now()}`; };
+
   return root;
 }
 
-/* ===== Экран «Мои заказы» ===== */
-function OrdersView(){
-  const root=el(`
-    <div class="grid gap-3 pb-28">
-      <div class="flex items-center gap-3 mb-1">
-        <button id="backOnly" class="px-3 py-2 rounded-xl border bg-white" aria-label="Назад">←</button>
-        <div class="text-lg font-semibold">Мои заказы</div>
-      </div>
-      <div id="ordersList" class="grid gap-3"></div>
-    </div>
-  `);
-
-  const box = root.querySelector('#ordersList');
-
-  function render(){
-    const list = loadHistory();
-    box.innerHTML = '';
-    if (!Array.isArray(list) || !list.length){
-      box.innerHTML = `<div class="text-sm text-gray-400">Пока нет заказов.</div>`;
-      return;
-    }
-    list.forEach((o)=>{
-      const itemsHtml = (o.items||[]).map(i=>`
-        <div class="flex items-start justify-between gap-3 text-sm">
-          <div class="min-w-0 truncate">${i.name}</div>
-          <div class="flex-shrink-0 whitespace-nowrap">×${i.qty} · ${money((i.price||0)*i.qty)}</div>
-        </div>
-      `).join('');
-
-      const card = el(`
-        <div class="card p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-xs text-gray-500">${new Date(o.createdAt||Date.now()).toLocaleString()}</div>
-              <div class="text-2xl font-extrabold tracking-tight mt-1">№ ${o.id}</div>
-            </div>
-            <div><span class="chip">${o.status||'новый'}</span></div>
-          </div>
-
-          <div class="mt-2 text-xs text-gray-500">Состав:</div>
-          <div class="mt-1 grid gap-1">${itemsHtml}</div>
-
-          <div class="mt-3 border-t pt-2 flex items-center justify-between">
-            <div class="text-sm">Итого: <b>${money(o.total||0)}</b></div>
-            <button class="px-4 py-2 rounded-xl bg-black text-white text-sm" data-repeat>Повторить заказ</button>
-          </div>
-        </div>
-      `);
-
-      card.querySelector('[data-repeat]').onclick = ()=>{
-        const items = (o.items||[]).map(i=>({ name:i.name, qty:i.qty }));
-        localStorage.setItem(CART_PRESELECT_KEY, JSON.stringify(items));
-        location.hash = '#/order';
-      };
-
-      box.appendChild(card);
-    });
-  }
-
-  root.querySelector('#backOnly').onclick = ()=> history.length ? history.back() : (location.hash='#/profile');
-  render();
-  return root;
-}
-
-/* ===== Экран «Обратная связь» ===== */
+/* ===== Контакты ===== */
 function ContactView(){
   const p=Object.assign({ phone:'', }, loadProfile());
   const root=el(`
@@ -444,7 +442,7 @@ function ContactView(){
   return root;
 }
 
-/* ===== Редактор профиля ===== */
+/* ===== Профиль / История / Табло ===== */
 function ProfileEditView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -452,8 +450,9 @@ function ProfileEditView(){
       <section class="glass-panel rounded-2xl p-5">
         <h2 class="text-lg font-semibold mb-3">Редактировать профиль</h2>
         <div class="grid gap-3">
-          <input id="pName" class="border rounded-xl p-3" placeholder="Имя и фамилия" value="${p.name||''}">
+          <input id="pName" class="border rounded-xl p-3" placeholder="Имя Фамилия" value="${p.name||''}">
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
+          <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки (не показывается в карточке)" value="${p.address||''}">
           <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
           <select id="paydef" class="border rounded-xl p-3">
             <option value="cash">Наличные</option>
@@ -469,12 +468,76 @@ function ProfileEditView(){
     </div>
   `);
   root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
+  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
 
-/* ===== Табло ===== */
+function HistoryView(){
+  const root=el(`
+    <div class="grid gap-3 pb-24">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Мои заказы</h2>
+        <div class="flex gap-2">
+          <button id="clearAll" class="px-3 py-2 rounded-xl border">Очистить всё</button>
+          <button id="back" class="px-3 py-2 rounded-xl border">Назад</button>
+        </div>
+      </div>
+      <div id="historyList" class="grid gap-3"></div>
+    </div>
+  `);
+  const box=root.querySelector('#historyList');
+  function cardView(o, idx){
+    const items=o.items||[];
+    const active = !['завершён','отменён'].includes(o.status||'новый');
+    const chipClass = active ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-700';
+    const outerBg = active ? 'bg-yellow-50 border-yellow-200' : 'bg-white';
+
+    const elCard = el(`
+      <div class="card p-4 ${outerBg}">
+        <div class="flex items-center justify-between">
+          <div class="text-2xl font-extrabold">№ ${o.id||'—'}</div>
+          <span class="chip ${chipClass}">${o.status||'новый'}</span>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
+        <div class="mt-3 grid gap-2">
+          ${ items.map(i=>`
+            <div class="flex items-center justify-between text-sm">
+              <div class="truncate mr-2">${i.name}</div>
+              <div class="whitespace-nowrap">${i.qty} × ${i.price} ₽</div>
+            </div>
+          `).join('') }
+        </div>
+        <div class="mt-3 border-t pt-2 flex items-center justify-between">
+          <div class="font-semibold">Итого: ${money(o.total||0)}</div>
+          <div class="flex gap-2">
+            <button class="px-3 py-2 rounded-xl border" data-repeat>Повторить заказ</button>
+            <button class="px-3 py-2 rounded-xl border text-red-600" data-del>Удалить</button>
+          </div>
+        </div>
+      </div>
+    `);
+    // действия
+    elCard.querySelector('[data-repeat]').onclick=()=>{
+      sessionStorage.setItem('repeat_order_items', JSON.stringify(items));
+      sessionStorage.setItem('open_pay_after_repeat','1');
+      location.hash='#/order';
+    };
+    elCard.querySelector('[data-del]').onclick=()=>{
+      const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render();
+    };
+    return elCard;
+  }
+  function render(){
+    const list=loadHistory(); box.innerHTML='';
+    if(!Array.isArray(list)||!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
+    list.forEach((o,idx)=> box.appendChild(cardView(o, idx)));
+  }
+  root.querySelector('#clearAll').onclick=()=>{ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); } };
+  root.querySelector('#back').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
+  render(); return root;
+}
+
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
@@ -505,7 +568,7 @@ function DashboardView(){
     const card=el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
         <div class="flex items-center justify-between gap-4">
-          <div class="text-lg font-semibold">#${o.id}</div>
+          <div class="text-lg font-semibold">#${o.id} — ${o.name||''}</div>
           <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status||'новый'}</div>
         </div>
         <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b></div>
@@ -517,9 +580,10 @@ function DashboardView(){
           </select>
           <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
         </div>
-        <div class="mt-2 text-right"><button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button></div>
-      </div>
-    `);
+        <div class="mt-2 text-right">
+          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+        </div>
+      </div>`);
     card.addEventListener('click',(e)=>{
       const act=e.target.dataset.act; if(!act) return;
       if(act==='save'){
@@ -534,42 +598,29 @@ function DashboardView(){
     });
     return card;
   }
-
   function load(){ const unique=new Map(); dashOrders.forEach(o=>unique.set(String(o.id),o)); list.innerHTML=''; if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return } [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) ); }
-  load();
-  return root;
+  load(); return root;
 }
 
-/* ===== 4-тап зона (ровно 4 быстрых) ===== */
+/* ===== 4-тап зона только на экране профиля ===== */
 function bindTabloTapZone(){
   const hot = document.getElementById('tabloTapHot');
-  if (!hot || hot._bound) return;
-  hot._bound = true;
-
+  if (!hot || hot._bound) return; hot._bound = true;
   let taps = 0, first = 0, timer = null;
-  const windowMs = 800; // «быстрых»
+  const windowMs = 1200;
   function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
   function handler(){
     const now = Date.now();
-    if (!first) first = now;
-    taps++;
+    if (!first) first = now; taps++;
     if (now - first > windowMs){ reset(); taps = 1; first = now; }
-    if (taps === 4){ // ровно 4
+    if (taps >= 4){
       reset();
       document.getElementById('payModal')?.classList.remove('open');
-      if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
-        location.hash = '#/dashboard';
-      }else{
-        document.getElementById('pinModal').classList.add('open');
-      }
-    }else{
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(reset, windowMs);
-    }
+      if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/dashboard';
+      else document.getElementById('pinModal').classList.add('open');
+    }else{ if (timer) clearTimeout(timer); timer = setTimeout(reset, windowMs); }
   }
-  ['click','pointerup','touchend'].forEach(ev =>
-    hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false})
-  );
+  ['click','pointerup','touchend'].forEach(ev => hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}));
 }
 
 /* ===== Router ===== */
@@ -578,7 +629,7 @@ function realRouter(){
   const h=location.hash.split('?')[0];
   if(h==='#/profile'){ mount(ProfileHubView()); bindTabloTapZone(); }
   else if(h==='#/profile-edit') mount(ProfileEditView());
-  else if(h==='#/orders') mount(OrdersView());
+  else if(h==='#/history') mount(HistoryView());
   else if(h==='#/contact') mount(ContactView());
   else if(h==='#/dashboard') mount(DashboardView());
   else mount(OrderView());
@@ -586,7 +637,7 @@ function realRouter(){
 function router(){
   const h=location.hash.split('?')[0];
   const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack=(h==='#/profile'||h==='#/orders'||h==='#/profile-edit'||h==='#/contact');
+  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact');
   if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
@@ -610,46 +661,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
   bindTabloTapZone();
-
-  // Pay modal
-  const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
-  const close=()=> m.classList.remove('open');
-  const finalize = ()=>{ const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } };
-
-  const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
-  const onOk = (e)=>{
-    if(e){ e.preventDefault(); e.stopPropagation(); }
-    const map={}; document.querySelectorAll('[data-q]').forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; });
-    if(Object.keys(map).length===0){ showToast(TOST_SELECT); close(); finalize(); return; }
-
-    const itemsSel=[]; let total=0;
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
-      const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
-    }));
-
-    const prof=loadProfile();
-    const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''});
-    if(localStorage.getItem('last_order_sig')===sig){ /*без уведомления*/ close(); finalize(); return; }
-    localStorage.setItem('last_order_sig',sig);
-
-    const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
-    const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-    const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
-    const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
-
-    if (document._orderViewRef && typeof document._orderViewRef.clearCartUI === 'function'){
-      document._orderViewRef.clearCartUI();
-    }
-
-    close(); finalize(); // без тоста «сохранён»
-  };
-  ok.addEventListener('click', onOk, { passive:false });
-  ok.addEventListener('pointerup', onOk, { passive:false });
-  ok.addEventListener('touchend', onOk, { passive:false });
-  cancel.addEventListener('click', onCancel, { passive:false });
-  cancel.addEventListener('pointerup', onCancel, { passive:false });
-  cancel.addEventListener('touchend', onCancel, { passive:false });
-  m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
 
   // KEY modal
   const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
