@@ -44,7 +44,7 @@
     .modal.open{ display:flex }
 
     /* --- патч: хедер всегда кликабелен --- */
-    .app-header{ position:relative; z-index:70; }
+    .app-header{ position:sticky; top:0; z-index:100; }
 
     /* --- патч: подсказка браузеру, что это тапы, а не жесты --- */
     button[data-act], #profileBtn { touch-action: manipulation; }
@@ -66,14 +66,28 @@
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl">
       <h3 class="text-lg font-semibold">Способ оплаты</h3>
-      <div class="grid gap-2" id="payOptions">
-        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="cash"> <span>Наличные</span></label>
-        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="card"> <span>Банковская карта</span></label>
-        <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="pay" value="transfer"> <span>Перевод</span></label>
+      <div>
+        <select id="paySelect" class="border rounded-xl p-3 w-full">
+          <option value="cash">Наличные</option>
+          <option value="card">Банковская карта</option>
+          <option value="transfer">Перевод</option>
+        </select>
       </div>
       <div class="flex justify-end gap-2">
         <button id="payCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
         <button id="payOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN modal -->
+  <div id="pinModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
+      <h3 class="text-lg font-semibold">Введите PIN</h3>
+      <input id="pinInput" class="border rounded-xl p-3 w-full text-center tracking-widest" maxlength="6" placeholder="••••" inputmode="numeric">
+      <div class="flex justify-end gap-2">
+        <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
+        <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
       </div>
     </div>
   </div>
@@ -152,8 +166,9 @@ function bindTapIncDec(catPager, counts, recalcTotal){
     if(!pressedEl) return;
     const dx = Math.abs(e.clientX - downX);
     const dy = Math.abs(e.clientY - downY);
-    const btn = e.target.closest('button[data-act]');
-    if(btn === pressedEl && dx < TAP_THRESH && dy < TAP_THRESH){
+    // важный фикс ПК: используем сохранённую кнопку, а не e.target
+    const btn = pressedEl;
+    if(dx < TAP_THRESH && dy < TAP_THRESH){
       const act  = btn.dataset.act;
       const name = btn.dataset.name;
       if(act==='inc') counts[name]=(counts[name]||0)+1;
@@ -161,7 +176,6 @@ function bindTapIncDec(catPager, counts, recalcTotal){
       catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`)
         .forEach(n=> n.textContent = counts[name]||0);
       recalcTotal();
-      // предохранитель от двойного click после pointerup
       catPager._ignoreNextClickTs = Date.now();
     }
     pressedEl = null;
@@ -196,6 +210,16 @@ function OrderView(){
   const confirmBar=root.querySelector('#confirmBar');
   const totalEl=root.querySelector('#totalVal');
   const confirmBtn=root.querySelector('#confirmBtn');
+
+  // unavailable cache для клиента
+  let unavailableClient = new Set();
+  (async()=>{
+    const srv = await fetchUnavailableFromServer();
+    const local = new Set(loadUnavailableFromLS());
+    if (Array.isArray(srv)) { unavailableClient = new Set(srv); saveUnavailableToLS(srv); }
+    else { unavailableClient = local; }
+    applyUnavailableStyles();
+  })();
 
   setBodyScrollLock(true);
 
@@ -233,15 +257,16 @@ function OrderView(){
       const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
       cat.items.forEach(it=>{
         const q=counts[it.name]||0;
+        const disabled = unavailableClient.has(it.name);
         list.appendChild(el(`
-          <div class="menu-card">
+          <div class="menu-card ${disabled?'opacity-50':''}">
             <div class="flex-1 min-w-0">
               <div class="font-medium text-sm">${it.name}</div>
               <div class="text-xs text-gray-500 mt-1">${money(it.price)}</div>
               <div class="flex items-center gap-3 mt-3">
-                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${it.name}" data-act="dec">−</button>
+                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${it.name}" data-act="dec" ${disabled?'disabled':''}>−</button>
                 <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc">+</button>
+                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc" ${disabled?'disabled':''}>+</button>
               </div>
             </div>
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
@@ -289,6 +314,17 @@ function OrderView(){
     }
 
     applyHeights(); setTimeout(applyHeights,60);
+    // функция для перекраски после загрузки unavailable
+    function applyUnavailableStyles(){
+      root.querySelectorAll('.menu-card').forEach(card=>{
+        const nameEl = card.querySelector('button[data-name]');
+        if(!nameEl) return;
+        const name = nameEl.dataset.name;
+        const disabled = unavailableClient.has(name);
+        card.classList.toggle('opacity-50', disabled);
+        card.querySelectorAll('button[data-act]').forEach(b=> b.disabled = disabled);
+      });
+    }
   }
 
   function applyHeights(){
@@ -319,7 +355,20 @@ function OrderView(){
 
   // подтверждение: сначала спросим оплату (по умолчанию — из профиля)
   confirmBtn.addEventListener('click', ()=>{
+    if (confirmBtn._busy) return; // анти-дубль
+    confirmBtn._busy = true; confirmBtn.disabled = true;
+
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
+    if(!items.length){ showToast('Выберите товары'); confirmBtn._busy=false; confirmBtn.disabled=false; return }
+    const prof=loadProfile();
+    if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; confirmBtn._busy=false; confirmBtn.disabled=false; return }
+
+    const m=document.getElementById('payModal');
+    const def=prof.paymentMethod||'cash';
+    const sel=document.getElementById('paySelect');
+    if (sel) sel.value = def;
+    m.classList.add('open');
+  }); }));
     if(!items.length){ showToast('Выберите товары'); return }
     const prof=loadProfile();
     if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; return }
@@ -636,10 +685,72 @@ function router(){
 window.addEventListener('hashchange', router);
 router();
 
+/* Pay modal handlers — единоразово */
+(function initPayModal(){
+  const m = document.getElementById('payModal');
+  const ok = document.getElementById('payOk');
+  const cancel = document.getElementById('payCancel');
+  const sel = document.getElementById('paySelect');
+  if (!m || !ok || !cancel || !sel) return;
+  const close = ()=> m.classList.remove('open');
+  cancel.onclick = close;
+  m.onclick = (e)=>{ if(e.target===m) close(); };
+  ok.onclick = ()=>{
+    const pay = sel.value || 'cash';
+    // собрать корзину снова и записать (с защитой от дублей по сигнатуре)
+    const countsEls = document.querySelectorAll('[data-q]');
+    const map = {}; countsEls.forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; });
+    const itemsSel=[]; let total=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }}));
+    const prof=loadProfile();
+    const sig = JSON.stringify({items:itemsSel,total,phone:prof.phone||''});
+    const lastSig = localStorage.getItem('last_order_sig');
+    if (lastSig===sig){ showToast('Уже сохранён'); close(); const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } return; }
+    localStorage.setItem('last_order_sig', sig);
+
+    const list=loadHistory();
+    list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay, status:'новый' });
+    saveHistory(list.slice(0,50));
+    // обновим способ оплаты по умолчанию
+    const p=loadProfile(); p.paymentMethod=pay; saveProfile(p);
+
+    close();
+    showToast('Заказ сохранён');
+    const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; }
+  };
+})();
+
+/* PIN gate для табло */
+(function initPinGate(){
+  const PIN = (window.PIN_CODE || '1234');
+  const m = document.getElementById('pinModal');
+  if(!m) return;
+  const input = document.getElementById('pinInput');
+  const ok = document.getElementById('pinOk');
+  const cancel = document.getElementById('pinCancel');
+  const close = ()=>{ m.classList.remove('open'); };
+  ok.onclick = ()=>{ if(input.value===PIN){ sessionStorage.setItem('TABLO_PIN_OK','1'); close(); router(); } else { showToast('Неверный PIN'); }};
+  cancel.onclick = ()=>{ close(); location.hash = '#/profile'; };
+  m.onclick = (e)=>{ if(e.target===m) cancel.onclick(); };
+
+  const origRouter = window._origRouter || router;
+  window._origRouter = origRouter;
+  window.router = function(){
+    const h = location.hash.split('?')[0];
+    if (h==='#/dashboard' && sessionStorage.getItem('TABLO_PIN_OK')!=='1'){
+      m.classList.add('open');
+      const app=document.getElementById('app'); if(app) app.innerHTML='';
+      return; // ждём PIN
+    }
+    _origRouter();
+  }
+})();
+
 /* Header */
 // страховка: обработчик на профайл вешаем один раз и он не теряется
 document.addEventListener('DOMContentLoaded', ()=>{
   const profileBtn = document.getElementById('profileBtn');
+  if (profileBtn) { profileBtn.style.pointerEvents='auto'; profileBtn.onclick = ()=>{ location.hash = '#/profile'; }; }
+});
   if (profileBtn) profileBtn.onclick = ()=>{ location.hash = '#/profile'; };
 });
 </script>
