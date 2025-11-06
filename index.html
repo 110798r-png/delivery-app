@@ -259,6 +259,11 @@ function OrderView(){
   return root;
 }
 
+/* ===== Общий Back-бар ===== */
+function BackBar(){
+  return el(`<div class="mb-3"><button id="backToOrder" class="px-3 py-2 rounded-xl border">← К заказу</button></div>`);
+}
+
 /* ===== Профиль ===== */
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
@@ -315,6 +320,9 @@ function ProfileHubView(){
       </section>
     </div>
   `);
+  root.prepend(BackBar());
+  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
+
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
   root.querySelector('#openTablo').onclick      = ()=> location.hash = '#/dashboard';
@@ -347,6 +355,8 @@ function ProfileEditView(){
       </section>
     </div>
   `);
+  root.prepend(BackBar());
+  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
   root.querySelector('#paydef').value = p.paymentMethod;
   root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
@@ -367,6 +377,8 @@ function HistoryView(){
       <div id="historyList" class="grid gap-2"></div>
     </div>
   `);
+  root.prepend(BackBar());
+  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
 
   const box=root.querySelector('#historyList');
   function render(){ const list=loadHistory(); box.innerHTML=''; if(!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return } list.forEach((o,idx)=>{ const items=o.items?.map(i=>`${i.name} ×${i.qty}`).join(', ')||'—'; const card=el(`<div class=\"p-3 rounded-xl border bg-white flex items-start justify-between gap-3\"> <div class=\"min-w-0\"> <div class=\"text-sm font-semibold\">#${o.id||'—'} · ${o.status||''}</div> <div class=\"text-xs text-gray-500\">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div> <div class=\"text-sm mt-1\">${money(o.total||0)}${o.pay? ' · '+o.pay:''}</div> <div class=\"text-xs text-gray-600 mt-1 truncate\">${items}</div> </div> <button class=\"text-xs text-red-500\" data-del>Удалить</button> </div>`); card.querySelector('[data-del]').onclick=()=>{ const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render(); }; box.appendChild(card); }); }
@@ -396,6 +408,8 @@ function DashboardView(){
       <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
     </div>
   `);
+  root.prepend(BackBar());
+  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
 
   const list=root.querySelector('#list');
   const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailable());
@@ -407,7 +421,7 @@ function DashboardView(){
 
   function orderCard(o){ const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0); const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal); const created=o.createdAt? new Date(o.createdAt): new Date(); const itemLines=(o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(', '); const card=el(`<div class=\"p-5 rounded-2xl bg-white border flex flex-col gap-2\" data-id=\"${o.id}\"> <div class=\"flex items-center justify-between gap-4\"> <div class=\"text-lg font-semibold\">#${o.id} — ${o.name||''}</div> <div class=\"px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm\">${o.status||'новый'}</div> </div> <div class=\"text-sm text-gray-600\">${created.toLocaleString()} · Итог: <b>${total} руб.</b></div> <div>🧾 ${itemLines||'—'}</div> <div class=\"mt-3 flex flex-wrap gap-2 items-center\"> <label class=\"text-sm\">Статус:</label> <select class=\"border rounded-xl p-2\" data-k=\"status\">${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}</select> <button type=\"button\" class=\"px-3 py-2 rounded-xl border\" data-act=\"save\">Сохранить</button> </div> <div class=\"mt-2 text-right\"><button type=\"button\" class=\"px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100\" data-act=\"delete\">Удалить</button></div> </div>`); card.addEventListener('click', (e)=>{ const act=e.target.dataset.act; if(!act) return; if(act==='save'){ const status=card.querySelector('[data-k="status"]').value; const list=loadHistory(); const i=list.findIndex(x=>String(x.id)===String(o.id)); if(i>=0){ list[i].status=status; saveHistory(list); showToast(`Статус заказа #${o.id} обновлён`); } } if(act==='delete'){ if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card && card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return } const list=loadHistory().filter(x=>String(x.id)!==String(o.id)); saveHistory(list); card.remove(); showToast(`Заказ #${o.id} удалён`); } }); return card; }
 
-  function load(){ const unique=new Map(); loadHistory().forEach(o=>unique.set(String(o.id),o)); list.innerHTML=''; if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return } [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) ); }
+  function load(){ const unique=new Map(); loadHistory().forEach(o=>unique.set(String(o.id),o)); list.innerHTML=''; if(unique.size===0){ list.innerHTML=`<div class=\"p-5 rounded-2xl bg-white border text-gray-500 col-span-full\">Пока нет заказов.</div>`; return } [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) ); }
   load();
   return root;
 }
