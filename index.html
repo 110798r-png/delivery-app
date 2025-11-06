@@ -40,7 +40,7 @@
 
     /* Header always tappable */
     .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn { touch-action: manipulation; }
+    button[data-act], #profileBtn, #payOk, #payCancel { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
   </style>
@@ -59,16 +59,20 @@
 
   <!-- Оплата -->
   <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl">
-      <h3 class="text-lg font-semibold">Способ оплаты</h3>
-      <select id="paySelect" class="border rounded-xl p-3 w-full">
-        <option value="cash">Наличные</option>
-        <option value="card">Банковская карта</option>
-        <option value="transfer">Перевод</option>
-      </select>
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
+      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
+      <div class="grid gap-1">
+        <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
+        <select id="paySelect" class="border rounded-xl p-3 w-full">
+          <option value="cash">Наличные</option>
+          <option value="card">Банковская карта</option>
+          <option value="transfer">Перевод</option>
+        </select>
+      </div>
       <div class="flex justify-end gap-2">
-        <button id="payCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
-        <button id="payOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Отмена</button>
+        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
       </div>
     </div>
   </div>
@@ -249,6 +253,17 @@ function OrderView(){
   confirmBtn.addEventListener('click', ()=>{
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
+    if(!items.length){ showToast('Выберите товары'); confirmBtn._busy=false; confirmBtn.disabled=false; return }
+    const prof=loadProfile(); if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; confirmBtn._busy=false; confirmBtn.disabled=false; return }
+
+    // Заполним окно подтверждения: список и тотал + способ оплаты по умолчанию из профиля
+    const sumBox = document.getElementById('paySummary');
+    let total=0; sumBox.innerHTML = items.map(i=>{ total += i.qty*i.price; return `<div class=\"flex items-center justify-between\"><div class=\"truncate\">${i.name} ×${i.qty}</div><div class=\"ml-2 whitespace-nowrap\">${money(i.qty*i.price)}</div></div>`; }).join('');
+    sumBox.insertAdjacentHTML('beforeend', `<div class=\"mt-2 pt-2 border-t flex items-center justify-between font-semibold\"><div>Итого</div><div>${money(total)}</div></div>`);
+
+    const sel=document.getElementById('paySelect'); sel.value = prof.paymentMethod||'cash';
+    const m=document.getElementById('payModal'); m.classList.add('open');
+  }); }));
     if(!items.length){ showToast('Выберите товары'); confirmBtn._busy=false; confirmBtn.disabled=false; return }
     const prof=loadProfile(); if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; confirmBtn._busy=false; confirmBtn.disabled=false; return }
     const sel=document.getElementById('paySelect'); sel.value = prof.paymentMethod||'cash'; document.getElementById('payModal').classList.add('open');
@@ -438,18 +453,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const profileBtn = document.getElementById('profileBtn');
   if (profileBtn){ profileBtn.style.pointerEvents='auto'; profileBtn.onclick=()=>{ location.hash='#/profile'; }; }
 
-  // Pay modal
+  // Pay modal — надёжные обработчики для мобильных
   const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
   const close=()=> m.classList.remove('open');
-  cancel.onclick = close; m.onclick=(e)=>{ if(e.target===m) close(); };
-  ok.onclick=()=>{
+  const finalize = ()=>{ const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } };
+
+  const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
+  const onOk = (e)=>{
+    if(e){ e.preventDefault(); e.stopPropagation(); }
     const pay = sel.value || 'cash';
     // собрать корзину
     const map={}; document.querySelectorAll('[data-q]').forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; });
     const itemsSel=[]; let total=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }}));
-    const prof=loadProfile(); const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''}); if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } return; } localStorage.setItem('last_order_sig',sig);
-    const list=loadHistory(); list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay, status:'новый' }); saveHistory(list.slice(0,50)); const p=loadProfile(); p.paymentMethod=pay; saveProfile(p); close(); showToast('Заказ сохранён'); const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; }
+    const prof=loadProfile(); const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''}); if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); finalize(); return; } localStorage.setItem('last_order_sig',sig);
+    const list=loadHistory(); list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay, status:'новый' }); saveHistory(list.slice(0,50)); const p=loadProfile(); p.paymentMethod=pay; saveProfile(p); close(); showToast('Заказ сохранён'); finalize();
   };
+  ok.addEventListener('click', onOk, { passive:false }); ok.addEventListener('pointerup', onOk, { passive:false }); ok.addEventListener('touchend', onOk, { passive:false });
+  cancel.addEventListener('click', onCancel, { passive:false }); cancel.addEventListener('pointerup', onCancel, { passive:false }); cancel.addEventListener('touchend', onCancel, { passive:false });
+  m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
 
   // PIN modal
   const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
