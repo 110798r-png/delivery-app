@@ -42,6 +42,10 @@
     button[data-act], #profileBtn, #payOk, #payCancel { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
+
+    /* карточки в стиле макета */
+    .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
+    .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:14px 16px; }
   </style>
 </head>
 <body>
@@ -51,7 +55,10 @@
         <div class="text-2xl font-extrabold tracking-tight">ЯмаМото</div>
         <div class="text-[12px] text-gray-600 -mt-0.5">локальный режим (без сервера)</div>
       </div>
+
+      <!-- два элемента: кнопка профиля и аватар; показываем по ситуации -->
       <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button">👤</a>
+      <button id="avatarBtn" class="hidden w-9 h-9 rounded-full border bg-white grid place-items-center select-none" aria-label="avatar">🙂</button>
     </header>
     <main id="app" class="phone-shell"></main>
   </div>
@@ -91,18 +98,16 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* Ловим ранние ошибки и ставим дефолтный маршрут */
+/* ранние ошибки + дефолтный маршрут */
 window.onerror = (m, s, l)=>{ console.error('BOOT ERR:', m, s+':'+l); alert('Ошибка JS: '+m+' @ '+s+':'+l); };
 document.addEventListener('DOMContentLoaded', ()=>{ if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order'; });
 
-/* ===== Хранилища (безопасные парсеры) ===== */
+/* ===== Хранилища ===== */
 const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
-const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';      // отдельное хранилище табло
+const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';   // отдельное хранилище табло
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-
-if (!location.hash || location.hash === "#/" || location.hash === "#") location.hash = "#/order";
 
 const el       = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast= (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
@@ -125,7 +130,6 @@ function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
 function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 function loadUnavailable(){ return safeParse(UNAVAILABLE_LS_KEY, []); }
 function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[])); }
-// отдельные данные табло
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
@@ -159,6 +163,26 @@ function bindTapIncDec(catPager, counts, recalcTotal){
   catPager.addEventListener('pointerdown', (e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; pressedEl=btn; downX=e.clientX; downY=e.clientY; });
   catPager.addEventListener('pointerup', (e)=>{ if(!pressedEl) return; const dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); const btn=pressedEl; if(dx<6 && dy<6){ const act=btn.dataset.act, name=btn.dataset.name; if(act==='inc') counts[name]=(counts[name]||0)+1; if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1); catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0); recalcTotal(); catPager._ignoreNextClickTs=Date.now(); } pressedEl=null; });
   ['pointercancel','pointerleave'].forEach(evt=> catPager.addEventListener(evt, ()=>{ pressedEl=null; }));
+}
+
+/* ===== детектор 4-тапов по аватару ===== */
+function bindSecretAvatarTap(btn, {taps=4, windowMs=1200}={}){
+  let cnt=0, first=0, timer=null;
+  function reset(){ cnt=0; first=0; if(timer){ clearTimeout(timer); timer=null; } }
+  btn.addEventListener('pointerdown', ()=>{
+    const now=Date.now();
+    if(!first) first=now;
+    cnt++;
+    if(now-first>windowMs){ reset(); cnt=1; first=now; }
+    if(cnt>=taps){
+      reset();
+      // переход на табло — вызовет окно «ключ»
+      location.hash='#/dashboard';
+    }else{
+      if(timer) clearTimeout(timer);
+      timer=setTimeout(reset, windowMs);
+    }
+  }, {passive:true});
 }
 
 /* ===== Order ===== */
@@ -245,7 +269,7 @@ function OrderView(){
 
   function recalcTotal(){ let sum=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*it.price )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
 
-  // подтверждение — модалка с дублирующим списком + выбор оплаты
+  // подтверждение — модалка
   confirmBtn.addEventListener('click', ()=>{
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
@@ -268,74 +292,86 @@ function OrderView(){
 /* ===== Общий Back-бар ===== */
 function BackBar(){ return el(`<div class="mb-3"><button id="backToOrder" class="px-3 py-2 rounded-xl border">← К заказу</button></div>`); }
 
-/* ===== Профиль ===== */
+/* ===== Профиль (по макету) ===== */
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
-  const all = loadHistory();
-  const last4 = Array.isArray(all) ? all.slice(0,4) : [];
+  const list = loadHistory();
+  const last4 = Array.isArray(list) ? list.slice(0,4) : [];
+
   const root=el(`
     <div class="grid gap-4 pb-24">
-      <div class="grid grid-cols-2 gap-3">
-        <button class="block-btn text-left" id="profileEditBtn">
-          <div class="text-2xl mb-1">👤</div>
-          <div class="text-sm font-semibold mb-1">Мой профиль</div>
-          <div class="text-xs text-gray-600 leading-snug">
-            ${p.name? `Имя: ${p.name}<br>`:'Не заполнен — нажмите'}
-            ${p.phone? `<br>Тел.: ${p.phone}`:''}
-            ${p.address? `<br>Адрес: ${p.address}`:''}
-            ${p.paymentMethod? `<br>Оплата: ${p.paymentMethod}`:''}
+
+      <!-- верх: две карточки -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- профиль -->
+        <button class="card p-4 text-left" id="profileEditBtn">
+          <div class="flex gap-3">
+            <div class="w-14 h-14 rounded-lg bg-gray-300 grid place-items-center text-2xl font-bold text-white">Я</div>
+            <div class="min-w-0">
+              <div class="text-base font-semibold">${p.name || 'Мой профиль'}</div>
+              <div class="text-xs text-gray-600 mt-1">${p.address || 'Адрес: не указан'}</div>
+              <div class="text-[11px] text-gray-500 mt-1">${p.phone ? 'Тел.: '+p.phone : 'Телефон: не указан'}</div>
+            </div>
           </div>
         </button>
 
-        <button class="block-btn text-left" id="historyBtn">
-          <div class="text-2xl mb-1">🧾</div>
-          <div class="text-sm font-semibold mb-1">История заказов</div>
-          <div class="space-y-1">
-            ${ last4.length ? last4.map(o=>`<div class="text-[11px] text-gray-600 truncate">#${o.id} · ${money(o.total||0)} · ${new Date(o.createdAt).toLocaleDateString()}</div>`).join('') : `<div class="text-xs text-gray-500">Пока пусто</div>`}
+        <!-- история -->
+        <button class="card p-4 text-left" id="historyBtn">
+          <div class="text-sm font-semibold mb-2">История заказов</div>
+          <div class="grid grid-cols-2 gap-2">
+            ${ last4.length ? last4.map(o=>`
+              <div class="border rounded-lg p-2 text-[11px] leading-tight">
+                #${o.id}<br>${money(o.total||0)}<br>${new Date(o.createdAt).toLocaleDateString()}
+              </div>`).join('') :
+              `<div class="text-xs text-gray-500 col-span-2">Пока пусто</div>`}
           </div>
         </button>
-      </div>
-
-      <section class="promo">
-        <div class="text-sm opacity-80">Технологичный вкус</div>
-        <div class="text-xl font-semibold mt-1">Скидка 10% на первые роллы</div>
-        <div class="text-xs opacity-80 mt-1">Оформите заказ онлайн — быстрее и выгоднее.</div>
       </section>
 
-      <div class="grid grid-cols-1 gap-2">
-        <button class="block-btn text-left" id="supportBtn">Техническая поддержка (позже)</button>
-        <button class="block-btn text-left" id="reviewsBtn">Отзывы (позже)</button>
-      </div>
+      <!-- широкой рекламный блок -->
+      <section class="card p-5">
+        <div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div>
+      </section>
 
+      <!-- строки-кнопки -->
+      <section class="grid gap-2">
+        <button class="rowlink text-left" id="reviewsBtn"><b>Отзывы</b></button>
+        <button class="rowlink text-left" id="supportBtn"><b>Техподдержка</b></button>
+      </section>
+
+      <!-- низ: камера + правый информационный блок -->
       <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div class="rounded-2xl border bg-black text-white aspect-video flex items-center justify-center">
+        <div class="card p-4 aspect-video flex items-center justify-center bg-black text-white">
           <div class="text-center">
             <div class="text-xs opacity-70 mb-1">LIVE</div>
             <div class="text-sm opacity-90">Камера кухни (скоро)</div>
           </div>
         </div>
-        <div class="rounded-2xl border bg-white p-3 flex flex-col gap-2">
-          <button id="openTablo" class="px-3 py-2 rounded-xl border">Открыть табло</button>
-          <div class="mt-1 text-sm">
-            <div class="font-semibold mb-1">Обратная связь</div>
-            <div><a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
-            <div><a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
+
+        <div class="card p-4 text-sm leading-relaxed">
+          <div class="text-xs text-gray-500 mb-2">Обратная связь и юридическая информация:</div>
+          <div>Почта: <a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
+          <div>Тел.: <a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
+          <div class="mt-2 text-xs text-gray-600">
+            Адрес: с. Косякино, ул. Гагарина, 26<br>
+            Время работы: 08:00–23:00
           </div>
         </div>
       </section>
+
     </div>
   `);
+
   root.prepend(BackBar());
   root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
-
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
-  root.querySelector('#openTablo').onclick      = ()=> location.hash = '#/dashboard';
-  root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат.');
-  root.querySelector('#reviewsBtn').onclick     = ()=> alert('Позже подключим отзывы.');
+  root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
+  root.querySelector('#reviewsBtn').onclick     = ()=> alert('Позже подключим экран отзывов.');
   return root;
 }
 
+/* ===== Редактор профиля ===== */
 function ProfileEditView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -411,7 +447,7 @@ function HistoryView(){
   return root;
 }
 
-/* ===== Табло (локально, отдельное хранилище) ===== */
+/* ===== Табло (локально) ===== */
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
@@ -494,13 +530,33 @@ function DashboardView(){
 /* ===== Router ===== */
 function mount(view){ const app=document.getElementById('app'); if (app.firstChild && typeof app.firstChild.cleanup === 'function') { try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
 function realRouter(){ const h=location.hash.split('?')[0]; if(h==='#/profile') mount(ProfileHubView()); else if(h==='#/profile-edit') mount(ProfileEditView()); else if(h==='#/history') mount(HistoryView()); else if(h==='#/dashboard') mount(DashboardView()); else mount(OrderView()); }
-function router(){ const h=location.hash.split('?')[0]; if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){ document.getElementById('pinModal').classList.add('open'); const app=document.getElementById('app'); if(app) app.innerHTML=''; return; } realRouter(); }
+function router(){
+  const h=location.hash.split('?')[0];
+
+  // показать в хедере: аватар вместо кнопки профиля на profile/history
+  const btn = document.getElementById('profileBtn');
+  const avatar = document.getElementById('avatarBtn');
+  if(h==='#/profile' || h==='#/history'){
+    btn.classList.add('hidden');
+    avatar.classList.remove('hidden');
+  }else{
+    avatar.classList.add('hidden');
+    btn.classList.remove('hidden');
+  }
+
+  if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
+    document.getElementById('pinModal').classList.add('open');
+    const app=document.getElementById('app'); if(app) app.innerHTML='';
+    return;
+  }
+  realRouter();
+}
 window.addEventListener('hashchange', router);
 router();
 
 /* Header & модалки */
 document.addEventListener('DOMContentLoaded', ()=>{
-  // профиль — страховка для мобилок
+  // профиль — надёжный переход
   const profileBtn = document.getElementById('profileBtn');
   const goProfile = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; };
   if (profileBtn){
@@ -509,7 +565,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     profileBtn.addEventListener('touchend', goProfile, { passive:false });
   }
 
-  // Pay modal — надёжные обработчики
+  // секретный 4-тап по аватару -> табло
+  const avatarBtn = document.getElementById('avatarBtn');
+  bindSecretAvatarTap(avatarBtn, {taps:4, windowMs:1200});
+
+  // Pay modal
   const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
   const close=()=> m.classList.remove('open');
   const finalize = ()=>{ const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } };
@@ -533,25 +593,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); finalize(); return; }
     localStorage.setItem('last_order_sig',sig);
 
-    // новый заказ
-    const order = {
-      id: Date.now().toString().slice(-6),
-      createdAt: Date.now(),
-      items: itemsSel,
-      total, pay, status:'новый'
-    };
-
-    // 1) История клиента
-    const history = loadHistory();
-    history.unshift(order);
-    saveHistory(history.slice(0,50));
-
-    // 2) Табло
-    const dash = loadDash();
-    dash.unshift(order);
-    saveDash(dash.slice(0,200));
-
-    // сохранить выбор оплаты в профиль
+    const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay, status:'новый' };
+    const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
+    const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
     const p=loadProfile(); p.paymentMethod=pay; saveProfile(p);
 
     close(); showToast('Заказ сохранён'); finalize();
