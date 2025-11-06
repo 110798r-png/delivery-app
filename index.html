@@ -39,7 +39,6 @@
     .promo{ border-radius:1.25rem; background:linear-gradient(135deg,#1f2937 0%,#111827 100%); color:#fff; padding:16px;
             box-shadow:0 12px 32px rgba(17,24,39,.35) }
 
-    /* simple modal */
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
     .modal.open{ display:flex }
   </style>
@@ -56,7 +55,7 @@
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- modal: выбор оплаты перед подтверждением -->
+  <!-- модалка выбора оплаты перед подтверждением -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl">
       <h3 class="text-lg font-semibold">Способ оплаты</h3>
@@ -76,8 +75,11 @@
 
 <script>
 /* ===== storage / helpers ===== */
+const API_BASE   = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order";
 const PROFILE_LS_KEY = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
+const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
+
 if (!location.hash || location.hash === "#/" || location.hash === "#") location.hash = "#/order";
 
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
@@ -89,8 +91,21 @@ function loadProfile(){ try{ return JSON.parse(localStorage.getItem(PROFILE_LS_K
 function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})) }
 function loadHistory(){ try{ return JSON.parse(localStorage.getItem(CLIENT_HISTORY_KEY))||[] }catch{ return [] } }
 function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(list||[])) }
+function loadUnavailableFromLS(){ try{ return JSON.parse(localStorage.getItem(UNAVAILABLE_LS_KEY))||[] }catch{ return [] } }
+function saveUnavailableToLS(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(items||[])) }
 
-/* ===== menu data (с «Полуфабрикатами») ===== */
+/* API helpers */
+async function ycCall(op, extra={}) {
+  try{
+    const res = await fetch(API_BASE, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({op,...extra}) });
+    const txt = await res.text();
+    return txt ? JSON.parse(txt) : {};
+  }catch(e){ return {error:'network', message:e.message} }
+}
+async function fetchUnavailableFromServer(){ const r=await ycCall("getUnavailable",{}); return Array.isArray(r?.items)?r.items:null }
+async function saveUnavailableToServer(items){ const r=await ycCall("setUnavailable",{items}); return !r.error }
+
+/* ===== menu data (включая «Полуфабрикаты») ===== */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -114,7 +129,7 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
   requestAnimationFrame(step);
 }
 
-/* ===== ORDER (как настроили ранее) ===== */
+/* ===== ORDER (как согласовали) ===== */
 function OrderView(){
   const root=el(`
     <div class="relative">
@@ -168,10 +183,10 @@ function OrderView(){
   }
   categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
 
-  // build panels
+  // build panels with swipe 1:1
   function buildPanels(){
     catPager.innerHTML='';
-    MENU_CATEGORIES.forEach((cat, idx)=>{
+    MENU_CATEGORIES.forEach((cat)=>{
       const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
       cat.items.forEach(it=>{
         const q=counts[it.name]||0;
@@ -192,7 +207,7 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
-      // swipe 1:1
+      // свайп одной панелью за жест
       let down=false, used=false, sx=0, sy=0, locked=null;
       const PIX_LOCK=10, THRESH = ()=> Math.max(40, panelW()*0.25);
       vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
@@ -255,7 +270,6 @@ function OrderView(){
   confirmBtn.addEventListener('click', ()=>{
     const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
     if(!items.length){ showToast('Выберите товары'); return }
-    const total = items.reduce((s,i)=>s+i.price*i.qty,0);
     const prof=loadProfile();
     if(!prof.name || !prof.phone || !prof.address){ showToast('Заполните профиль'); location.hash='#/profile-edit'; return }
 
@@ -269,9 +283,10 @@ function OrderView(){
     m.onclick = (e)=>{ if(e.target===m) close(); };
     m.querySelector('#payOk').onclick = ()=>{
       const sel = m.querySelector('input[name="pay"]:checked')?.value || def;
-      // заказ (демо) + запись в историю
+      const itemsSel=[]; let total=0;
+      MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }}));
       const list=loadHistory();
-      list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items, total, pay: sel, status:'новый' });
+      list.unshift({ id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel, status:'новый' });
       saveHistory(list.slice(0,50));
       close();
       showToast('Заказ сохранён');
@@ -283,7 +298,7 @@ function OrderView(){
   return root;
 }
 
-/* ===== ПРОФИЛЬ: хаб (две кнопки) + нижняя секция с «камерой» и инфо ===== */
+/* ===== ПРОФИЛЬ: хаб ===== */
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const last4 = loadHistory().slice(0,4);
@@ -319,7 +334,13 @@ function ProfileHubView(){
         <div class="text-xs opacity-80 mt-1">Оформите заказ онлайн — быстрее и выгоднее.</div>
       </section>
 
-      <!-- Нижняя двухколоночная секция -->
+      <!-- две кнопки под рекламным блоком -->
+      <div class="grid grid-cols-1 gap-2">
+        <button class="block-btn text-left" id="supportBtn">Техническая поддержка (чат через экран табло с клиентом)</button>
+        <button class="block-btn text-left" id="reviewsBtn">Отзывы</button>
+      </div>
+
+      <!-- нижняя двухколоночная секция -->
       <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <!-- live camera (плейсхолдер) -->
         <div class="rounded-2xl border bg-black text-white aspect-video flex items-center justify-center">
@@ -337,6 +358,10 @@ function ProfileHubView(){
             <div class="font-semibold mb-1">Обратная связь</div>
             <div><a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
             <div><a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
+            <div class="mt-2 text-xs text-gray-600">
+              <div><b>Адрес:</b> с. Косякино, ул. Гагарина, 26</div>
+              <div><b>Время работы:</b> 08:00–23:00</div>
+            </div>
           </div>
         </div>
       </section>
@@ -347,11 +372,12 @@ function ProfileHubView(){
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
   root.querySelector('#openTablo').onclick      = ()=> location.hash = '#/dashboard';
   root.querySelector('#coopBtn').onclick        = ()=> alert('Пишите на почту или в поддержку — обсудим детали сотрудничества.');
-
+  root.querySelector('#supportBtn').onclick     = ()=> alert('Чат техподдержки свяжем с экраном табло позже.');
+  root.querySelector('#reviewsBtn').onclick     = ()=> alert('Экран отзывов добавим позже.');
   return root;
 }
 
-/* ===== ПРОФИЛЬ: редактор (ВКЛЮЧИЛ способ оплаты) ===== */
+/* ===== ПРОФИЛЬ: редактор ===== */
 function ProfileEditView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -362,14 +388,12 @@ function ProfileEditView(){
           <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${p.name||''}">
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
           <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
-
           <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
           <div class="grid gap-2">
             <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="cash"> Наличные</label>
             <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="card"> Банковская карта</label>
             <label class="flex items-center gap-2 border rounded-xl p-3"><input type="radio" name="paydef" value="transfer"> Перевод</label>
           </div>
-
           <div class="flex gap-2">
             <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
             <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
@@ -379,10 +403,7 @@ function ProfileEditView(){
       </section>
     </div>
   `);
-
-  // выбрать текущее значение оплаты
   root.querySelectorAll('input[name="paydef"]').forEach(r=> r.checked = (r.value === p.paymentMethod));
-
   root.querySelector('#pSave').onclick=()=>{
     const paymentMethod = root.querySelector('input[name="paydef"]:checked')?.value || 'cash';
     const p2={ name:root.querySelector('#pName').value.trim(),
@@ -438,13 +459,110 @@ function HistoryView(){
   return root;
 }
 
-/* ===== Табло — заглушка (подключим реальный позже) ===== */
+/* ===== ТАБЛО — как было раньше (список заказов, наличие, звук) ===== */
 function DashboardView(){
-  return el(`<div class="grid gap-3 pb-24">
-    <h2 class="text-lg font-semibold">Табло (демо)</h2>
-    <div class="rounded-2xl border bg-white p-4 text-sm text-gray-600">Здесь подключим прежний экран табло.</div>
-    <button class="px-3 py-2 rounded-xl border w-max" onclick="location.hash='#/profile'">Назад</button>
-  </div>`);
+  const root=el(`
+    <div class="grid gap-4 max-w-6xl pb-24">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold">Текущие заказы</h2>
+        <div class="flex gap-2">
+          <button type="button" class="px-3 py-2 rounded-xl border" id="enableSound">🔊 Включить звук</button>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-white border">
+        <h3 class="font-semibold mb-3">Наличие товаров</h3>
+        <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне клиента товар станет серым и его нельзя будет добавить.</p>
+        <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
+        <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
+      <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
+    </div>
+  `);
+
+  const list=root.querySelector('#list'); let audioCtx=null; let soundEnabled=false; const seenIds=new Set(); let lastOrdersMap=new Map();
+  const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailableFromLS());
+
+  function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{
+    const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`);
+    stockList.appendChild(row);
+  })) }
+  renderStock();
+
+  (async()=>{ const srv=await fetchUnavailableFromServer(); if(Array.isArray(srv)){ unavailable=new Set(srv); renderStock(); saveUnavailableToLS(srv); } })();
+
+  root.querySelector('#saveStock').onclick=async()=>{
+    const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+    saveUnavailableToLS(checked); const ok=await saveUnavailableToServer(checked);
+    showToast(ok?'Наличие сохранено':'Сохранено только локально'); unavailable=new Set(checked);
+  };
+
+  function playBeep(d=0.35,f=880){ if(!audioCtx||!soundEnabled) return; const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+    osc.type='square'; osc.frequency.value=f; g.gain.setValueAtTime(0.35,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);
+    osc.connect(g).connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+d) }
+
+  root.querySelector('#enableSound').onclick=async()=>{ try{ if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; audioCtx=new AC() }
+    if(audioCtx.state==='suspended') await audioCtx.resume(); soundEnabled=true; playBeep(); setTimeout(()=>playBeep(),200); showToast('Звук новых заказов включён') }catch{ showToast('Браузер не дал включить звук') } };
+
+  function orderCard(o){
+    const clientTotal = (o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0), 0);
+    const total       = Math.max(typeof o.total==='number'?o.total:0, clientTotal);
+    const created     = o.createdAt? new Date(o.createdAt): new Date();
+    const itemLines   = (o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(', ');
+    const card=el(`
+      <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
+        <div class="flex items-center justify-between gap-4">
+          <div class="text-lg font-semibold">#${o.id} — ${o.name||''}</div>
+          <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status||'новый'}</div>
+        </div>
+        <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b>${o._source==='local' ? ' · <span class="text-red-500">локально</span>' : ''}</div>
+        <div>📍 ${o.address||''}</div><div>☎️ ${o.phone||''}</div><div>🧾 ${itemLines||'—'}</div>
+        <div>⏰ ${o.deliverByTime&&o.deliverTime?('к '+o.deliverTime):'как можно скорее'}</div>
+        <div class="mt-3 flex flex-wrap gap-2 items-center">
+          <label class="text-sm">Статус:</label>
+          <select class="border rounded-xl p-2" data-k="status">
+            ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
+        </div>
+        <div class="flex gap-2 items-center">
+          <label class="text-sm">Ожидание (мин):</label>
+          <input type="number" min="0" class="border rounded-xl p-2 w-24" data-k="eta" value="${o.etaMinutes??''}" />
+          <button type="button" class="px-3 py-2 rounded-xl border" data-act="set-eta">OK</button>
+        </div>
+        <div class="mt-2 text-right"><button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button></div>
+      </div>`);
+    card.addEventListener('click', async (e)=>{
+      const act=e.target.dataset.act; if(!act) return;
+      if(act==='save'){ const status=card.querySelector('[data-k="status"]').value; await ycCall("update",{id:o.id, patch:{status}}); showToast(`Статус заказа #${o.id} обновлён`) }
+      if(act==='set-eta'){ const etaMinutes=Number(card.querySelector('[data-k="eta"]').value||0); await ycCall("update",{id:o.id, patch:{etaMinutes}}); showToast(`ETA заказа #${o.id} обновлён`) }
+      if(act==='delete'){ if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card && card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
+        await ycCall("delete",{id:o.id}); card.remove(); showToast(`Заказ #${o.id} удалён`) }
+    });
+    return card;
+  }
+
+  async function load(){
+    const res=await ycCall("list");
+    const unique=new Map();
+    if(!res.error && Array.isArray(res.orders) && res.orders.length>0){ res.orders.forEach(o=>unique.set(String(o.id),o)); lastOrdersMap=new Map(unique) }
+    else if(lastOrdersMap.size>0){ lastOrdersMap.forEach((v,k)=>unique.set(k,v)) }
+
+    list.innerHTML='';
+    if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
+    const currentIds=new Set();
+    [...unique.values()].forEach(o=>{
+      const idStr=String(o.id); currentIds.add(idStr);
+      if(!seenIds.has(idStr)){ showToast("Новый заказ #"+o.id); if(soundEnabled){ playBeep(); setTimeout(()=>playBeep(),250) } }
+      list.appendChild(orderCard(o))
+    });
+    seenIds.clear(); currentIds.forEach(id=>seenIds.add(id));
+  }
+  load(); const t=setInterval(()=>{ if(location.hash==='#/dashboard') load() }, 5000);
+  root.cleanup = ()=> clearInterval(t);
+  return root;
 }
 
 /* ===== Router ===== */
@@ -459,12 +577,12 @@ function router(){
   else if(h==='#/profile-edit') mount(ProfileEditView());
   else if(h==='#/history')    mount(HistoryView());
   else if(h==='#/dashboard')  mount(DashboardView());
-  else                        mount(OrderView()); // #/order и всё остальное
+  else                        mount(OrderView());
 }
 window.addEventListener('hashchange', router);
 router();
 
-/* Header: всегда открывает профиль-хаб */
+/* Header */
 document.getElementById('profileBtn').addEventListener('click', ()=>{ location.hash='#/profile' });
 </script>
 </body>
