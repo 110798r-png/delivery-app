@@ -38,14 +38,10 @@
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
-    .chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.2rem .6rem; border-radius:999px; font-size:12px; background:#eff6ff; color:#1e3a8a }
-    .chip.gray{ background:#f1f5f9; color:#334155 }
-    .chip.green{ background:#dcfce7; color:#14532d }
-    .chip.orange{ background:#ffedd5; color:#7c2d12 }
-    .chip.red{ background:#ffe4e6; color:#7f1d1d }
+    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.1rem .45rem; border-radius:999px; font-size:11px; background:#f1f5f9; color:#334155 }
 
     .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
-    .card-tall{ min-height: 140px; }
+    .card-tall{ min-height: 180px; } /* повыше */
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
 
     /* зона 4-тапов (невидимая) */
@@ -142,6 +138,11 @@ function syncOrderStatus(id, status){
   if (changed) saveHistory(hist);
 }
 
+function countActiveOrders(){
+  const list = loadHistory();
+  return (Array.isArray(list)?list:[]).filter(o => !['завершён','отменён'].includes(o.status||'новый')).length;
+}
+
 /* ===== Меню ===== */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
@@ -180,19 +181,32 @@ function OrderView(){
       <section><div id="catPager" class="no-scrollbar"></div></section>
       <div id="confirmBar" class="confirm-bar">
         <div class="flex items-center justify-between gap-3">
-          <div class="text-base"><span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b></div>
+          <div class="text-base flex items-center gap-2">
+            <span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b>
+          </div>
+          <button id="cartBtn" class="relative px-3 py-2 rounded-xl border bg-white" aria-label="Корзина">🛒
+            <span id="cartBadge" class="hidden absolute -top-1 -right-1 chip"></span>
+          </button>
           <button id="confirmBtn" class="px-4 py-3 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>Подтвердить заказ</button>
         </div>
       </div>
     </div>
   `);
   const categoryBar=root.querySelector('#categoryBar'); const catPager=root.querySelector('#catPager'); const confirmBar=root.querySelector('#confirmBar'); const totalEl=root.querySelector('#totalVal'); const confirmBtn=root.querySelector('#confirmBtn');
+  const cartBtn=root.querySelector('#cartBtn'); const cartBadge=root.querySelector('#cartBadge');
   setBodyScrollLock(true);
 
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
   const panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
-  // Развешиваем категории
+  function updateCartBadge(){
+    const n = countActiveOrders();
+    if(n>0){ cartBadge.textContent=n; cartBadge.classList.remove('hidden'); }
+    else cartBadge.classList.add('hidden');
+  }
+  updateCartBadge();
+  cartBtn.onclick = ()=> location.hash = '#/orders';
+
   MENU_CATEGORIES.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(MENU_CATEGORIES.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(MENU_CATEGORIES[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(MENU_CATEGORIES[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -247,11 +261,8 @@ function OrderView(){
   // Применяем предзаполнение от "Повторить заказ"
   function applyPreselect(){
     if (!preselect) return;
-    // обнулим все
     MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> counts[it.name]=0 ));
-    // выставим по заказу
     preselect.forEach(it => { counts[it.name] = (counts[it.name]||0) + (it.qty||0); });
-    // отрисуем значения
     catPager.querySelectorAll('[data-q]').forEach(n=>{
       const name=n.getAttribute('data-q');
       n.textContent = counts[name]||0;
@@ -277,14 +288,14 @@ function OrderView(){
   buildPanels(); bindTapIncDec(catPager, counts, recalcTotal); highlightChip(0); requestAnimationFrame(()=> { goToIndex(0,{animate:false}); applyPreselect(); });
   root.cleanup = ()=> setBodyScrollLock(false);
 
-  // вспомогательная очистка корзины после подтверждения
+  // очистка корзины после подтверждения
   root.clearCartUI = ()=>{
     MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> counts[it.name]=0 ));
     catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
     recalcTotal();
+    updateCartBadge();
   };
 
-  // доступ снаружи
   document._orderViewRef = root;
   return root;
 }
@@ -292,51 +303,26 @@ function OrderView(){
 /* ===== Профиль ===== */
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
-  const list = loadHistory();
-  const activeOrder = (Array.isArray(list)?list:[]).find(o => (o.status||'новый')!=='завершён' && (o.status||'новый')!=='отменён');
-  const last2 = (Array.isArray(list)?list:[]).slice(0,2);
 
-  const rightCardContent = activeOrder
-    ? `
-      <div class="text-sm font-semibold mb-2">Активный заказ</div>
-      <div class="border rounded-lg p-2 text-[12px] leading-tight">
-        <div>#${activeOrder.id} · <b>${activeOrder.status||'новый'}</b></div>
-        <div>${money(activeOrder.total||0)}</div>
-        <div>${new Date(activeOrder.createdAt).toLocaleDateString()}</div>
-      </div>`
-    : `
-      <div class="text-sm font-semibold mb-2">Мои заказы</div>
-      <div class="grid grid-cols-1 gap-2">
-        ${
-          last2.length
-            ? last2.map(o=>`
-              <div class="border rounded-lg p-2 text-[12px] leading-tight">
-                <div>#${o.id} · ${o.status||'—'}</div>
-                <div>${money(o.total||0)}</div>
-                <div>${new Date(o.createdAt).toLocaleDateString()}</div>
-              </div>`).join('')
-            : `<div class="text-xs text-gray-500">Пока пусто</div>`
-        }
-      </div>`;
-
-  const rightCardBtnId = 'ordersBtn';
+  const rightCardContent = `
+    <div class="flex items-center justify-between">
+      <div class="text-sm font-semibold">Мои заказы</div>
+      <div class="text-xl">🍟 ➜</div>
+    </div>
+  `;
 
   const root=el(`
     <div class="grid gap-4 pb-24">
 
       <section class="grid grid-cols-2 gap-3">
         <button class="card card-tall p-4 text-left" id="profileEditBtn">
-          <div class="flex gap-3">
-            <div class="w-14 h-14 rounded-lg bg-gray-300 grid place-items-center text-2xl font-bold text-white">Я</div>
-            <div class="min-w-0">
-              <div class="text-base font-semibold truncate">${p.name || 'Мой профиль'}</div>
-              <div class="text-xs text-gray-600 mt-1 truncate">${p.address || 'Адрес: не указан'}</div>
-              <div class="text-[11px] text-gray-500 mt-1 truncate">${p.phone ? 'Тел.: '+p.phone : 'Телефон: не указан'}</div>
-            </div>
+          <div class="min-w-0">
+            <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
+            <div class="text-[12px] text-gray-600 mt-2 truncate">${p.phone ? p.phone : 'Телефон: не указан'}</div>
           </div>
         </button>
 
-        <button class="card card-tall p-4 text-left" id="${rightCardBtnId}">
+        <button class="card card-tall p-4 text-left" id="ordersBtn">
           ${rightCardContent}
         </button>
       </section>
@@ -374,7 +360,7 @@ function ProfileHubView(){
   return root;
 }
 
-/* ===== Экран «Мои заказы» (большие карточки) ===== */
+/* ===== Экран «Мои заказы» ===== */
 function OrdersView(){
   const root=el(`
     <div class="grid gap-3 pb-28">
@@ -388,12 +374,6 @@ function OrdersView(){
 
   const box = root.querySelector('#ordersList');
 
-  function statusChip(s){
-    const map = { 'новый':'gray', 'готовится':'orange', 'в пути':'orange', 'готов':'green', 'завершён':'green', 'отменён':'red' };
-    const cls = map[s] || 'gray';
-    return `<span class="chip ${cls}">${s}</span>`;
-  }
-
   function render(){
     const list = loadHistory();
     box.innerHTML = '';
@@ -401,7 +381,6 @@ function OrdersView(){
       box.innerHTML = `<div class="text-sm text-gray-400">Пока нет заказов.</div>`;
       return;
     }
-
     list.forEach((o)=>{
       const itemsHtml = (o.items||[]).map(i=>`
         <div class="flex items-start justify-between gap-3 text-sm">
@@ -417,7 +396,7 @@ function OrdersView(){
               <div class="text-xs text-gray-500">${new Date(o.createdAt||Date.now()).toLocaleString()}</div>
               <div class="text-2xl font-extrabold tracking-tight mt-1">№ ${o.id}</div>
             </div>
-            <div>${statusChip(o.status||'новый')}</div>
+            <div><span class="chip">${o.status||'новый'}</span></div>
           </div>
 
           <div class="mt-2 text-xs text-gray-500">Состав:</div>
@@ -473,9 +452,8 @@ function ProfileEditView(){
       <section class="glass-panel rounded-2xl p-5">
         <h2 class="text-lg font-semibold mb-3">Редактировать профиль</h2>
         <div class="grid gap-3">
-          <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${p.name||''}">
+          <input id="pName" class="border rounded-xl p-3" placeholder="Имя и фамилия" value="${p.name||''}">
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
-          <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
           <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
           <select id="paydef" class="border rounded-xl p-3">
             <option value="cash">Наличные</option>
@@ -491,12 +469,12 @@ function ProfileEditView(){
     </div>
   `);
   root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
+  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
 
-/* ===== Табло (упрощённо; синхронизация статуса сохранена) ===== */
+/* ===== Табло ===== */
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
@@ -527,7 +505,7 @@ function DashboardView(){
     const card=el(`
       <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
         <div class="flex items-center justify-between gap-4">
-          <div class="text-lg font-semibold">#${o.id} — ${o.name||''}</div>
+          <div class="text-lg font-semibold">#${o.id}</div>
           <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status||'новый'}</div>
         </div>
         <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b></div>
@@ -562,21 +540,21 @@ function DashboardView(){
   return root;
 }
 
-/* ===== 4-тап зона только на экране профиля ===== */
+/* ===== 4-тап зона (ровно 4 быстрых) ===== */
 function bindTabloTapZone(){
   const hot = document.getElementById('tabloTapHot');
   if (!hot || hot._bound) return;
   hot._bound = true;
 
   let taps = 0, first = 0, timer = null;
-  const windowMs = 1200;
+  const windowMs = 800; // «быстрых»
   function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
   function handler(){
     const now = Date.now();
     if (!first) first = now;
     taps++;
     if (now - first > windowMs){ reset(); taps = 1; first = now; }
-    if (taps >= 4){
+    if (taps === 4){ // ровно 4
       reset();
       document.getElementById('payModal')?.classList.remove('open');
       if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
@@ -641,7 +619,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
   const onOk = (e)=>{
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    // корзина должна быть не пустой — защита продублирована
     const map={}; document.querySelectorAll('[data-q]').forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; });
     if(Object.keys(map).length===0){ showToast(TOST_SELECT); close(); finalize(); return; }
 
@@ -649,9 +626,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
       const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
     }));
+
     const prof=loadProfile();
     const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''});
-    if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); finalize(); return; }
+    if(localStorage.getItem('last_order_sig')===sig){ /*без уведомления*/ close(); finalize(); return; }
     localStorage.setItem('last_order_sig',sig);
 
     const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
@@ -659,12 +637,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
     const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
 
-    // Обнулить корзину на экране заказа
     if (document._orderViewRef && typeof document._orderViewRef.clearCartUI === 'function'){
       document._orderViewRef.clearCartUI();
     }
 
-    close(); showToast('Заказ сохранён'); finalize();
+    close(); finalize(); // без тоста «сохранён»
   };
   ok.addEventListener('click', onOk, { passive:false });
   ok.addEventListener('pointerup', onOk, { passive:false });
