@@ -39,11 +39,11 @@
     .modal.open{ display:flex }
 
     .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn, #payOk, #payCancel { touch-action: manipulation; }
+    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
-    /* карточки в стиле макета */
+    /* карточки профиля/истории */
     .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:14px 16px; }
   </style>
@@ -56,9 +56,9 @@
         <div class="text-[12px] text-gray-600 -mt-0.5">локальный режим (без сервера)</div>
       </div>
 
-      <!-- два элемента: кнопка профиля и аватар; показываем по ситуации -->
+      <!-- показываем ТОЛЬКО одну кнопку: 👤 на заказе, ← на профиле/истории -->
       <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button">👤</a>
-      <button id="avatarBtn" class="hidden w-9 h-9 rounded-full border bg-white grid place-items-center select-none" aria-label="avatar">🙂</button>
+      <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад">←</button>
     </header>
     <main id="app" class="phone-shell"></main>
   </div>
@@ -161,28 +161,17 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
 function bindTapIncDec(catPager, counts, recalcTotal){
   let downX=0, downY=0, pressedEl=null;
   catPager.addEventListener('pointerdown', (e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; pressedEl=btn; downX=e.clientX; downY=e.clientY; });
-  catPager.addEventListener('pointerup', (e)=>{ if(!pressedEl) return; const dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); const btn=pressedEl; if(dx<6 && dy<6){ const act=btn.dataset.act, name=btn.dataset.name; if(act==='inc') counts[name]=(counts[name]||0)+1; if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1); catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0); recalcTotal(); catPager._ignoreNextClickTs=Date.now(); } pressedEl=null; });
-  ['pointercancel','pointerleave'].forEach(evt=> catPager.addEventListener(evt, ()=>{ pressedEl=null; }));
-}
-
-/* ===== детектор 4-тапов по аватару ===== */
-function bindSecretAvatarTap(btn, {taps=4, windowMs=1200}={}){
-  let cnt=0, first=0, timer=null;
-  function reset(){ cnt=0; first=0; if(timer){ clearTimeout(timer); timer=null; } }
-  btn.addEventListener('pointerdown', ()=>{
-    const now=Date.now();
-    if(!first) first=now;
-    cnt++;
-    if(now-first>windowMs){ reset(); cnt=1; first=now; }
-    if(cnt>=taps){
-      reset();
-      // переход на табло — вызовет окно «ключ»
-      location.hash='#/dashboard';
-    }else{
-      if(timer) clearTimeout(timer);
-      timer=setTimeout(reset, windowMs);
+  catPager.addEventListener('pointerup', (e)=>{ if(!pressedEl) return; const dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); const btn=pressedEl;
+    if(dx<6 && dy<6){
+      const act=btn.dataset.act, name=btn.dataset.name;
+      if(act==='inc') counts[name]=(counts[name]||0)+1;
+      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
+      catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0);
+      recalcTotal(); catPager._ignoreNextClickTs=Date.now();
     }
-  }, {passive:true});
+    pressedEl=null;
+  });
+  ['pointercancel','pointerleave'].forEach(evt=> catPager.addEventListener(evt, ()=>{ pressedEl=null; }));
 }
 
 /* ===== Order ===== */
@@ -246,7 +235,7 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
-      // свайп панели
+      // свайп панели (горизонтально)
       let down=false, used=false, sx=0, sy=0, locked=null; const PIX_LOCK=10, THRESH = ()=> Math.max(40, panelW()*0.25);
       vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
       vbox.addEventListener('pointermove',e=>{ if(!down||used||isAnimating) return; const dx=e.clientX-sx, dy=e.clientY-sy; if(locked===null){ if(Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>PIX_LOCK) locked='y'; } if(locked==='x'){ e.preventDefault(); if(Math.abs(dx)>=THRESH()){ used=true; const next = dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } } }, {passive:false});
@@ -254,7 +243,14 @@ function OrderView(){
     });
 
     if(!catPager._pmBound){
-      catPager.addEventListener('click', e=>{ if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; } const act=e.target?.dataset?.act; if(!act) return; const name=e.target.dataset.name; if(act==='inc') counts[name]=(counts[name]||0)+1; else counts[name]=Math.max(0,(counts[name]||0)-1); catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0); recalcTotal(); });
+      catPager.addEventListener('click', e=>{
+        if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; }
+        const act=e.target?.dataset?.act; if(!act) return;
+        const name=e.target.dataset.name;
+        if(act==='inc') counts[name]=(counts[name]||0)+1; else counts[name]=Math.max(0,(counts[name]||0)-1);
+        catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0);
+        recalcTotal();
+      });
       catPager.addEventListener('keydown', (e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); }});
       catPager._pmBound=true;
     }
@@ -288,9 +284,6 @@ function OrderView(){
   root.cleanup = ()=> setBodyScrollLock(false);
   return root;
 }
-
-/* ===== Общий Back-бар ===== */
-function BackBar(){ return el(`<div class="mb-3"><button id="backToOrder" class="px-3 py-2 rounded-xl border">← К заказу</button></div>`); }
 
 /* ===== Профиль (по макету) ===== */
 function ProfileHubView(){
@@ -328,7 +321,7 @@ function ProfileHubView(){
         </button>
       </section>
 
-      <!-- широкой рекламный блок -->
+      <!-- широкая «реклама» -->
       <section class="card p-5">
         <div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div>
       </section>
@@ -339,7 +332,7 @@ function ProfileHubView(){
         <button class="rowlink text-left" id="supportBtn"><b>Техподдержка</b></button>
       </section>
 
-      <!-- низ: камера + правый информационный блок -->
+      <!-- низ: камера + правый информационный блок (обратная связь) -->
       <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="card p-4 aspect-video flex items-center justify-center bg-black text-white">
           <div class="text-center">
@@ -362,8 +355,7 @@ function ProfileHubView(){
     </div>
   `);
 
-  root.prepend(BackBar());
-  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
+  // Кнопки действий
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
@@ -396,10 +388,14 @@ function ProfileEditView(){
       </section>
     </div>
   `);
-  root.prepend(BackBar());
-  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
   root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
+  root.querySelector('#pSave').onclick=()=>{
+    const p2={ name:root.querySelector('#pName').value.trim(),
+               phone:root.querySelector('#pPhone').value.trim(),
+               address:root.querySelector('#pAddr').value.trim(),
+               paymentMethod:root.querySelector('#paydef').value };
+    saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile';
+  };
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
@@ -418,8 +414,6 @@ function HistoryView(){
       <div id="historyList" class="grid gap-2"></div>
     </div>
   `);
-  root.prepend(BackBar());
-  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
 
   const box=root.querySelector('#historyList');
   function render(){
@@ -447,7 +441,7 @@ function HistoryView(){
   return root;
 }
 
-/* ===== Табло (локально) ===== */
+/* ===== Табло (локально, отдельное хранилище) ===== */
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
@@ -533,15 +527,16 @@ function realRouter(){ const h=location.hash.split('?')[0]; if(h==='#/profile') 
 function router(){
   const h=location.hash.split('?')[0];
 
-  // показать в хедере: аватар вместо кнопки профиля на profile/history
-  const btn = document.getElementById('profileBtn');
-  const avatar = document.getElementById('avatarBtn');
-  if(h==='#/profile' || h==='#/history'){
-    btn.classList.add('hidden');
-    avatar.classList.remove('hidden');
-  }else{
-    avatar.classList.add('hidden');
-    btn.classList.remove('hidden');
+  // в хедере: 👤 только на заказе; ← на профиле/истории/редакторе/истории
+  const profileBtn = document.getElementById('profileBtn');
+  const backBtn    = document.getElementById('backBtn');
+  const showBack = (h==='#/profile' || h==='#/history' || h==='#/profile-edit');
+  if (showBack){
+    profileBtn.classList.add('hidden');
+    backBtn.classList.remove('hidden');
+  } else {
+    backBtn.classList.add('hidden');
+    profileBtn.classList.remove('hidden');
   }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
@@ -556,7 +551,7 @@ router();
 
 /* Header & модалки */
 document.addEventListener('DOMContentLoaded', ()=>{
-  // профиль — надёжный переход
+  // 👤 профиль — надёжный переход
   const profileBtn = document.getElementById('profileBtn');
   const goProfile = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; };
   if (profileBtn){
@@ -565,9 +560,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     profileBtn.addEventListener('touchend', goProfile, { passive:false });
   }
 
-  // секретный 4-тап по аватару -> табло
-  const avatarBtn = document.getElementById('avatarBtn');
-  bindSecretAvatarTap(avatarBtn, {taps:4, windowMs:1200});
+  // ← назад — к заказу
+  const backBtn = document.getElementById('backBtn');
+  const goOrder = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/order'; };
+  if (backBtn){
+    backBtn.addEventListener('click', goOrder, { passive:false });
+    backBtn.addEventListener('pointerup', goOrder, { passive:false });
+    backBtn.addEventListener('touchend', goOrder, { passive:false });
+  }
 
   // Pay modal
   const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
