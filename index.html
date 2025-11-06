@@ -29,6 +29,7 @@
       padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06);
     }
 
+    /* горизонтальный пейджер категорий + вертикальная прокрутка списка */
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
@@ -41,11 +42,17 @@
 
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
     .modal.open{ display:flex }
+
+    /* --- патч: хедер всегда кликабелен --- */
+    .app-header{ position:relative; z-index:70; }
+
+    /* --- патч: подсказка браузеру, что это тапы, а не жесты --- */
+    button[data-act], #profileBtn { touch-action: manipulation; }
   </style>
 </head>
 <body>
   <div class="w-full py-3">
-    <header id="appHeader" class="phone-shell flex items-center justify-between mb-3 sm:mb-4">
+    <header id="appHeader" class="phone-shell flex items-center justify-between mb-3 sm:mb-4 app-header">
       <div class="leading-tight">
         <div class="text-2xl font-extrabold tracking-tight">ЯмаМото</div>
         <div class="text-[12px] text-gray-600 -mt-0.5">суши • роллы • фастфуд</div>
@@ -127,6 +134,42 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
   const start = performance.now();
   function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft = from + diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); }
   requestAnimationFrame(step);
+}
+
+/* ===== Надёжный TAP для кнопок +/− внутри catPager ===== */
+function bindTapIncDec(catPager, counts, recalcTotal){
+  const TAP_THRESH = 6; // px
+  let downX=0, downY=0, pressedEl=null;
+
+  catPager.addEventListener('pointerdown', (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    pressedEl = btn;
+    downX = e.clientX; downY = e.clientY;
+  });
+
+  catPager.addEventListener('pointerup', (e)=>{
+    if(!pressedEl) return;
+    const dx = Math.abs(e.clientX - downX);
+    const dy = Math.abs(e.clientY - downY);
+    const btn = e.target.closest('button[data-act]');
+    if(btn === pressedEl && dx < TAP_THRESH && dy < TAP_THRESH){
+      const act  = btn.dataset.act;
+      const name = btn.dataset.name;
+      if(act==='inc') counts[name]=(counts[name]||0)+1;
+      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
+      catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`)
+        .forEach(n=> n.textContent = counts[name]||0);
+      recalcTotal();
+      // предохранитель от двойного click после pointerup
+      catPager._ignoreNextClickTs = Date.now();
+    }
+    pressedEl = null;
+  });
+
+  ['pointercancel','pointerleave'].forEach(evt=>{
+    catPager.addEventListener(evt, ()=>{ pressedEl=null; });
+  });
 }
 
 /* ===== ORDER (как согласовали) ===== */
@@ -228,11 +271,19 @@ function OrderView(){
 
     if(!catPager._pmBound){
       catPager.addEventListener('click', e=>{
+        // если только что был synthetic tap — гасим click
+        if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; }
         const act=e.target?.dataset?.act; if(!act) return;
         const name=e.target.dataset.name;
         if(act==='inc') counts[name]=(counts[name]||0)+1; else counts[name]=Math.max(0,(counts[name]||0)-1);
         catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0);
         recalcTotal();
+      });
+      // доступность клавиатурой
+      catPager.addEventListener('keydown', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
       });
       catPager._pmBound=true;
     }
@@ -293,7 +344,10 @@ function OrderView(){
     };
   });
 
-  buildPanels(); highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
+  buildPanels();
+  // патч: синтетический tap для +/−
+  bindTapIncDec(catPager, counts, recalcTotal);
+  highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
   root.cleanup = ()=> setBodyScrollLock(false);
   return root;
 }
@@ -583,7 +637,11 @@ window.addEventListener('hashchange', router);
 router();
 
 /* Header */
-document.getElementById('profileBtn').addEventListener('click', ()=>{ location.hash='#/profile' });
+// страховка: обработчик на профайл вешаем один раз и он не теряется
+document.addEventListener('DOMContentLoaded', ()=>{
+  const profileBtn = document.getElementById('profileBtn');
+  if (profileBtn) profileBtn.onclick = ()=>{ location.hash = '#/profile'; };
+});
 </script>
 </body>
 </html>
