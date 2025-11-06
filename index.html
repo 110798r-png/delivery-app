@@ -27,20 +27,12 @@
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
 
-    .block-btn{ border-radius:1.25rem; padding:1rem; box-shadow:0 8px 24px rgba(15,23,42,.08); transition:transform .12s ease; background:#fff; border:1px solid #eef2f7; }
-    .block-btn:active{ transform:scale(.98); }
-
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
-    .modal.open{ display:flex }
-
-    .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
-    /* карточки */
+    /* карточки/ряды профиля */
     .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
-    .card-tall{ min-height: 140px; } /* удлинённые */
+    .card-tall{ min-height:140px; }
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
 
     /* зона 4-тапов (невидимая) */
@@ -122,7 +114,7 @@ function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.s
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
-/* ===== меню и анимация/тапы (+/−) — без изменений по логике ===== */
+/* ===== меню и анимация/тапы для +/- ===== */
 const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -247,10 +239,7 @@ function ProfileHubView(){
 
   const root=el(`
     <div class="grid gap-4 pb-24">
-
-      <!-- верх: строго два столбца, удлинённые -->
       <section class="grid grid-cols-2 gap-3">
-        <!-- профиль -->
         <button class="card card-tall p-4 text-left" id="profileEditBtn">
           <div class="flex gap-3">
             <div class="w-14 h-14 rounded-lg bg-gray-300 grid place-items-center text-2xl font-bold text-white">Я</div>
@@ -262,7 +251,6 @@ function ProfileHubView(){
           </div>
         </button>
 
-        <!-- история -->
         <button class="card card-tall p-4 text-left" id="historyBtn">
           <div class="text-sm font-semibold mb-2">История заказов</div>
           <div class="grid grid-cols-1 gap-2">
@@ -277,19 +265,16 @@ function ProfileHubView(){
         </button>
       </section>
 
-      <!-- широкая «реклама» -->
       <section class="card p-5">
         <div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div>
       </section>
 
-      <!-- строки-кнопки -->
       <section class="grid gap-2">
         <button class="rowlink text-left" id="reviewsBtn">Отзывы</button>
         <button class="rowlink text-left" id="supportBtn">Техподдержка</button>
         <button class="rowlink text-left" id="feedbackBtn">Обратная связь</button>
       </section>
 
-      <!-- Юридическая информация (отдельная карточка) -->
       <section class="card p-4 text-sm leading-relaxed">
         <div class="text-base font-semibold mb-2">Юридическая информация</div>
         <div class="text-xs text-gray-600">
@@ -298,15 +283,13 @@ function ProfileHubView(){
         </div>
       </section>
 
-      <!-- невидимая зона 4-тапов (справа) для входа в табло -->
+      <!-- невидимая зона 4-тапов (справа) -->
       <section id="tabloTapZone">
         <div id="tabloTapHot" aria-label="tablo-tap-hot"></div>
       </section>
-
     </div>
   `);
 
-  // действия
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
@@ -317,7 +300,7 @@ function ProfileHubView(){
 
 /* ===== Экран «Обратная связь» ===== */
 function ContactView(){
-  const p=Object.assign({ phone:'', }, loadProfile());
+  const p=Object.assign({ phone:'' }, loadProfile());
   const root=el(`
     <div class="grid gap-4 pb-24">
       <div class="flex items-center gap-3">
@@ -335,7 +318,7 @@ function ContactView(){
   return root;
 }
 
-/* ===== Редактор профиля / История / Табло — как раньше (мелкие правки уже внесены ранее) ===== */
+/* ===== Редактор профиля / История / Табло ===== */
 function ProfileEditView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -424,6 +407,11 @@ function router(){
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){ document.getElementById('pinModal').classList.add('open'); const app=document.getElementById('app'); if(app) app.innerHTML=''; return; }
   realRouter();
+
+  // привязать 4-тап-зону (если на текущем экране есть)
+  if (typeof window.bindTabloTapZone === 'function') {
+    setTimeout(window.bindTabloTapZone, 0);
+  }
 }
 window.addEventListener('hashchange', router); router();
 
@@ -437,28 +425,111 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const goOrder=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/order'; };
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
-  // 4-тап зона (справа внизу под блоками)
-  const hot=document.getElementById('tabloTapHot');
-  let taps=0, first=0, timer=null; const windowMs=1200;
-  function reset(){ taps=0; first=0; if(timer){ clearTimeout(timer); timer=null; } }
-  const handler=()=>{ const now=Date.now(); if(!first) first=now; taps++; if(now-first>windowMs){ reset(); taps=1; first=now; } if(taps>=4){ reset(); if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash='#/dashboard'; else document.getElementById('pinModal').classList.add('open'); } else { if(timer) clearTimeout(timer); timer=setTimeout(reset, windowMs); } };
-  ['click','pointerup','touchend'].forEach(ev=> hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}));
+  // ----- 4-тап зона (справа внизу под блоками) -----
+  window.bindTabloTapZone = function bindTabloTapZone(){
+    const hot = document.getElementById('tabloTapHot');
+    if (!hot || hot._bound) return;
+    hot._bound = true;
 
-  // Pay modal
-  const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
-  const close=()=> m.classList.remove('open');
-  const finalize=()=>{ const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } };
-  const onCancel=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
-  const onOk=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } const pay=sel.value||'cash'; const map={}; document.querySelectorAll('[data-q]').forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; }); const itemsSel=[]; let total=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }})); const prof=loadProfile(); const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''}); if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); finalize(); return; } localStorage.setItem('last_order_sig',sig); const order={ id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay, status:'новый' }; const history=loadHistory(); history.unshift(order); saveHistory(history.slice(0,50)); const dash=loadDash(); dash.unshift(order); saveDash(dash.slice(0,200)); const p=loadProfile(); p.paymentMethod=pay; saveProfile(p); close(); showToast('Заказ сохранён'); finalize(); };
-  ['click','pointerup','touchend'].forEach(ev=> ok.addEventListener(ev, onOk, {passive:false}));
-  ['click','pointerup','touchend'].forEach(ev=> cancel.addEventListener(ev, onCancel, {passive:false}));
-  m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
+    let taps = 0, first = 0, timer = null;
+    const windowMs = 1200;
+    function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
+    function handler(){
+      const now = Date.now();
+      if (!first) first = now;
+      taps++;
+      if (now - first > windowMs){ reset(); taps = 1; first = now; }
+      if (taps >= 4){
+        reset();
+        if (sessionStorage.getItem('TABLO_PIN_OK') === '1'){
+          location.hash = '#/dashboard';
+        } else {
+          document.getElementById('pinModal').classList.add('open');
+        }
+      } else {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(reset, windowMs);
+      }
+    }
 
-  // KEY modal
-  const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
-  pinOk.onclick=(e)=>{ e&&e.preventDefault(); if((pinInput.value||'').length>0){ sessionStorage.setItem(TABLO_PIN_OK,'1'); pinM.classList.remove('open'); location.hash='#/dashboard'; } else { showToast('Введите ключ'); } };
-  pinCancel.onclick=()=>{ pinM.classList.remove('open'); if(location.hash!=='#/dashboard') location.hash='#/profile'; };
-  pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
+    ['click','pointerup','touchend'].forEach(ev =>
+      hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false})
+    );
+  };
+  // на случай если мы уже на профиле при загрузке
+  setTimeout(window.bindTabloTapZone, 0);
+
+  // === Pay modal ===
+  const payM = document.getElementById('payModal');
+  const payOk = document.getElementById('payOk');
+  const payCancel = document.getElementById('payCancel');
+  const paySel = document.getElementById('paySelect');
+  const payClose = ()=> payM.classList.remove('open');
+  const payFinalize = ()=>{
+    const btn=document.getElementById('confirmBtn');
+    if(btn){ btn._busy=false; btn.disabled=false; }
+  };
+
+  const onPayCancel = (e)=>{ e&&e.preventDefault(); payClose(); payFinalize(); };
+  const onPayOk = (e)=>{
+    e&&e.preventDefault();
+    const pay = paySel.value || 'cash';
+
+    // собрать корзину
+    const map={};
+    document.querySelectorAll('[data-q]').forEach(n=>{
+      const name=n.getAttribute('data-q');
+      const q=Number(n.textContent||'0')||0;
+      if(q>0) map[name]=q;
+    });
+
+    const itemsSel=[]; let total=0;
+    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
+      const q=map[it.name]||0;
+      if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
+    }));
+
+    const prof=loadProfile();
+    const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''});
+    if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); payClose(); payFinalize(); return; }
+    localStorage.setItem('last_order_sig',sig);
+
+    const order={ id: Date.now().toString().slice(-6), createdAt: Date.now(), items:itemsSel, total, pay, status:'новый' };
+    const history=loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
+    const dash=loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
+    const p=loadProfile(); p.paymentMethod=pay; saveProfile(p);
+
+    payClose(); showToast('Заказ сохранён'); payFinalize();
+  };
+  ['click','pointerup','touchend'].forEach(ev=>{
+    payOk.addEventListener(ev,onPayOk,{passive:false});
+    payCancel.addEventListener(ev,onPayCancel,{passive:false});
+  });
+  payM.onclick=(e)=>{ if(e.target===payM) onPayCancel(e); };
+
+  // === PIN modal ===
+  const pinM = document.getElementById('pinModal');
+  const pinOk = document.getElementById('pinOk');
+  const pinCancel = document.getElementById('pinCancel');
+  const pinInput = document.getElementById('pinInput');
+
+  const onPinOk = (e)=>{
+    e&&e.preventDefault();
+    if((pinInput.value||'').trim()){
+      sessionStorage.setItem('TABLO_PIN_OK','1');
+      pinM.classList.remove('open');
+      location.hash = '#/dashboard';
+    } else {
+      showToast('Введите ключ');
+    }
+  };
+  const onPinCancel = (e)=>{ e&&e.preventDefault(); pinM.classList.remove('open'); };
+
+  ['click','pointerup','touchend'].forEach(ev=>{
+    pinOk.addEventListener(ev,onPinOk,{passive:false});
+    pinCancel.addEventListener(ev,onPinCancel,{passive:false});
+  });
+  pinM.onclick=(e)=>{ if(e.target===pinM) onPinCancel(e); };
 });
 </script>
 </body>
