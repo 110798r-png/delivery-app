@@ -27,9 +27,6 @@
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
 
-    .block-btn{ border-radius:1.25rem; padding:1rem; box-shadow:0 8px 24px rgba(15,23,42,.08); transition:transform .12s ease; background:#fff; border:1px solid #eef2f7; }
-    .block-btn:active{ transform:scale(.98); }
-
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
     .modal.open{ display:flex }
 
@@ -42,8 +39,12 @@
     .card-tall{ min-height: 140px; }
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
 
+    /* зона 4-тапов (невидимая) */
     #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
     #tabloTapHot{ width:120px; height:48px; border-radius:12px; }
+
+    /* чип статуса в истории */
+    .chip{ display:inline-flex; align-items:center; padding:.15rem .55rem; border-radius:.7rem; font-size:.75rem; background:#eef2ff; color:#1f2937 }
   </style>
 </head>
 <body>
@@ -93,6 +94,7 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
+/* дефолтный маршрут */
 document.addEventListener('DOMContentLoaded', ()=>{ if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order'; });
 
 /* ===== Хранилища ===== */
@@ -101,7 +103,7 @@ const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-const REPEAT_LS_KEY      = 'repeat_order_payload_v1';
+const DRAFT_CART_KEY     = 'draft_cart_v1';
 
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
@@ -183,16 +185,6 @@ function OrderView(){
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
   const panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
-  // Читаем payload «Повторить заказ»
-  let repeatPayload = safeParse(REPEAT_LS_KEY, null);
-  if (repeatPayload && typeof repeatPayload==='object'){
-    Object.entries(repeatPayload).forEach(([name,qty])=>{
-      counts[name]=Math.max(0, Number(qty)||0);
-    });
-    localStorage.removeItem(REPEAT_LS_KEY);
-    setTimeout(()=> showToast('Добавлено из прошлого заказа'), 150);
-  }
-
   MENU_CATEGORIES.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(MENU_CATEGORIES.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(MENU_CATEGORIES[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(MENU_CATEGORIES[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -228,6 +220,16 @@ function OrderView(){
       ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,()=>{ down=false; used=false; locked=null; }));
     });
 
+    // применяем черновик «повторить заказ»
+    const draft = safeParse(DRAFT_CART_KEY, null);
+    if (draft && typeof draft==='object'){
+      Object.entries(draft).forEach(([name,q])=>{
+        const n = catPager.querySelector(`[data-q="${CSS.escape(name)}"]`);
+        if (n){ n.textContent = Number(q)||0; }
+      });
+      sessionStorage.removeItem(DRAFT_CART_KEY);
+    }
+
     if(!catPager._pmBound){
       catPager.addEventListener('click', e=>{ if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; } const act=e.target?.dataset?.act; if(!act) return; const name=e.target.dataset.name; if(act==='inc') counts[name]=(counts[name]||0)+1; else counts[name]=Math.max(0,(counts[name]||0)-1); catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0); recalcTotal(); });
       catPager.addEventListener('keydown', (e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); }});
@@ -235,8 +237,7 @@ function OrderView(){
     }
 
     applyHeights(); setTimeout(applyHeights,60);
-    // если было «повторить заказ» — пересчитать сумму
-    recalcTotal();
+    recalcTotal(); // на случай черновика
   }
 
   function applyHeights(){ const headerH=document.getElementById('appHeader').getBoundingClientRect().height; const chipsH=root.querySelector('.sticky-top').getBoundingClientRect().height; const confirmH=confirmBar.getBoundingClientRect().height; const availH=Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8); const first=catPager.querySelector('.menu-card'); const cardH=first?Math.ceil(first.getBoundingClientRect().height):104; const h=Math.min(availH, cardH*4 + 12*3 + 4); root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px'); goToIndex(activeIdx,{animate:false}); }
@@ -244,11 +245,25 @@ function OrderView(){
 
   catPager.addEventListener('scroll', ()=>{ if (isAnimating) return; if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer); catPager._scrollTimer = setTimeout(()=>{ const idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width||1)); if(idx!==activeIdx){ highlightChip(idx); activeIdx=idx; } }, 80); });
 
-  function recalcTotal(){ let sum=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*it.price )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
+  function recalcTotal(){
+    let sum=0;
+    catPager.querySelectorAll('[data-q]').forEach(n=>{
+      const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0;
+      if(q>0){
+        for(const cat of MENU_CATEGORIES){ const it = cat.items.find(x=>x.name===name); if(it){ sum += q*it.price; break; } }
+      }
+    });
+    totalEl.textContent=money(sum);
+    confirmBtn.disabled = sum<=0;
+    return sum;
+  }
 
   // строгая защита: без позиций окно оплаты не открываем
   confirmBtn.addEventListener('click', ()=>{
-    const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
+    const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
+      const q = Number(root.querySelector(`[data-q="${CSS.escape(it.name)}"]`)?.textContent||'0')||0;
+      if(q>0) items.push({name:it.name, qty:q, price:it.price});
+    }));
     if(!items.length){ showToast(TOST_SELECT); return; }
 
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
@@ -260,7 +275,15 @@ function OrderView(){
     document.getElementById('payModal').classList.add('open');
   });
 
-  buildPanels(); bindTapIncDec(catPager, counts, recalcTotal); highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
+  buildPanels();
+  highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
+
+  // очистка корзины из внешнего обработчика
+  root.resetCartDom = function(){
+    catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
+    totalEl.textContent = money(0);
+    confirmBtn.disabled = true;
+  };
   root.cleanup = ()=> setBodyScrollLock(false);
   return root;
 }
@@ -276,7 +299,7 @@ function ProfileHubView(){
     ? `
       <div class="text-sm font-semibold mb-2">Активный заказ</div>
       <div class="border rounded-lg p-2 text-[12px] leading-tight">
-        <div>#${activeOrder.id} · <b>${activeOrder.status||'новый'}</b></div>
+        <div>#${activeOrder.id} · <span class="chip">${activeOrder.status||'новый'}</span></div>
         <div>${money(activeOrder.total||0)}</div>
         <div>${new Date(activeOrder.createdAt).toLocaleDateString()}</div>
       </div>`
@@ -287,7 +310,7 @@ function ProfileHubView(){
           last2.length
             ? last2.map(o=>`
               <div class="border rounded-lg p-2 text-[12px] leading-tight">
-                <div>#${o.id} · ${o.status||'—'}</div>
+                <div>#${o.id} · <span class="chip">${o.status||'—'}</span></div>
                 <div>${money(o.total||0)}</div>
                 <div>${new Date(o.createdAt).toLocaleDateString()}</div>
               </div>`).join('')
@@ -343,8 +366,7 @@ function ProfileHubView(){
   `);
 
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
-  if (activeOrder) root.querySelector('#activeBtn').onclick = ()=> location.hash = '#/history';
-  else root.querySelector('#historyBtn').onclick = ()=> location.hash = '#/history';
+  (activeOrder ? root.querySelector('#activeBtn') : root.querySelector('#historyBtn')).onclick = ()=> location.hash = '#/history';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
   root.querySelector('#reviewsBtn').onclick     = ()=> alert('Позже подключим экран отзывов.');
   root.querySelector('#feedbackBtn').onclick    = ()=> location.hash = '#/contact';
@@ -371,99 +393,70 @@ function ContactView(){
   return root;
 }
 
-/* ===== Редактор профиля / История / Табло ===== */
-function ProfileEditView(){
-  const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
-  const root=el(`
-    <div class="grid gap-4 pb-24">
-      <section class="glass-panel rounded-2xl p-5">
-        <h2 class="text-lg font-semibold mb-3">Редактировать профиль</h2>
-        <div class="grid gap-3">
-          <input id="pName" class="border rounded-xl p-3" placeholder="Имя" value="${p.name||''}">
-          <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
-          <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
-          <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
-          <select id="paydef" class="border rounded-xl p-3">
-            <option value="cash">Наличные</option>
-            <option value="card">Банковская карта</option>
-            <option value="transfer">Перевод</option>
-          </select>
-          <div class="flex gap-2">
-            <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
-            <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
-          </div>
-        </div>
-      </section>
-    </div>
-  `);
-  root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
-  root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
-  return root;
-}
-
+/* ===== История / Повторить заказ (крупные карты как в макете) ===== */
 function HistoryView(){
   const root=el(`
-    <div class="grid gap-3 pb-24">
+    <div class="grid gap-4 pb-24">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">История заказов</h2>
-        <div class="flex gap-2">
-          <button id="clearAll" class="px-3 py-2 rounded-xl border">Очистить всё</button>
-          <button id="back" class="px-3 py-2 rounded-xl border">Назад</button>
-        </div>
+        <h2 class="text-lg font-semibold">Мои заказы</h2>
+        <button id="back" class="px-3 py-2 rounded-xl border">Назад</button>
       </div>
-      <div id="historyList" class="grid gap-2"></div>
+      <div id="historyList" class="grid gap-4"></div>
     </div>
   `);
   const box=root.querySelector('#historyList');
+
+  function cardFor(o, idx){
+    const d = o.createdAt? new Date(o.createdAt): new Date();
+    const items = (o.items||[]).map(i=>`
+      <div class="flex items-center justify-between text-sm">
+        <div class="truncate mr-3">${i.name}</div>
+        <div class="whitespace-nowrap">${i.qty} × ${money(i.price||0)}</div>
+      </div>`).join('');
+    const elCard = el(`
+      <section class="bg-white border rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-gray-500">${d.toLocaleDateString()}, ${d.toLocaleTimeString().slice(0,5)}</div>
+          <div class="chip">${o.status||'новый'}</div>
+        </div>
+        <div class="text-3xl font-extrabold tracking-tight mt-1">№ ${o.id||'—'}</div>
+        <div class="mt-3 grid gap-2">${items||'<div class="text-sm text-gray-400">—</div>'}</div>
+        <div class="mt-3 pt-3 border-t flex items-center justify-between font-semibold">
+          <div>Итого</div><div>${money(o.total||0)}</div>
+        </div>
+        <button class="mt-3 w-full rounded-xl bg-red-600 text-white py-3 font-semibold" data-repeat>Повторить заказ</button>
+      </section>
+    `);
+    elCard.querySelector('[data-repeat]').onclick = ()=>{
+      const draft = {};
+      (o.items||[]).forEach(i=>{ draft[i.name] = (draft[i.name]||0) + (i.qty||0); });
+      sessionStorage.setItem(DRAFT_CART_KEY, JSON.stringify(draft));
+      location.hash = '#/order';
+      showToast('Позиции перенесены в корзину');
+    };
+    return elCard;
+  }
+
   function render(){
     const list=loadHistory();
     box.innerHTML='';
     if(!Array.isArray(list)||!list.length){
-      box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return;
+      box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>';
+      return;
     }
-    list.forEach((o,idx)=>{
-      const items=o.items?.map(i=>`${i.name} ×${i.qty}`).join(', ')||'—';
-      const card=el(`
-        <div class="p-3 rounded-xl border bg-white flex flex-col gap-2">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="text-sm font-semibold">#${o.id||'—'} · ${o.status||''}</div>
-              <div class="text-xs text-gray-500">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-              <div class="text-sm mt-1">${money(o.total||0)}${o.pay? ' · '+o.pay:''}</div>
-              <div class="text-xs text-gray-600 mt-1 truncate">🧾 ${items}</div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 pt-1">
-            <button class="px-3 py-2 rounded-xl border" data-repeat>Повторить заказ</button>
-            <button class="px-3 py-2 rounded-xl border text-red-500" data-del>Удалить</button>
-          </div>
-        </div>`);
-      card.querySelector('[data-del]').onclick=()=>{
-        const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render();
-      };
-      card.querySelector('[data-repeat]').onclick=()=>{
-        // Сохраняем name->qty и переходим в меню
-        const payload={};
-        (o.items||[]).forEach(i=>{ if(i.qty>0) payload[i.name]=i.qty; });
-        localStorage.setItem(REPEAT_LS_KEY, JSON.stringify(payload));
-        location.hash='#/order';
-        showToast('Заказ скопирован в корзину');
-      };
-      box.appendChild(card);
-    });
+    list.forEach((o, idx)=> box.appendChild(cardFor(o, idx)) );
   }
-  root.querySelector('#clearAll').onclick=()=>{ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); } };
+
   root.querySelector('#back').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   render(); return root;
 }
 
+/* ===== Табло ===== */
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Текущие заказы</h2>
-        <div class="flex gap-2"></div>
       </div>
       <div class="p-4 rounded-2xl bg-white border">
         <h3 class="font-semibold mb-3">Наличие товаров</h3>
@@ -476,6 +469,7 @@ function DashboardView(){
     </div>
   `);
   const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
+
   function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
   root.querySelector('#saveStock').onclick=()=>{ const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
@@ -485,46 +479,34 @@ function DashboardView(){
     const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
     const created=o.createdAt? new Date(o.createdAt): new Date();
     const itemLines=(o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(', ');
-    const card=el(`
-      <div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
-        <div class="flex items-center justify-between gap-4">
-          <div class="text-lg font-semibold">#${o.id} — ${o.name||''}</div>
-          <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status||'новый'}</div>
-        </div>
-        <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b></div>
-        <div>🧾 ${itemLines||'—'}</div>
-        <div class="mt-3 flex flex-wrap gap-2 items-center">
-          <label class="text-sm">Статус:</label>
-          <select class="border rounded-xl p-2" data-k="status">
-            ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}
-          </select>
-          <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
-        </div>
-        <div class="mt-2 text-right">
-          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
-        </div>
-      </div>`);
+    const card=el(`<div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="${o.id}">
+      <div class="flex items-center justify-between gap-4">
+        <div class="text-lg font-semibold">#${o.id} — ${o.name||''}</div>
+        <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">${o.status||'новый'}</div>
+      </div>
+      <div class="text-sm text-gray-600">${created.toLocaleString()} · Итог: <b>${total} руб.</b></div>
+      <div>🧾 ${itemLines||'—'}</div>
+      <div class="mt-3 flex flex-wrap gap-2 items-center">
+        <label class="text-sm">Статус:</label>
+        <select class="border rounded-xl p-2" data-k="status">
+          ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>
+      </div>
+      <div class="mt-2 text-right">
+        <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
+      </div>
+    </div>`);
     card.addEventListener('click',(e)=>{
       const act=e.target.dataset.act; if(!act) return;
       if(act==='save'){
         const status=card.querySelector('[data-k="status"]').value;
         const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
-        if(i>=0){
-          dashOrders[i]={...dashOrders[i], status};
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, status);
-          localStorage.setItem('__orders_ping', String(Date.now())); // дернуть storage
-          showToast(`Статус #${o.id} обновлён`);
-        }
+        if(i>=0){ dashOrders[i]={...dashOrders[i], status}; saveDash(dashOrders); syncOrderStatus(o.id, status); showToast(`Статус #${o.id} обновлён`); }
       }
       if(act==='delete'){
-        if(!card.dataset.confirm){
-          card.dataset.confirm='1'; e.target.textContent='Точно удалить?';
-          setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000);
-          return;
-        }
-        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён с табло`);
+        if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
+        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён с табло`);
       }
     });
     return card;
@@ -542,108 +524,4 @@ function bindTabloTapZone(){
   let taps = 0, first = 0, timer = null;
   const windowMs = 1200;
   function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
-  function handler(){
-    const now = Date.now();
-    taps++; if (!first) first = now;
-    if (now - first > windowMs){ reset(); taps = 1; first = now; }
-    if (taps >= 4){
-      reset();
-      document.getElementById('payModal')?.classList.remove('open');
-      if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
-        location.hash = '#/dashboard';
-      }else{
-        document.getElementById('pinModal').classList.add('open');
-      }
-    }else{
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(reset, windowMs);
-    }
-  }
-  ['click','pointerup','touchend'].forEach(ev =>
-    hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false})
-  );
-}
-
-/* ===== Router ===== */
-function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
-function realRouter(){
-  const h=location.hash.split('?')[0];
-  if(h==='#/profile'){ mount(ProfileHubView()); bindTabloTapZone(); }
-  else if(h==='#/profile-edit') mount(ProfileEditView());
-  else if(h==='#/history') mount(HistoryView());
-  else if(h==='#/contact') mount(ContactView());
-  else if(h==='#/dashboard') mount(DashboardView());
-  else mount(OrderView());
-}
-function router(){
-  const h=location.hash.split('?')[0];
-  const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact');
-  if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
-
-  if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
-    document.getElementById('pinModal').classList.add('open');
-    const app=document.getElementById('app'); if(app) app.innerHTML='';
-    return;
-  }
-  if(h==='#/profile'){ document.getElementById('payModal')?.classList.remove('open'); }
-  realRouter();
-}
-window.addEventListener('hashchange', router); router();
-
-/* Header и модалки */
-document.addEventListener('DOMContentLoaded', ()=>{
-  const profileBtn=document.getElementById('profileBtn');
-  const goProfile=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; };
-  ['click','pointerup','touchend'].forEach(ev=> profileBtn.addEventListener(ev, goProfile, {passive:false}));
-
-  const backBtn=document.getElementById('backBtn');
-  const goOrder=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/order'; };
-  ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
-
-  bindTabloTapZone();
-
-  // Pay modal
-  const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
-  const close=()=> m.classList.remove('open');
-  const finalize = ()=>{ const btn=document.getElementById('confirmBtn'); if(btn){ btn._busy=false; btn.disabled=false; } };
-
-  const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
-  const onOk = (e)=>{
-    if(e){ e.preventDefault(); e.stopPropagation(); }
-    const map={}; document.querySelectorAll('[data-q]').forEach(n=>{ const name=n.getAttribute('data-q'); const q=Number(n.textContent||'0')||0; if(q>0) map[name]=q; });
-    if(Object.keys(map).length===0){ showToast(TOST_SELECT); close(); finalize(); return; }
-
-    const itemsSel=[]; let total=0;
-    MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
-      const q=map[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
-    }));
-    const prof=loadProfile();
-    const sig=JSON.stringify({items:itemsSel,total,phone:prof.phone||''});
-    if(localStorage.getItem('last_order_sig')===sig){ showToast('Уже сохранён'); close(); finalize(); return; }
-    localStorage.setItem('last_order_sig',sig);
-
-    const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
-    const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-    const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
-    const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
-
-    close(); showToast('Заказ сохранён'); finalize();
-  };
-  ok.addEventListener('click', onOk, { passive:false });
-  ok.addEventListener('pointerup', onOk, { passive:false });
-  ok.addEventListener('touchend', onOk, { passive:false });
-  cancel.addEventListener('click', onCancel, { passive:false });
-  cancel.addEventListener('pointerup', onCancel, { passive:false });
-  cancel.addEventListener('touchend', onCancel, { passive:false });
-  m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
-
-  // KEY modal
-  const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
-  pinOk.onclick=(e)=>{ e&&e.preventDefault(); if((pinInput.value||'').length>0){ sessionStorage.setItem(TABLO_PIN_OK,'1'); pinM.classList.remove('open'); router(); } else { showToast('Введите ключ'); } };
-  pinCancel.onclick=()=>{ pinM.classList.remove('open'); location.hash='#/profile'; };
-  pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
-});
-</script>
-</body>
-</html>
+  function handle
