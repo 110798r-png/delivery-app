@@ -211,15 +211,18 @@ function OrderView(){
   const totalEl=root.querySelector('#totalVal');
   const confirmBtn=root.querySelector('#confirmBtn');
 
-  // unavailable cache для клиента
+  // unavailable cache + painter (должно быть объявлено до buildPanels)
   let unavailableClient = new Set();
-  (async()=>{
-    const srv = await fetchUnavailableFromServer();
-    const local = new Set(loadUnavailableFromLS());
-    if (Array.isArray(srv)) { unavailableClient = new Set(srv); saveUnavailableToLS(srv); }
-    else { unavailableClient = local; }
-    applyUnavailableStyles();
-  })();
+  function applyUnavailableStyles(){
+    root.querySelectorAll('.menu-card').forEach(card=>{
+      const btn = card.querySelector('button[data-act][data-name]');
+      if(!btn) return;
+      const name = btn.dataset.name;
+      const disabled = unavailableClient.has(name);
+      card.classList.toggle('opacity-50', disabled);
+      card.querySelectorAll('button[data-act]').forEach(b=> b.disabled = disabled);
+    });
+  }
 
   setBodyScrollLock(true);
 
@@ -314,17 +317,6 @@ function OrderView(){
     }
 
     applyHeights(); setTimeout(applyHeights,60);
-    // функция для перекраски после загрузки unavailable
-    function applyUnavailableStyles(){
-      root.querySelectorAll('.menu-card').forEach(card=>{
-        const nameEl = card.querySelector('button[data-name]');
-        if(!nameEl) return;
-        const name = nameEl.dataset.name;
-        const disabled = unavailableClient.has(name);
-        card.classList.toggle('opacity-50', disabled);
-        card.querySelectorAll('button[data-act]').forEach(b=> b.disabled = disabled);
-      });
-    }
   }
 
   function applyHeights(){
@@ -394,6 +386,15 @@ function OrderView(){
   });
 
   buildPanels();
+  // после первичной сборки — подтянуть unavailable и применить стили
+  (async()=>{
+    const srv = await fetchUnavailableFromServer();
+    const local = new Set(loadUnavailableFromLS());
+    if (Array.isArray(srv)) { unavailableClient = new Set(srv); saveUnavailableToLS(srv); }
+    else { unavailableClient = local; }
+    applyUnavailableStyles();
+  })();
+
   // патч: синтетический tap для +/−
   bindTapIncDec(catPager, counts, recalcTotal);
   highlightChip(0); requestAnimationFrame(()=> goToIndex(0,{animate:false}));
@@ -741,15 +742,8 @@ router();
       const app=document.getElementById('app'); if(app) app.innerHTML='';
       return; // ждём PIN
     }
-    _origRouter();
-  }
-})();
-
-/* Header */
-// страховка: обработчик на профайл вешаем один раз и он не теряется
-document.addEventListener('DOMContentLoaded', ()=>{
-  const profileBtn = document.getElementById('profileBtn');
-  if (profileBtn) { profileBtn.style.pointerEvents='auto'; profileBtn.onclick = ()=>{ location.hash = '#/profile'; }; }
+    origRouter();
+  }; }
 });
   if (profileBtn) profileBtn.onclick = ()=>{ location.hash = '#/profile'; };
 });
