@@ -92,6 +92,9 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
+window.onerror = (m, s, l, c, e)=>{ console.error('BOOT ERR:', m, s+':'+l); alert('Ошибка JS: '+m+' @ '+s+':'+l); };
+ocument.addEventListener('DOMContentLoaded', ()=>{ if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order'; });
+
 /* ===== Локальный режим: без сервера ===== */
 const PROFILE_LS_KEY = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
