@@ -39,13 +39,17 @@
     .modal.open{ display:flex }
 
     .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
+    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn, #fabTablo { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
     /* карточки профиля/истории */
     .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
     .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:14px 16px; }
+
+    /* плавающая кнопка “Табло” */
+    #fabTablo{ position:fixed; right:16px; bottom:16px; z-index:60; width:56px; height:56px;
+      border-radius:9999px; box-shadow:0 12px 28px rgba(0,0,0,.22); }
   </style>
 </head>
 <body>
@@ -55,13 +59,15 @@
         <div class="text-2xl font-extrabold tracking-tight">ЯмаМото</div>
         <div class="text-[12px] text-gray-600 -mt-0.5">локальный режим (без сервера)</div>
       </div>
-
-      <!-- показываем ТОЛЬКО одну кнопку: 👤 на заказе, ← на профиле/истории -->
+      <!-- показываем ТОЛЬКО одну кнопку: 👤 на заказе, ← на профиле/истории/редакторе -->
       <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button">👤</a>
       <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад">←</button>
     </header>
     <main id="app" class="phone-shell"></main>
   </div>
+
+  <!-- Плавающая кнопка Табло (показываем только на #/profile) -->
+  <button id="fabTablo" class="hidden bg-black text-white grid place-items-center">Т</button>
 
   <!-- Подтверждение + выбор оплаты -->
   <div id="payModal" class="modal">
@@ -285,7 +291,7 @@ function OrderView(){
   return root;
 }
 
-/* ===== Профиль (по макету) ===== */
+/* ===== Профиль (макет) ===== */
 function ProfileHubView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const list = loadHistory();
@@ -294,16 +300,16 @@ function ProfileHubView(){
   const root=el(`
     <div class="grid gap-4 pb-24">
 
-      <!-- верх: две карточки -->
-      <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- верх: строго два столбца даже на телефоне -->
+      <section class="grid grid-cols-2 gap-3">
         <!-- профиль -->
         <button class="card p-4 text-left" id="profileEditBtn">
           <div class="flex gap-3">
             <div class="w-14 h-14 rounded-lg bg-gray-300 grid place-items-center text-2xl font-bold text-white">Я</div>
             <div class="min-w-0">
-              <div class="text-base font-semibold">${p.name || 'Мой профиль'}</div>
-              <div class="text-xs text-gray-600 mt-1">${p.address || 'Адрес: не указан'}</div>
-              <div class="text-[11px] text-gray-500 mt-1">${p.phone ? 'Тел.: '+p.phone : 'Телефон: не указан'}</div>
+              <div class="text-base font-semibold truncate">${p.name || 'Мой профиль'}</div>
+              <div class="text-xs text-gray-600 mt-1 truncate">${p.address || 'Адрес: не указан'}</div>
+              <div class="text-[11px] text-gray-500 mt-1 truncate">${p.phone ? 'Тел.: '+p.phone : 'Телефон: не указан'}</div>
             </div>
           </div>
         </button>
@@ -332,7 +338,7 @@ function ProfileHubView(){
         <button class="rowlink text-left" id="supportBtn"><b>Техподдержка</b></button>
       </section>
 
-      <!-- низ: камера + правый информационный блок (обратная связь) -->
+      <!-- низ: камера + правый блок (обратная связь) -->
       <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div class="card p-4 aspect-video flex items-center justify-center bg-black text-white">
           <div class="text-center">
@@ -355,7 +361,7 @@ function ProfileHubView(){
     </div>
   `);
 
-  // Кнопки действий
+  // действия
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#historyBtn').onclick     = ()=> location.hash = '#/history';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
@@ -527,10 +533,12 @@ function realRouter(){ const h=location.hash.split('?')[0]; if(h==='#/profile') 
 function router(){
   const h=location.hash.split('?')[0];
 
-  // в хедере: 👤 только на заказе; ← на профиле/истории/редакторе/истории
+  // в хедере: 👤 только на заказе; ← на профиле/истории/редакторе
   const profileBtn = document.getElementById('profileBtn');
   const backBtn    = document.getElementById('backBtn');
+  const fab        = document.getElementById('fabTablo');
   const showBack = (h==='#/profile' || h==='#/history' || h==='#/profile-edit');
+
   if (showBack){
     profileBtn.classList.add('hidden');
     backBtn.classList.remove('hidden');
@@ -538,6 +546,9 @@ function router(){
     backBtn.classList.add('hidden');
     profileBtn.classList.remove('hidden');
   }
+
+  // показываем плавающую кнопку только на профиле
+  if (h==='#/profile'){ fab.classList.remove('hidden'); } else { fab.classList.add('hidden'); }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
     document.getElementById('pinModal').classList.add('open');
@@ -549,7 +560,7 @@ function router(){
 window.addEventListener('hashchange', router);
 router();
 
-/* Header & модалки */
+/* Header, FAB & модалки */
 document.addEventListener('DOMContentLoaded', ()=>{
   // 👤 профиль — надёжный переход
   const profileBtn = document.getElementById('profileBtn');
@@ -568,6 +579,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
     backBtn.addEventListener('pointerup', goOrder, { passive:false });
     backBtn.addEventListener('touchend', goOrder, { passive:false });
   }
+
+  // FAB "Табло": запрос ключа
+  const fab = document.getElementById('fabTablo');
+  const openDashboard = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); }
+    // если ключ уже введён — сразу переходим, иначе показываем модалку
+    if (sessionStorage.getItem(TABLO_PIN_OK)==='1') { location.hash='#/dashboard'; }
+    else { document.getElementById('pinModal').classList.add('open'); }
+  };
+  fab.addEventListener('click', openDashboard, {passive:false});
+  fab.addEventListener('pointerup', openDashboard, {passive:false});
+  fab.addEventListener('touchend', openDashboard, {passive:false});
 
   // Pay modal
   const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
@@ -610,8 +632,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   // KEY modal
   const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
-  pinOk.onclick=(e)=>{ e&&e.preventDefault(); if((pinInput.value||'').length>0){ sessionStorage.setItem(TABLO_PIN_OK,'1'); pinM.classList.remove('open'); router(); } else { showToast('Введите ключ'); } };
-  pinCancel.onclick=()=>{ pinM.classList.remove('open'); location.hash='#/profile'; };
+  pinOk.onclick=(e)=>{ e&&e.preventDefault(); if((pinInput.value||'').length>0){ sessionStorage.setItem(TABLO_PIN_OK,'1'); pinM.classList.remove('open'); location.hash='#/dashboard'; } else { showToast('Введите ключ'); } };
+  pinCancel.onclick=()=>{ pinM.classList.remove('open'); if(location.hash!=='#/dashboard') location.hash='#/profile'; };
   pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
 });
 </script>
