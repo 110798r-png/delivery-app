@@ -144,15 +144,20 @@ function syncOrderStatus(id, status){
 var MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
-    { name:'Говяжий двойной', price:340, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+    { name:'Говяжий средний', price:340, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+    { name:'Говяжий двойной', price:440, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
     { name:'Куриный бургер',  price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
-    { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
+    { name:'Куриный средний', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
+     { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
     { name:'Чизбургер', price:220 }
+    { name:'Чизбургер двойной', price:220 }
   ]},
-  { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер макс', price:250 } ]},
-  { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Спрайт', price:100 }, { name:'Эспрессо', price:120 } ]},
+  { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер обычный с картошкой', price:220 }, { name:'Твистер макс', price:250 },{ name:'Твистер макс с картошкой', price:280 },  ]},
+  { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Добрый лайм', price:100 }, { name:'фдэт-уайт', price:100 }, { name:'Раф банан', price:100 }, { name:'Эспрессо', price:100 } ]},
   { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Стрипсы', price:190 } ]},
+  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Курзе с мясом', price:160 }, { name:'Курзе с творогом ', price:210 }, { name:'хинкал слоенный', price:190 },  { name:'Хинкал тонкий', price:190 },  { name:'Хинкал толстый', price:190 } ]},
+   { key:'nuggets',    title:'Нагетсы', items:[ { name:'Наггетсы 6 шт.', price:160 }, { name:'Наггетсы 9 шт.', price:210 }, { name:'Нагетсы 18 шт. ', price:190 },  { name:'Нагетсы 18 шт.', price:210 },  { name:'Нагетсы 36 шт.', price:210 } ]},
+   { key:'strips',    title:'Стрипсы', items:[ { name:'Стрипсы 6 шт. ', price:160 }, { name:'Стрипсы 9 шт.', price:210 }, { name:'Стрипсы 18 шт. ', price:190 },  { name:'Стрипсы 18 шт.', price:210 },  { name:'Стрипсы 36 шт.', price:210 } ]},
 ];
 
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
