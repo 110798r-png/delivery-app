@@ -1,704 +1,526 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum=1, user-scalable=no" />
-  <title>ЯмаМото — локальный стенд</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <style>
-    html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
-    *, *::before, *::after { box-sizing:border-box; }
-    img { max-width:100%; display:block; }
-    .hidden{ display:none }
-    .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ShoppingCart, TicketPercent, Bike, Clock, Search, LogIn, Trash2, Plus, Minus, Star, Filter, Monitor, X, Settings as Gear } from "lucide-react";
 
-    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
+// ===================== DIDOTWISTER — Single Venue Mobile Web App =====================
+// В этом файле добавлено:
+// - Кнопка «шестерёнка» (админ) + Конструктор меню (добавить/редактировать/удалить)
+// - Доступ по коду 110798r
+// - Сохранение меню в localStorage (dw_menu)
+// - Табло кухни/выдачи (код тот же) — кнопка Монитор снизу справа
+// -------------------------------------------------------------------------------------
 
-    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
-    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
-    .sticky-top{ position:sticky; top:.5rem; z-index:30 }
+// --- Mock Venue --------------------------------------------------------------
+const VENUE = {
+  id: "didotwister-central",
+  name: "DIDOTWISTER • Central Kitchen",
+  address: "Vilnius, Gedimino pr. 10",
+  eta: 25,
+};
 
-    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:1.25rem; padding:1rem; min-height:6.4rem }
-    .menu-card-img{ width:110px; height:70px; border-radius:.75rem; background:#eee; object-fit:cover }
-
-    .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
-
-    #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
-    .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
-    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
-
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
-    .modal.open{ display:flex }
-
-    .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
-    .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
-    .badge.red{ background:#fee2e2; color:#991b1b }
-
-    .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
-    .card-tall{ min-height: 164px; }
-    .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
-
-    #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
-    #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
-
-    .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
-  </style>
-</head>
-<body>
-  <div class="w-full py-3">
-    <header id="appHeader" class="phone-shell flex items-center justify-between mb-3 sm:mb-4 app-header">
-      <div class="leading-tight">
-        <div class="text-2xl font-extrabold tracking-tight">ЯмаМото</div>
-      </div>
-      <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button" title="Профиль">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
-      </a>
-      <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад" title="Назад">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </header>
-    <main id="app" class="phone-shell"></main>
-  </div>
-
-  <!-- Оплата -->
-  <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
-      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
-      <div class="grid gap-1">
-        <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
-        <select id="paySelect" class="border rounded-xl p-3 w-full">
-          <option value="cash">Наличные</option>
-          <option value="card">Банковская карта</option>
-          <option value="transfer">Перевод</option>
-        </select>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Отмена</button>
-        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Ключ для табло -->
-  <div id="pinModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
-      <h3 class="text-lg font-semibold">Введите ключ</h3>
-      <input id="pinInput" class="border rounded-xl p-3 w-full text-center" placeholder="введите ключ" inputmode="text">
-      <div class="flex justify-end gap-2">
-        <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
-        <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
-});
-
-const PROFILE_LS_KEY     = 'client_profile_v1';
-const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
-const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
-const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
-const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-
-function el(html){ var t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
-function showToast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(function(){ t.classList.add('hidden'); }, 1800); }
-var TOST_SELECT = 'Пожалуйста, выберите товар';
-function money(x){ return x+' руб.'; }
-function setBodyScrollLock(on){ document.body.style.overflow = on ? 'hidden' : ''; }
-
-function safeParse(k, f){
-  try{
-    var v=JSON.parse(localStorage.getItem(k)||'null');
-    if(v==null) return f;
-    if(Array.isArray(f)) return Array.isArray(v)?v:[];
-    if(typeof f==='object') return v&&typeof v==='object'?v:{};
-    return v;
-  }catch(e){ return f }
-}
-function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
-function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})); }
-function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
-function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-function loadUnavailable(){ return safeParse(UNAVAILABLE_LS_KEY, []); }
-function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[])); }
-function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
-function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-
-function syncOrderStatus(id, status){
-  var hist = loadHistory(); var changed = false;
-  for (var i=0;i<hist.length;i++){
-    if (String(hist[i].id) === String(id)){
-      if (hist[i].status !== status){ hist[i] = Object.assign({}, hist[i], { status: status }); changed = true; }
-      break;
-    }
-  }
-  if (changed) saveHistory(hist);
-}
-
-var MENU_CATEGORIES = [
-  { key:'burgers', title:'Бургеры', items:[
-    { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
-    { name:'Говяжий двойной', price:440, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
-    { name:'Куриный бургер',  price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
-     { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' },
-    { name:'Чизбургер', price:220 }
- 
-  ]},
-  { key:'twisters', title:'Твистеры', items:[ { name:'Твистер обычный', price:200 }, { name:'Твистер обычный с картошкой', price:220 }, { name:'Твистер макс', price:250 },{ name:'Твистер макс с картошкой', price:280 },  ]},
-  { key:'drinks',  title:'Напитки', items:[ { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Добрый лайм', price:100 }, { name:'фдэт-уайт', price:100 }, { name:'Раф банан', price:100 }, { name:'Эспрессо', price:100 } ]},
-  { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Курзе с мясом', price:160 }, { name:'Курзе с творогом ', price:210 }, { name:'хинкал слоенный', price:190 },  { name:'Хинкал тонкий', price:190 },  { name:'Хинкал толстый', price:190 } ]},
-
+const CATEGORIES = [
+  { id: "burgers", name: "Бургеры", emoji: "🍔" },
+  { id: "chicken", name: "Курица", emoji: "🍗" },
+  { id: "buckets", name: "Бакеты", emoji: "🍟" },
+  { id: "sides", name: "Сайдсы", emoji: "🥔" },
+  { id: "drinks", name: "Напитки", emoji: "🥤" },
+  { id: "desserts", name: "Десерты", emoji: "🍰" },
 ];
 
-function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
-function animateScrollX(el, to, opts){
-  opts = opts || {}; var duration = typeof opts.duration==='number'?opts.duration:280; var onEnd=opts.onEnd;
-  var from=el.scrollLeft; var diff=to-from; if(!diff){ if(onEnd) onEnd(); return; }
-  var start=performance.now();
-  function step(ts){ var t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else if(onEnd) onEnd(); }
-  requestAnimationFrame(step);
+const INITIAL_MENU = [
+  { id: "ch-burger", name: "Чикенбургер", desc: "Котлета из курицы, соус, салат, булочка", price: 3.9, category: "burgers", rating: 4.6, kcal: 410, img: "https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=1200&auto=format&fit=crop", tags: ["хит", "острый"] },
+  { id: "dbl-burger", name: "Дабл Бургер", desc: "Двойная котлета и сыр", price: 5.5, category: "burgers", rating: 4.7, kcal: 650, img: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1200&auto=format&fit=crop", tags: ["новинка"] },
+  { id: "bucket-classic", name: "Бакет Классический", desc: "12 крылышек + картофель фри", price: 12.9, category: "buckets", rating: 4.8, kcal: 1200, img: "https://images.unsplash.com/photo-1625944524821-31a37d4c0468?q=80&w=1200&auto=format&fit=crop", tags: ["семье"] },
+  { id: "strips-6", name: "Стрипсы (6 шт.)", desc: "Сочная курица в панировке", price: 6.9, category: "chicken", rating: 4.5, kcal: 520, img: "https://images.unsplash.com/photo-1625944525460-4b74a53ce38e?q=80&w=1200&auto=format&fit=crop", tags: ["острый"] },
+  { id: "fries", name: "Картофель фри", desc: "Классический", price: 2.2, category: "sides", rating: 4.4, kcal: 320, img: "https://images.unsplash.com/photo-1541592553160-82008b127ccb?q=80&w=1200&auto=format&fit=crop", tags: ["вег"] },
+  { id: "cola", name: "Кола 0.5", desc: "Газированный напиток", price: 1.8, category: "drinks", rating: 4.2, kcal: 210, img: "https://images.unsplash.com/photo-1629203851121-93d139c0b6a4?q=80&w=1200&auto=format&fit=crop", tags: [] },
+  { id: "ice-cream", name: "Мороженое", desc: "Пломбир в стаканчике", price: 1.5, category: "desserts", rating: 4.1, kcal: 180, img: "https://images.unsplash.com/photo-1490324412536-e044eae4b85e?q=80&w=1200&auto=format&fit=crop", tags: ["детям"] },
+];
+
+const DELIVERY_SLOTS = ["Как можно скорее", "Через 30 мин", "Через 1 час", "К выбранному времени…"];
+
+const format = (n) => n.toFixed(2).replace(".", ",");
+
+const Qty = ({ value, onDec, onInc }) => (
+  <div className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2">
+    <button className="p-1.5" onClick={onDec} aria-label="Уменьшить">
+      <Minus size={18} />
+    </button>
+    <span className="w-7 text-center text-base">{value}</span>
+    <button className="p-1.5" onClick={onInc} aria-label="Увеличить">
+      <Plus size={18} />
+    </button>
+  </div>
+);
+
+// --- Tablo (Kitchen/Counter) ------------------------------------------------------
+function Tablo({ open, onClose }) {
+  const [auth, setAuth] = useState(false);
+  const [code, setCode] = useState("");
+  const [tab, setTab] = useState("active"); // active | ready
+  const [orders, setOrders] = useState([
+    { id: "DW-1024", status: "active", eta: 12, items: ["Чикенбургер x2", "Фри x1"], createdAt: Date.now() - 1000*60*8 },
+    { id: "DW-1025", status: "active", eta: 18, items: ["Бакет Классический"], createdAt: Date.now() - 1000*60*5 },
+    { id: "DW-1023", status: "ready", eta: 0, items: ["Стрипсы x6", "Кола 0.5"], createdAt: Date.now() - 1000*60*20 },
+  ]);
+
+  const markReady = (id) => setOrders((os)=> os.map(o => o.id===id?{...o,status:"ready",eta:0}:o));
+  const complete = (id) => setOrders((os)=> os.filter(o => o.id!==id));
+
+  if (!open) return null;
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] bg-black/60">
+        <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="absolute left-1/2 top-4 -translate-x-1/2 w-[min(96%,1100px)] rounded-3xl overflow-hidden shadow-2xl">
+          <div className="bg-black text-white px-5 py-4 flex items-center gap-3">
+            <Monitor size={20}/> <div className="font-semibold">Табло DIDOTWISTER</div>
+            <button className="ml-auto opacity-80 hover:opacity-100" onClick={onClose}><X/></button>
+          </div>
+
+          {!auth ? (
+            <div className="bg-white p-6">
+              <div className="text-lg font-semibold mb-2">Вход по коду</div>
+              <p className="text-sm text-gray-600 mb-4">Введите код сотрудника, чтобы открыть табло.</p>
+              <input value={code} onChange={(e)=>setCode(e.target.value)} placeholder="Код доступа" className="w-full rounded-2xl border px-4 py-3 mb-3"/>
+              <button onClick={()=> setAuth(code === "110798r")} className="w-full rounded-2xl bg-black text-white py-3">Войти</button>
+              {code && code !== "110798r" && <div className="text-sm text-red-600 mt-2">Неверный код</div>}
+            </div>
+          ) : (
+            <div className="bg-white p-0">
+              <div className="px-4 pt-4 flex gap-2">
+                <button onClick={()=>setTab("active")} className={`flex-1 rounded-2xl px-3 py-2 border ${tab==='active'?'bg-black text-white':''}`}>Активные</button>
+                <button onClick={()=>setTab("ready")} className={`flex-1 rounded-2xl px-3 py-2 border ${tab==='ready'?'bg-black text-white':''}`}>Готовы к выдаче</button>
+              </div>
+              <div className="p-4 grid md:grid-cols-2 gap-3">
+                {orders.filter(o=> o.status===tab).map((o)=>(
+                  <div key={o.id} className="rounded-2xl border p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-lg font-bold">Заказ {o.id}</div>
+                      <div className="text-sm text-gray-500">{tab==='active'?`~${o.eta} мин`:'готов'}</div>
+                    </div>
+                    <ul className="text-sm list-disc pl-6 mb-3">
+                      {o.items.map((i,idx)=>(<li key={idx}>{i}</li>))}
+                    </ul>
+                    <div className="flex gap-2">
+                      {tab==='active' ? (
+                        <button onClick={()=>markReady(o.id)} className="flex-1 rounded-xl bg-black text-white py-2">Готово</button>
+                      ) : (
+                        <button onClick={()=>complete(o.id)} className="flex-1 rounded-xl border py-2">Выдан</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {orders.filter(o=> o.status===tab).length===0 && (
+                  <div className="text-gray-500 text-sm p-4">Пока пусто</div>
+                )}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 
-function bindTapIncDec(catPager, counts, recalcTotal){
-  var downX=0, downY=0, pressedEl=null;
-  catPager.addEventListener('pointerdown',function(e){ var btn=e.target.closest('button[data-act]'); if(!btn) return; pressedEl=btn; downX=e.clientX; downY=e.clientY; });
-  catPager.addEventListener('pointerup',function(e){
-    if(!pressedEl) return; var dx=Math.abs(e.clientX-downX), dy=Math.abs(e.clientY-downY); var btn=pressedEl;
-    if(dx<6&&dy<6){
-      var act=btn.getAttribute('data-act'); var name=btn.getAttribute('data-name');
-      if(act==='inc') counts[name]=(counts[name]||0)+1;
-      if(act==='dec') counts[name]=Math.max(0,(counts[name]||0)-1);
-      var nodes = catPager.querySelectorAll('[data-q="'+CSS.escape(name)+'"]');
-      for (var i=0;i<nodes.length;i++){ nodes[i].textContent=counts[name]||0; }
-      recalcTotal(); catPager._ignoreNextClickTs=Date.now();
+// --- Settings (Menu Builder) ------------------------------------------------------
+function SettingsPanel({ open, onClose, menu, setMenu }) {
+  const [auth, setAuth] = useState(false);
+  const [code, setCode] = useState("");
+  const blank = { id: "", name: "", desc: "", price: 0, category: CATEGORIES[0].id, rating: 4.5, kcal: 0, img: "", tags: [] };
+  const [draft, setDraft] = useState(blank);
+  const [editingId, setEditingId] = useState(null);
+  const [tagInput, setTagInput] = useState("");
+
+  const resetForm = () => { setDraft(blank); setEditingId(null); setTagInput(""); };
+  const toId = (name) => name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "") + "-" + Math.floor(Math.random()*10000);
+
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (!t) return; setDraft(d => ({ ...d, tags: Array.from(new Set([...(d.tags||[]), t])) })); setTagInput("");
+  };
+  const removeTag = (t) => setDraft(d => ({ ...d, tags: (d.tags||[]).filter(x=>x!==t) }));
+
+  const onSave = () => {
+    const rec = { ...draft, price: Number(draft.price), rating: Number(draft.rating), kcal: Number(draft.kcal) };
+    if (editingId) {
+      setMenu((m)=> m.map(item => item.id===editingId ? { ...rec, id: editingId } : item));
+    } else {
+      const id = rec.id?.trim() || toId(rec.name || "item");
+      setMenu((m)=> [{ ...rec, id }, ...m]);
     }
-    pressedEl=null;
+    resetForm();
+  };
+  const onEdit = (id) => {
+    const item = menu.find(i=>i.id===id);
+    if (!item) return; setEditingId(id); setDraft({ ...item }); setTagInput("");
+  };
+  const onDelete = (id) => setMenu((m)=> m.filter(i=> i.id!==id));
+
+  if (!open) return null;
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] bg-black/60">
+        <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="absolute left-1/2 top-4 -translate-x-1/2 w-[min(96%,1100px)] rounded-3xl overflow-hidden shadow-2xl bg-white">
+          <div className="bg-black text-white px-5 py-4 flex items-center gap-3">
+            <Gear size={20}/> <div className="font-semibold">Конструктор меню • DIDOTWISTER</div>
+            <button className="ml-auto opacity-80 hover:opacity-100" onClick={onClose}><X/></button>
+          </div>
+
+          {!auth ? (
+            <div className="p-6">
+              <div className="text-lg font-semibold mb-2">Вход по коду</div>
+              <p className="text-sm text-gray-600 mb-4">Введите код сотрудника, чтобы редактировать меню.</p>
+              <input value={code} onChange={(e)=>setCode(e.target.value)} placeholder="Код доступа" className="w-full rounded-2xl border px-4 py-3 mb-3"/>
+              <button onClick={()=> setAuth(code === "110798r")} className="w-full rounded-2xl bg-black text-white py-3">Войти</button>
+              {code && code !== "110798r" && <div className="text-sm text-red-600 mt-2">Неверный код</div>}
+            </div>
+          ) : (
+            <div className="p-4 grid md:grid-cols-2 gap-4">
+              {/* Form */}
+              <div className="rounded-2xl border p-4 space-y-3">
+                <div className="font-semibold">{editingId?"Редактировать позицию":"Добавить позицию"}</div>
+                <input value={draft.name} onChange={(e)=>setDraft({...draft,name:e.target.value})} placeholder="Название" className="w-full rounded-xl border px-3 py-2"/>
+                <textarea value={draft.desc} onChange={(e)=>setDraft({...draft,desc:e.target.value})} placeholder="Описание" className="w-full rounded-xl border px-3 py-2"/>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" step="0.01" value={draft.price} onChange={(e)=>setDraft({...draft,price:e.target.value})} placeholder="Цена, €" className="rounded-xl border px-3 py-2"/>
+                  <input type="number" step="1" value={draft.kcal} onChange={(e)=>setDraft({...draft,kcal:e.target.value})} placeholder="Ккал" className="rounded-xl border px-3 py-2"/>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={draft.category} onChange={(e)=>setDraft({...draft,category:e.target.value})} className="rounded-xl border px-3 py-2">
+                    {CATEGORIES.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <input type="number" step="0.1" value={draft.rating} onChange={(e)=>setDraft({...draft,rating:e.target.value})} placeholder="Рейтинг" className="rounded-xl border px-3 py-2"/>
+                </div>
+                <input value={draft.img} onChange={(e)=>setDraft({...draft,img:e.target.value})} placeholder="URL изображения" className="w-full rounded-xl border px-3 py-2"/>
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">Теги</div>
+                  <div className="flex gap-2 mb-2">
+                    <input value={tagInput} onChange={(e)=>setTagInput(e.target.value)} placeholder="новинка / острый / хит" className="flex-1 rounded-xl border px-3 py-2"/>
+                    <button onClick={addTag} className="rounded-xl border px-3 py-2">Добавить тег</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(draft.tags||[]).map(t=> (
+                      <span key={t} className="px-2 py-0.5 text-xs rounded-full bg-gray-100 border">
+                        {t} <button className="ml-1" onClick={()=>removeTag(t)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={onSave} className="flex-1 rounded-2xl bg-black text-white py-2">{editingId?"Сохранить":"Добавить"}</button>
+                  <button onClick={resetForm} className="rounded-2xl border px-4">Сброс</button>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="rounded-2xl border p-4">
+                <div className="font-semibold mb-3">Текущее меню ({menu.length})</div>
+                <div className="space-y-2 max-h-[60vh] overflow-auto pr-1">
+                  {menu.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 border rounded-xl p-2">
+                      <img src={item.img} alt="" className="w-14 h-14 object-cover rounded-lg"/>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{item.name}</div>
+                        <div className="text-xs text-gray-500 truncate">€ {format(item.price)} • {CATEGORIES.find(c=>c.id===item.category)?.name} • {item.kcal} ккал</div>
+                      </div>
+                      <button onClick={()=>onEdit(item.id)} className="rounded-xl border px-3 py-1.5">Править</button>
+                      <button onClick={()=>onDelete(item.id)} className="rounded-xl border px-3 py-1.5 text-red-600">Удалить</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// --- Main App --------------------------------------------------------------
+export default function DIDOTWISTERApp() {
+  const [tab, setTab] = useState("delivery"); // delivery | pickup
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
+  const [cart, setCart] = useState({}); // { id: qty }
+  const [coupon, setCoupon] = useState("");
+  const [slot, setSlot] = useState(DELIVERY_SLOTS[0]);
+  const [isCartOpen, setCartOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [tabloOpen, setTabloOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Menu state with localStorage persistence
+  const [menu, setMenu] = useState(() => {
+    try { const saved = localStorage.getItem("dw_menu"); return saved ? JSON.parse(saved) : INITIAL_MENU; } catch { return INITIAL_MENU; }
   });
-  ['pointercancel','pointerleave'].forEach(function(evt){ catPager.addEventListener(evt, function(){ pressedEl=null; }); });
-}
+  useEffect(()=>{
+    try { localStorage.setItem("dw_menu", JSON.stringify(menu)); } catch {}
+  }, [menu]);
 
-function OrderView(){
-  var root=el(
-    '<div class="relative">\
-      <section class="sticky-top mb-2">\
-        <div class="glass-panel rounded-2xl px-3 py-3">\
-          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>\
-        </div>\
-      </section>\
-      <section><div id="catPager" class="no-scrollbar"></div></section>\
-      <div id="confirmBar" class="confirm-bar">\
-        <div class="flex items-center justify-between gap-3">\
-          <div class="text-base">\
-            <span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b>\
-            <button id="cartBadge" class="ml-3 align-middle text-xs px-2 py-1 rounded-lg border hidden">\
-              <span class="inline-flex items-center gap-1">\
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9h-12L6 6Zm0 0L5 3H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.5" fill="currentColor"/><circle cx="18" cy="20" r="1.5" fill="currentColor"/></svg>\
-                <span id="cartActiveInfo"></span>\
-              </span>\
-            </button>\
-          </div>\
-          <button id="confirmBtn" class="px-4 py-3 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>Подтвердить заказ</button>\
-        </div>\
-      </div>\
-    </div>'
-  );
-
-  var categoryBar=root.querySelector('#categoryBar'); var catPager=root.querySelector('#catPager');
-  var totalEl=root.querySelector('#totalVal');
-  var confirmBtn=root.querySelector('#confirmBtn'); var cartBadge=root.querySelector('#cartBadge');
-
-  setBodyScrollLock(true);
-  var counts={}; var scrollMemory=new Map(); var activeIdx=0, isAnimating=false; var unavailableClient=new Set(loadUnavailable());
-  function panelW(){ var r = catPager.getBoundingClientRect(); return r.width||1; }
-
-  MENU_CATEGORIES.forEach(function(cat,idx){
-    categoryBar.appendChild(el('<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap '+(idx===0?'bg-black text-white border-black':'bg-white/50')+'" data-idx="'+idx+'">'+cat.title+'</button>'));
+  const add = (id) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
+  const dec = (id) => setCart((c) => {
+    const v = (c[id] || 0) - 1;
+    const n = { ...c };
+    if (v <= 0) delete n[id];
+    else n[id] = v;
+    return n;
   });
-  function highlightChip(idx){
-    var buttons=categoryBar.querySelectorAll('button');
-    for (var i=0;i<buttons.length;i++){
-      var b=buttons[i]; var on=i===idx;
-      b.classList.toggle('bg-black',on);
-      b.classList.toggle('text-white',on);
-      b.classList.toggle('border-black',on);
-      if(on){ try{ b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }catch(e){} }
-    }
-  }
-  function goToIndex(idx, opts){
-    opts = opts || {}; var animate = (typeof opts.animate==='boolean')?opts.animate:true;
-    idx=Math.max(0,Math.min(MENU_CATEGORIES.length-1,idx));
-    var target=Math.round(panelW()*idx); highlightChip(idx);
-    if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return }
-    isAnimating=true; var prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none';
-    var oldPanel = catPager.children[activeIdx]; var oldBox = oldPanel ? oldPanel.querySelector('.v-scroll') : null;
-    if(oldBox){ scrollMemory.set(MENU_CATEGORIES[activeIdx].key, oldBox.scrollTop); }
-    animateScrollX(catPager, target, { duration:280, onEnd:function(){
-      var newPanel = catPager.children[idx]; var box=newPanel ? newPanel.querySelector('.v-scroll') : null;
-      if(box){ box.scrollTop = scrollMemory.get(MENU_CATEGORIES[idx].key)||0; }
-      activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory';
-    }});
-  }
-  categoryBar.addEventListener('click', function(e){ var b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.getAttribute('data-idx'),{animate:true}); });
+  const remove = (id) => setCart((c) => { const n = { ...c }; delete n[id]; return n; });
 
-  function buildPanels(){
-    catPager.innerHTML='';
-    MENU_CATEGORIES.forEach(function(cat){
-      var panel=el('<div class="cat-panel"></div>'), vbox=el('<div class="v-scroll px-0.5"></div>'), list=el('<div class="grid gap-3"></div>');
-      cat.items.forEach(function(it){
-        var q=counts[it.name]||0; var disabled=unavailableClient.has(it.name);
-        list.appendChild(el(
-          '<div class="menu-card '+(disabled?'opacity-50':'')+'">\
-            <div class="flex-1 min-w-0">\
-              <div class="font-medium text-sm flex items-center gap-2">'+it.name+(disabled?'<span class="badge red">Нет в наличии</span>':'')+'</div>\
-              <div class="text-xs text-gray-500 mt-1">'+money(it.price)+'</div>\
-              <div class="flex items-center gap-3 mt-3">\
-                <button type="button" class="w-8 h-8 rounded-xl border" data-name="'+it.name+'" data-act="dec" '+(disabled?'disabled':'')+'>−</button>\
-                <div class="w-6 text-center text-sm" data-q="'+it.name+'">'+q+'</div>\
-                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="'+it.name+'" data-act="inc" '+(disabled?'disabled':'')+'>+</button>\
-              </div>\
-            </div>\
-            <img src="'+(it.img||'https://placehold.co/110x70?text=food')+'" class="menu-card-img" alt="">\
-          </div>'
-        ));
-      });
-      list.appendChild(el('<div class="h-24"></div>'));
-      vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
+  const items = useMemo(() => menu.filter((m) => (
+    (cat === "all" || m.category === cat) &&
+    (q.trim() === "" || m.name.toLowerCase().includes(q.toLowerCase()))
+  )), [q, cat, menu]);
 
-      var down=false, used=false, sx=0, sy=0, locked=null; var PIX_LOCK=10;
-      function THRESH(){ return Math.max(40, panelW()*0.25); }
-      vbox.addEventListener('pointerdown',function(e){ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; if (vbox.setPointerCapture) vbox.setPointerCapture(e.pointerId); });
-      vbox.addEventListener('pointermove',function(e){
-        if(!down||used||isAnimating) return; var dx=e.clientX-sx, dy=e.clientY-sy;
-        if(locked===null){ if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>PIX_LOCK) locked='y'; }
-        if(locked==='x'){ try{ e.preventDefault(); }catch(_){} if(Math.abs(dx)>=THRESH()){ used=true; var next=dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } }
-      }, {passive:false});
-      ['pointerup','pointercancel','pointerleave'].forEach(function(evt){ vbox.addEventListener(evt,function(){ down=false; used=false; locked=null; }); });
-    });
+  const cartList = Object.entries(cart).map(([id, qty]) => ({
+    ...menu.find((m) => m.id === id),
+    qty,
+    sum: (menu.find((m) => m.id === id)?.price || 0) * qty,
+  })).filter(x=>x && x.name);
 
-    if(!catPager._pmBound){
-      catPager.addEventListener('click', function(e){
-        if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; }
-        var target=e.target; var ds = target && target.dataset ? target.dataset : null;
-        var act = ds ? ds.act : null; if(!act) return;
-        var name = ds.name;
-        if(act==='inc') counts[name]=(counts[name]||0)+1; else counts[name]=Math.max(0,(counts[name]||0)-1);
-        var nodes = catPager.querySelectorAll('[data-q="'+CSS.escape(name)+'"]');
-        for (var i=0;i<nodes.length;i++){ nodes[i].textContent=counts[name]||0; }
-        recalcTotal();
-      });
-      catPager.addEventListener('keydown', function(e){ var btn=e.target.closest('button[data-act]'); if(!btn) return; if(e.key==='Enter'||e.key===' '){ e.preventDefault(); btn.click(); }});
-      catPager._pmBound=true;
-    }
+  const subtotal = cartList.reduce((a, b) => a + b.sum, 0);
+  const discount = coupon.toLowerCase() === "WELCOME10" ? subtotal * 0.1 : 0;
+  const deliveryFee = tab === "delivery" && subtotal > 0 ? 2.0 : 0;
+  const total = Math.max(subtotal - discount + deliveryFee, 0);
 
-    applyHeights(); setTimeout(applyHeights,60);
-  }
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Mobile Header */}
+     <header className="sticky top-0 z-40 backdrop-blur border-b bg-white/80">
+  <div className="mx-auto px-3 py-3 flex items-center gap-3 max-w-2xl">
+    <div className="text-2xl font-black tracking-tight flex items-center gap-2">
+      DIDOTWISTER
+      {/* Кнопка Табло рядом с названием */}
+      <button
+        onClick={()=>setTabloOpen(true)}
+        className="rounded-full border p-2"
+        title="Табло"
+      >
+        <Monitor size={18}/>
+      </button>
+      {/* Кнопка Шестерёнка рядом с названием */}
+      <button
+        onClick={()=>setSettingsOpen(true)}
+        className="rounded-full border p-2"
+        title="Настройки"
+      >
+        <Gear size={18}/>
+      </button>
+    </div>
 
-  function applyHeights(){
-    try{
-      var header=document.getElementById('appHeader');
-      var headerH = header ? header.getBoundingClientRect().height : 0;
-      var stickyTop = root.querySelector('.sticky-top');
-      var chipsH = stickyTop ? stickyTop.getBoundingClientRect().height : 0;
-      var confirmBarEl = document.getElementById('confirmBar');
-      var confirmH = confirmBarEl ? confirmBarEl.getBoundingClientRect().height : 0;
-      var availH=Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
-      var first=catPager.querySelector('.menu-card');
-      var cardH=first?Math.ceil(first.getBoundingClientRect().height):104;
-      var h=Math.min(availH, cardH*4 + 12*3 + 4);
-      var scrollers = root.querySelectorAll('.v-scroll');
-      for (var i=0;i<scrollers.length;i++){ scrollers[i].style.height=h+'px'; }
-      goToIndex(activeIdx,{animate:false});
-    }catch(e){ console.warn('[applyHeights]', e); }
-  }
-  window.addEventListener('resize', applyHeights);
+    <div className="ml-auto flex items-center gap-2">
+      <button
+        className="sm:hidden inline-flex items-center gap-2 border rounded-2xl px-3 py-2"
+        onClick={()=>setAuthOpen(true)}
+      >
+        <LogIn size={18} />
+      </button>
+      <button
+        className="relative inline-flex items-center gap-2 rounded-2xl bg-black text-white px-3 py-2"
+        onClick={()=>setCartOpen(true)}
+      >
+        <ShoppingCart size={18} />
+        <span className="hidden sm:inline">Корзина</span>
+        {cartList.length > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 grid place-items-center">
+            {cartList.reduce((a,b)=>a+b.qty,0)}
+          </span>
+        )}
+      </button>
+    </div>
+  </div>
+</header>
 
-  catPager.addEventListener('scroll', function(){
-    if (isAnimating) return;
-    if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer);
-    catPager._scrollTimer = setTimeout(function(){
-      var idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width||1));
-      if(idx!==activeIdx){ highlightChip(idx); activeIdx=idx; }
-    }, 80);
-  });
+      {/* Venue Bar */}
+      <section className="mx-auto px-3 py-3 max-w-2xl">
+        <div className="rounded-2xl border p-3 flex items-center gap-3">
+          <div className="text-sm">
+            <div className="font-semibold">{VENUE.name}</div>
+            <div className="text-gray-500">{VENUE.address} • ~{VENUE.eta} мин</div>
+          </div>
+          <div className="ml-auto text-sm inline-flex items-center gap-2">
+            <Bike size={18}/>
+            <div className="grid grid-cols-2 gap-1 rounded-xl border p-1">
+              <button onClick={()=>setTab("delivery")} className={`px-2 py-1 rounded-lg ${tab==='delivery'?'bg-black text-white':''}`}>Доставка</button>
+              <button onClick={()=>setTab("pickup")} className={`px-2 py-1 rounded-lg ${tab==='pickup'?'bg-black text-white':''}`}>Самовывоз</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  function recalcTotal(){ var sum=0; MENU_CATEGORIES.forEach(function(cat){ cat.items.forEach(function(it){ sum += (counts[it.name]||0)*it.price; }); }); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
+      {/* Search & Slots */}
+      <section className="mx-auto px-3 max-w-2xl">
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-2 border rounded-2xl px-3 py-2">
+            <Search size={16} />
+            <input className="outline-none w-full" placeholder="Поиск по меню" value={q} onChange={(e)=>setQ(e.target.value)} />
+          </div>
+          <div className="min-w-[44%] flex items-center gap-2 border rounded-2xl px-3 py-2">
+            <Clock size={16}/> <select className="bg-transparent outline-none w-full" value={slot} onChange={(e)=>setSlot(e.target.value)}>
+              {DELIVERY_SLOTS.map((s)=> <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+      </section>
 
-  (function applyPreselect(){
-    var payload = sessionStorage.getItem('repeat_order_items');
-    if(!payload) return;
-    try{
-      var items=JSON.parse(payload)||[];
-      items.forEach(function(it){ counts[it.name]= (counts[it.name]||0) + (it.qty||0); });
-      var qs = catPager.querySelectorAll('[data-q]');
-      for (var i=0;i<qs.length;i++){ var name=qs[i].getAttribute('data-q'); qs[i].textContent = counts[name]||0; }
-      recalcTotal();
-      sessionStorage.removeItem('repeat_order_items');
-      if(sessionStorage.getItem('open_pay_after_repeat')==='1'){ sessionStorage.removeItem('open_pay_after_repeat'); setTimeout(function(){ confirmBtn.click(); }, 150); }
-    }catch(e){}
-  })();
+      {/* Category Bar */}
+      <section className="mx-auto px-3 pt-3 max-w-2xl">
+        <div className="flex items-center gap-2 overflow-auto pb-2">
+          <button onClick={()=>setCat("all")} className={`px-3 py-2 rounded-xl border flex items-center gap-2 ${cat==='all'?'bg-black text-white':''}`}>
+            <Filter size={16}/> Все
+          </button>
+          {CATEGORIES.map((c)=>(
+            <button key={c.id} onClick={()=>setCat(c.id)} className={`px-3 py-2 rounded-xl border flex items-center gap-2 ${cat===c.id?'bg-black text-white':''}`}>
+              <span>{c.emoji}</span>{c.name}
+            </button>
+          ))}
+        </div>
+      </section>
 
-  function updateCartBadge(){
-    var list = loadHistory();
-    var active=null;
-    if (Array.isArray(list)){
-      for (var i=0;i<list.length;i++){
-        var st=list[i].status||'';
-        if (st!=='завершён' && st!=='отменён'){ active=list[i]; break; }
-      }
-    }
-    var info = root.querySelector('#cartActiveInfo');
-    if(active){ info.textContent = '№ '+active.id+' — '+(active.status||'новый'); cartBadge.classList.remove('hidden'); }
-    else { cartBadge.classList.add('hidden'); }
-  }
-  cartBadge.addEventListener('click', function(){ location.hash='#/history'; });
-  updateCartBadge();
+      {/* Menu Grid */}
+      <main className="mx-auto px-3 py-4 max-w-2xl">
+        {items.length === 0 ? (
+          <div className="text-center text-gray-500">Ничего не найдено…</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {items.map((m) => (
+              <motion.div key={m.id} layout className="rounded-3xl border overflow-hidden flex flex-col">
+                <div className="relative">
+                  <img src={m.img} alt={m.name} className="w-full h-40 object-cover"/>
+                  <div className="absolute top-2 left-2 flex gap-2">
+                    {(m.tags||[]).map(t => <span key={t} className="px-2 py-0.5 text-xs rounded-full bg-gray-100 border">{t}</span>)}
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="font-semibold">{m.name}</div>
+                    <div className="inline-flex items-center gap-1 text-sm text-yellow-600"><Star size={16}/>{m.rating}</div>
+                  </div>
+                  <p className="text-sm text-gray-600 flex-1">{m.desc}</p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-lg font-bold">€ {format(m.price)}</div>
+                    {cart[m.id] ? (
+                      <Qty value={cart[m.id]} onDec={()=>dec(m.id)} onInc={()=>add(m.id)} />
+                    ) : (
+                      <button className="rounded-2xl bg-black text-white px-3 py-2" onClick={()=>add(m.id)}>Добавить</button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </main>
 
-  confirmBtn.addEventListener('click', function(){
-    var items=[]; MENU_CATEGORIES.forEach(function(cat){ cat.items.forEach(function(it){ var q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }); });
-    if(!items.length){ showToast(TOST_SELECT); return; }
-    if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
+      {/* Footer Info */}
+      <footer className="mx-auto px-3 pb-28 text-xs text-gray-500 max-w-2xl">
+        DIDOTWISTER — демо одного заведения. Конструктор меню и табло работают локально и сохраняются в браузере.
+      </footer>
 
-    var sumBox = document.getElementById('paySummary');
-    var total=0; sumBox.innerHTML = items.map(function(i){ total += i.qty*i.price; return '<div class="flex items-center justify-between"><div class="truncate">'+i.name+' ×'+i.qty+'</div><div class="ml-2 whitespace-nowrap">'+money(i.qty*i.price)+'</div></div>'; }).join('');
-    sumBox.insertAdjacentHTML('beforeend', '<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold"><div>Итого</div><div>'+money(total)+'</div></div>');
-    var prof=loadProfile(); var sel=document.getElementById('paySelect'); sel.value = prof.paymentMethod||'cash';
-    document.getElementById('payModal').classList.add('open');
-  });
+      {/* Floating Checkout Bar (Mobile-first) */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(96%,680px)]">
+        <div className="rounded-3xl shadow-lg border bg-white px-4 py-3 flex items-center gap-3">
+          <div className="text-sm">
+            <div className="font-semibold">{tab === 'delivery' ? 'Доставка' : 'Самовывоз'}</div>
+            <div className="text-gray-500 text-xs">{VENUE.address} • ~{VENUE.eta} мин</div>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="text-sm text-gray-600">Итого: <span className="font-semibold text-black">€ {format(total)}</span></div>
+            <button onClick={()=>setCartOpen(true)} className="rounded-2xl bg-black text-white px-4 py-2 flex items-center gap-2">
+              <ShoppingCart size={18}/> Оформить
+            </button>
+          </div>
+        </div>
+      </div>
 
-  function resetCounts(){ Object.keys(counts).forEach(function(k){ counts[k]=0; }); var qs=catPager.querySelectorAll('[data-q]'); for (var i=0;i<qs.length;i++){ qs[i].textContent='0'; } recalcTotal(); }
+      {/* Round FABs */}
+      
 
-  (function bindPayModal(){
-    var m=document.getElementById('payModal'); var ok=document.getElementById('payOk'); var cancel=document.getElementById('payCancel'); var sel=document.getElementById('paySelect');
-    function close(){ if(m) m.classList.remove('open'); }
-    function finalize(){ confirmBtn._busy=false; confirmBtn.disabled=false; }
+      {/* Promo Banner */}
+      <section className="mx-auto px-3 pt-3 max-w-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-black to-gray-800 text-white p-5">
+          <div className="text-2xl font-bold mb-1">Добро пожаловать в DIDOTWISTER</div>
+          <p className="opacity-90 mb-4">Промокод <b>WELCOME10</b> на первый заказ — скидка 10%.</p>
+          <div className="flex items-center gap-2 text-sm opacity-90"><TicketPercent size={16}/> Только сегодня</div>
+        </div>
+      </section>
 
-    function onCancel(e){ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); }
-    function onOk(e){
-      if(e){ e.preventDefault(); e.stopPropagation(); }
-      var itemsSel=[]; var total=0;
-      MENU_CATEGORIES.forEach(function(cat){ cat.items.forEach(function(it){ var q=counts[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; } }); });
-      if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
+      {/* Cart Drawer */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/40">
+            <motion.aside initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }} transition={{ type: "spring", stiffness: 240, damping: 24 }} className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl">
+              <div className="p-4 border-b flex items-center justify-between">
+                <div className="font-semibold">Корзина</div>
+                <button className="text-gray-500" onClick={()=>setCartOpen(false)}>Закрыть</button>
+              </div>
 
-      var order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total: total, pay: sel.value||'cash', status:'новый' };
-      var history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-      var dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
-      var p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
+              <div className="p-4 space-y-4 overflow-auto h-[calc(100%-240px)]">
+                {cartList.length === 0 ? (
+                  <div className="text-gray-500 text-sm">Корзина пуста</div>
+                ) : cartList.map((it) => (
+                  <div key={it.id} className="flex items-center gap-3">
+                    <img src={it.img} alt="" className="w-16 h-16 object-cover rounded-xl"/>
+                    <div className="flex-1">
+                      <div className="font-medium">{it.name}</div>
+                      <div className="text-xs text-gray-500">€ {format(it.price)} • {it.kcal} ккал</div>
+                      <div className="mt-2"><Qty value={it.qty} onDec={()=>dec(it.id)} onInc={()=>add(it.id)}/></div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">€ {format(it.sum)}</div>
+                      <button className="text-gray-400 text-xs inline-flex items-center gap-1 mt-1" onClick={()=>remove(it.id)}>
+                        <Trash2 size={14}/> удалить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-      close(); finalize(); resetCounts(); updateCartBadge();
-    }
-    ['click','pointerup','touchend'].forEach(function(ev){ ok.addEventListener(ev, onOk, {passive:false}); });
-    ['click','pointerup','touchend'].forEach(function(ev){ cancel.addEventListener(ev, onCancel, {passive:false}); });
-    m.onclick=function(e){ if(e.target===m) onCancel(e); };
-  })();
+              <div className="p-4 border-t space-y-3">
+                <div className="flex items-center gap-2">
+                  <input className="flex-1 rounded-2xl border px-3 py-2" placeholder="Промокод" value={coupon} onChange={(e)=>setCoupon(e.target.value)} />
+                </div>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between"><span>Сумма</span><span>€ {format(subtotal)}</span></div>
+                  {discount>0 && <div className="flex justify-between text-green-600"><span>Скидка</span><span>- € {format(discount)}</span></div>}
+                  {deliveryFee>0 && <div className="flex justify-between"><span>Доставка</span><span>€ {format(deliveryFee)}</span></div>}
+                  <div className="flex justify-between font-semibold pt-2 border-t"><span>Итого</span><span>€ {format(total)}</span></div>
+                </div>
+                <button className="w-full rounded-2xl bg-black text-white py-3">Перейти к оплате (демо)</button>
+              </div>
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-  buildPanels(); bindTapIncDec(catPager, counts, recalcTotal); highlightChip(0); requestAnimationFrame(function(){ goToIndex(0,{animate:false}); });
-  root.cleanup = function(){ setBodyScrollLock(false); };
-  return root;
-}
+      {/* Auth Modal (Mock) */}
+      <AnimatePresence>
+        {authOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/40">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(92%,480px)] bg-white rounded-3xl shadow-2xl p-6">
+              <div className="text-lg font-semibold mb-4">Войти или зарегистрироваться</div>
+              <div className="space-y-3">
+                <input className="w-full rounded-2xl border px-4 py-3" placeholder="Телефон или email" />
+                <button className="w-full rounded-2xl bg-black text-white py-3">Получить код (демо)</button>
+              </div>
+              <button className="mt-4 w-full text-sm text-gray-500" onClick={()=>setAuthOpen(false)}>Закрыть</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-function ProfileHubView(){
-  var p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
+      {/* Panels */}
+      <Tablo open={tabloOpen} onClose={()=>setTabloOpen(false)} />
+      <SettingsPanel open={settingsOpen} onClose={()=>setSettingsOpen(false)} menu={menu} setMenu={setMenu} />
 
-  var root=el(
-  '<div class="grid gap-4 pb-28">\
-    <section class="grid grid-cols-2 gap-3">\
-      <button class="card card-tall p-4 text-left" id="profileEditBtn">\
-        <div class="flex items-start justify-between">\
-          <div class="min-w-0">\
-            <div class="text-base font-semibold truncate">'+(p.name || 'Имя Фамилия')+'</div>\
-            <div class="text-xs text-gray-600 mt-2 truncate">'+(p.phone || '+7 ___ ___-__-__')+'</div>\
-          </div>\
-          <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29v2l1.73.29c.16.62.41 1.21.73 1.76л-1 1.46 1.41 1.41 1.46-1c.55.32 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.41 1.76-.73l1.46 1 1.41-1.41-1-1.46c.32-.55.57-1.14.73-1.76l1.73-.29Z" fill="currentColor"/></svg>\
-        </div>\
-      </button>\
-      <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">\
-        <div class="text-base font-semibold">Мои заказы</div>\
-        <div class="flex items-center gap-3">\
-          <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6l1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>\
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>\
-        </div>\
-      </button>\
-    </section>\
-    <section class="card p-5"><div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div></section>\
-    <section class="card p-4 flex flex-col items-center gap-2">\
-      <div class="text-xl font-bold">🎥 Лайв-камера</div>\
-      <div class="rounded-2xl overflow-hidden border w-full">\
-        <img id="liveCam" class="w-full object-cover" src="https://placehold.co/540x300?text=Live+Camera" alt="camera">\
-      </div>\
-      <button id="reloadCam" class="px-3 py-2 rounded-xl border bg-white">Обновить</button>\
-    </section>\
-    <section class="grid gap-2">\
-      <button class="rowlink text-left flex items-center justify-between" id="reviewsBtn">Отзывы\
-        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>\
-      </button>\
-      <button class="rowlink text-left flex items-center justify-between" id="supportBtn">Техподдержка\
-        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>\
-      </button>\
-      <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">Обратная связь\
-        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>\
-      </button>\
-    </section>\
-    <section class="card p-4 text-sm leading-relaxed">\
-      <div class="text-base font-semibold mb-2">Юридическая информация</div>\
-      <div class="text-xs text-gray-600">Адрес: с. Косякино, ул. Гагарина, 26<br>Время работы: 08:00–23:00</div>\
-    </section>\
-    <section id="tabloTapZone"><div id="tabloTapHot" aria-label="tablo-tap-hot"></div></section>\
-  </div>'
+      {/* Dev TODOs */}
+      {/*
+        Реальные интеграции:
+        - Catalog API + RBAC (роль: админ) вместо лок. конструктора
+        - Заказы -> Табло (веб-сокеты)
+        - Импорт/экспорт CSV/JSON для меню
+      */}
+    </div>
   );
-
-  root.querySelector('#profileEditBtn').onclick = function(){ location.hash = '#/profile-edit'; };
-  root.querySelector('#ordersBtn').onclick      = function(){ location.hash = '#/history'; };
-  root.querySelector('#supportBtn').onclick     = function(){ alert('Позже подключим чат техподдержки.'); };
-  root.querySelector('#reviewsBtn').onclick     = function(){ alert('Позже подключим экран отзывов.'); };
-  root.querySelector('#feedbackBtn').onclick    = function(){ location.hash = '#/contact'; };
-  root.querySelector('#reloadCam').onclick      = function(){ var img=root.querySelector('#liveCam'); var url=img.src.split('?')[0]; img.src = url+'?t='+Date.now(); };
-
-  return root;
 }
-
-function ContactView(){
-  var p=Object.assign({ phone:'' }, loadProfile());
-  var root=el(
-    '<div class="grid gap-4 pb-24">\
-      <div class="flex items-center gap-3">\
-        <button id="backOnly" class="px-3 py-2 rounded-xl border bg-white" aria-label="Назад">←</button>\
-        <div class="text-lg font-semibold">Обратная связь</div>\
-      </div>\
-      <section class="card p-4 text-sm grid gap-2">\
-        <div>Почта: <a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>\
-        <div>Тел.: <a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>\
-        '+(p.phone ? '<div class="text-xs text-gray-500">Ваш телефон в профиле: '+p.phone+'</div>' : '')+'\
-      </section>\
-    </div>'
-  );
-  root.querySelector('#backOnly').onclick = function(){ history.length ? history.back() : (location.hash='#/profile'); };
-  return root;
-}
-
-function ProfileEditView(){
-  var p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
-  var root=el(
-    '<div class="grid gap-4 pb-24">\
-      <section class="glass-panel rounded-2xl p-5">\
-        <h2 class="text-lg font-semibold mb-3">Редактировать профиль</h2>\
-        <div class="grid gap-3">\
-          <input id="pName" class="border rounded-xl p-3" placeholder="Имя Фамилия" value="'+(p.name||'')+'">\
-          <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="'+(p.phone||'')+'">\
-          <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки (не показывается в карточке)" value="'+(p.address||'')+'">\
-          <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>\
-          <select id="paydef" class="border rounded-xl p-3">\
-            <option value="cash">Наличные</option>\
-            <option value="card">Банковская карта</option>\
-            <option value="transfer">Перевод</option>\
-          </select>\
-          <div class="flex gap-2">\
-            <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>\
-            <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>\
-          </div>\
-        </div>\
-      </section>\
-    </div>'
-  );
-  root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=function(){ var p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
-  root.querySelector('#pBack').onclick=function(){ history.length ? history.back() : (location.hash='#/profile'); };
-  return root;
-}
-
-function HistoryView(){
-  var root=el(
-    '<div class="grid gap-3 pb-24">\
-      <div class="flex items-center justify-between">\
-        <h2 class="text-lg font-semibold">Мои заказы</h2>\
-        <div class="flex gap-2">\
-          <button id="clearAll" class="px-3 py-2 rounded-xl border">Очистить всё</button>\
-          <button id="back" class="px-3 py-2 rounded-xl border">Назад</button>\
-        </div>\
-      </div>\
-      <div id="historyList" class="grid gap-3"></div>\
-    </div>'
-  );
-  var box=root.querySelector('#historyList');
-  function cardView(o, idx){
-    var items=o.items||[];
-    var active = !['завершён','отменён'].includes(o.status||'новый');
-    var chipClass = active ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-700';
-    var outerBg = active ? 'bg-yellow-50 border-yellow-200' : 'bg-white';
-
-    var elCard = el(
-      '<div class="card p-4 '+outerBg+'">\
-        <div class="flex items-center justify-between">\
-          <div class="text-2xl font-extrabold">№ '+(o.id||'—')+'</div>\
-          <span class="chip '+chipClass+'">'+(o.status||'новый')+'</span>\
-        </div>\
-        <div class="text-xs text-gray-500 mt-1">'+(o.createdAt? new Date(o.createdAt).toLocaleString():'')+'</div>\
-        <div class="mt-3 grid gap-2">'+
-          items.map(function(i){ return '<div class="flex items-center justify-between text-sm"><div class="truncate mr-2">'+i.name+'</div><div class="whitespace-nowrap">'+i.qty+' × '+i.price+' ₽</div></div>'; }).join('')+
-        '</div>\
-        <div class="mt-3 border-t pt-2 flex items-center justify-between">\
-          <div class="font-semibold">Итого: '+money(o.total||0)+'</div>\
-          <div class="flex gap-2">\
-            <button class="px-3 py-2 rounded-xl border" data-repeat>Повторить заказ</button>\
-            <button class="px-3 py-2 rounded-xl border text-red-600" data-del>Удалить</button>\
-          </div>\
-        </div>\
-      </div>'
-    );
-    elCard.querySelector('[data-repeat]').onclick=function(){
-      sessionStorage.setItem('repeat_order_items', JSON.stringify(items));
-      sessionStorage.setItem('open_pay_after_repeat','1');
-      location.hash='#/order';
-    };
-    elCard.querySelector('[data-del]').onclick=function(){
-      var cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render();
-    };
-    return elCard;
-  }
-  function render(){
-    var list=loadHistory(); box.innerHTML='';
-    if(!Array.isArray(list)||!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
-    list.forEach(function(o,idx){ box.appendChild(cardView(o, idx)); });
-  }
-  root.querySelector('#clearAll').onclick=function(){ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); } };
-  root.querySelector('#back').onclick=function(){ history.length ? history.back() : (location.hash='#/profile'); };
-  render(); return root;
-}
-
-function DashboardView(){
-  var root=el(
-    '<div class="grid gap-4 max-w-6xl pb-24">\
-      <div class="flex items-center justify-between"><h2 class="text-xl font-semibold">Текущие заказы</h2></div>\
-      <div class="p-4 rounded-2xl bg-white border">\
-        <h3 class="font-semibold mb-3">Наличие товаров</h3>\
-        <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.</p>\
-        <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>\
-        <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>\
-      </div>\
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>\
-      <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash=\'#/profile\'">Назад</button></div>\
-    </div>'
-  );
-  var list=root.querySelector('#list'); var stockList=root.querySelector('#stockList'); var unavailable=new Set(loadUnavailable()); var dashOrders=loadDash();
-
-  function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(function(cat){ cat.items.forEach(function(item){ var row=el('<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="'+item.name+'" '+(unavailable.has(item.name)?'checked':'')+' /><span>'+item.name+'</span></label>'); stockList.appendChild(row); }); }); }
-  renderStock();
-  root.querySelector('#saveStock').onclick=function(){ var checked=[].slice.call(stockList.querySelectorAll('input[type=checkbox]:checked')).map(function(i){ return i.value; }); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
-
-  function orderCard(o){
-    var clientTotal=(o.items||[]).reduce(function(s,i){ return s + (i.price||0)*(i.qty||0); },0);
-    var total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
-    var created=o.createdAt? new Date(o.createdAt): new Date();
-    var itemLines=(o.items||[]).map(function(i){return i.name+' ×'+i.qty;}).join(', ');
-    var card=el(
-      '<div class="p-5 rounded-2xl bg-white border flex flex-col gap-2" data-id="'+o.id+'">\
-        <div class="flex items-center justify-between gap-4">\
-          <div class="text-lg font-semibold">#'+o.id+' — '+(o.name||'')+'</div>\
-          <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm">'+(o.status||'новый')+'</div>\
-        </div>\
-        <div class="text-sm text-gray-600">'+created.toLocaleString()+' · Итог: <b>'+total+' руб.</b></div>\
-        <div>🧾 '+(itemLines||'—')+'</div>\
-        <div class="mt-3 flex flex-wrap gap-2 items-center">\
-          <label class="text-sm">Статус:</label>\
-          <select class="border rounded-xl p-2" data-k="status">'+['новый','готовится','в пути','готов','завершён','отменён'].map(function(s){return '<option '+(s===(o.status||'новый')?'selected':'')+'>'+s+'</option>';}).join('')+'</select>\
-          <button type="button" class="px-3 py-2 rounded-xl border" data-act="save">Сохранить</button>\
-        </div>\
-        <div class="mt-2 text-right"><button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button></div>\
-      </div>'
-    );
-    card.addEventListener('click',function(e){
-      var act=e.target.dataset.act; if(!act) return;
-      if(act==='save'){
-        var status=card.querySelector('[data-k="status"]').value;
-        var i=dashOrders.findIndex(function(x){ return String(x.id)===String(o.id); });
-        if(i>=0){ dashOrders[i]=Object.assign({}, dashOrders[i], {status:status}); saveDash(dashOrders); syncOrderStatus(o.id, status); showToast('Статус #'+o.id+' обновлён'); }
-      }
-      if(act==='delete'){
-        if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(function(){ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить'; } },3000); return }
-        dashOrders=dashOrders.filter(function(x){ return String(x.id)!==String(o.id); }); saveDash(dashOrders); card.remove(); showToast('Заказ #'+o.id+' удалён с табло');
-      }
-    });
-    return card;
-  }
-  function load(){ var unique=new Map(); dashOrders.forEach(function(o){ unique.set(String(o.id),o); }); list.innerHTML=''; if(unique.size===0){ list.innerHTML='<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>'; return } unique.forEach(function(o){ list.appendChild(orderCard(o)); }); }
-  load(); return root;
-}
-
-function bindTabloTapZone(){
-  var hot = document.getElementById('tabloTapHot');
-  if (!hot || hot._bound) return; hot._bound = true;
-  var taps = 0, first = 0, timer = null;
-  var windowMs = 1200;
-  function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
-  function handler(){
-    var now = Date.now();
-    if (!first) first = now; taps++;
-    if (now - first > windowMs){ reset(); taps = 1; first = now; }
-    if (taps >= 4){
-      reset();
-      var pm = document.getElementById('payModal'); if (pm) pm.classList.remove('open');
-      if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/dashboard';
-      else document.getElementById('pinModal').classList.add('open');
-    }else{ if (timer) clearTimeout(timer); timer = setTimeout(reset, windowMs); }
-  }
-  ['click','pointerup','touchend'].forEach(function(ev){ hot.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}); });
-}
-
-function mount(view){
-  var app=document.getElementById('app');
-  if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch(e){} }
-  app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view);
-}
-function realRouter(){
-  var h=location.hash.split('?')[0];
-  if(h==='#/profile'){ mount(ProfileHubView()); bindTabloTapZone(); }
-  else if(h==='#/profile-edit') mount(ProfileEditView());
-  else if(h==='#/history') mount(HistoryView());
-  else if(h==='#/contact') mount(ContactView());
-  else if(h==='#/dashboard') mount(DashboardView());
-  else mount(OrderView());
-}
-function router(){
-  var h=location.hash.split('?')[0];
-  var profileBtn=document.getElementById('profileBtn'); var backBtn=document.getElementById('backBtn');
-  var showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact');
-  if(showBack){ if(profileBtn) profileBtn.classList.add('hidden'); if(backBtn) backBtn.classList.remove('hidden'); }
-  else { if(backBtn) backBtn.classList.add('hidden'); if(profileBtn) profileBtn.classList.remove('hidden'); }
-
-  if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
-    document.getElementById('pinModal').classList.add('open');
-    var app=document.getElementById('app'); if(app) app.innerHTML='';
-    return;
-  }
-  if(h==='#/profile'){ var pm2=document.getElementById('payModal'); if(pm2) pm2.classList.remove('open'); }
-  realRouter();
-}
-window.addEventListener('hashchange', function(){ try{ router(); }catch(e){ console.error(e); }});
-try{ router(); }catch(e){ console.error(e); }
-
-/* Header и модалки */
-document.addEventListener('DOMContentLoaded', function(){
-  var profileBtn=document.getElementById('profileBtn');
-  function goProfile(e){ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; }
-  ['click','pointerup','touchend'].forEach(function(ev){ profileBtn.addEventListener(ev, goProfile, {passive:false}); });
-
-  var backBtn=document.getElementById('backBtn');
-  function goOrder(e){ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/order'; }
-  ['click','pointerup','touchend'].forEach(function(ev){ backBtn.addEventListener(ev, goOrder, {passive:false}); });
-
-  bindTabloTapZone();
-
-  var pinM=document.getElementById('pinModal'); var pinOk=document.getElementById('pinOk'); var pinCancel=document.getElementById('pinCancel'); var pinInput=document.getElementById('pinInput');
-  pinOk.onclick=function(e){ if(e) e.preventDefault(); if((pinInput.value||'').length>0){ sessionStorage.setItem(TABLO_PIN_OK,'1'); pinM.classList.remove('open'); try{ router(); }catch(_){} } else { showToast('Введите ключ'); } };
-  pinCancel.onclick=function(){ pinM.classList.remove('open'); location.hash='#/profile'; };
-  pinM.onclick=function(e){ if(e.target===pinM) pinCancel.onclick(); };
-});
-</script>
-</body>
-</html>
