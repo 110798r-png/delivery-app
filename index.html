@@ -2,9 +2,12 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum=1, user-scalable=no" />
+  <!-- fixed: maximum-scale -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ЯмаМото — локальный стенд</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <!-- fix 404 favicon -->
+  <link rel="icon" href="data:,">
   <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
     *, *::before, *::after { box-sizing:border-box; }
@@ -18,7 +21,7 @@
     .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
     .sticky-top{ position:sticky; top:.5rem; z-index:30 }
 
-    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:var(--card-radius,1.25rem); padding:1rem; min-height:6.4rem }
+    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:1.25rem; padding:1rem; min-height:6.4rem }
     .menu-card-img{ width:110px; height:70px; border-radius:.75rem; background:#eee; object-fit:cover }
 
     .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
@@ -96,49 +99,56 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ===== Маршрут по умолчанию ===== */
+/* дефолтный маршрут */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
 
-/* ===== Ключи хранилища ===== */
+/* ===== Хранилища ===== */
 const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const UNAVAILABLE_LS_KEY = 'orders_unavailable_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
-const MENU_CONFIG_KEY    = 'menu_config_v1';     // <— меню
-const UI_CONFIG_KEY      = 'ui_config_v1';       // <— настройки интерфейса
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
 
-/* ===== Утилиты ===== */
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); }
 const TOST_SELECT = 'Пожалуйста, выберите товар';
 const money = (x)=> `${x} руб.`;
-function setBodyScrollLock(on){ document.body.style.overflow = on ? 'hidden' : ''; }
-function safeParse(k, fallback){
+const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
+
+function safeParse(k, f){
   try{
-    const v = JSON.parse(localStorage.getItem(k)||'null');
-    if (v==null) return fallback;
-    if (Array.isArray(fallback)) return Array.isArray(v)?v:[];
-    if (typeof fallback==='object') return v && typeof v==='object' ? v : {};
+    const v=JSON.parse(localStorage.getItem(k)||'null');
+    if(v==null) return f;
+    if(Array.isArray(f)) return Array.isArray(v)?v:[];
+    if(typeof f==='object') return v&&typeof v==='object'?v:{};
     return v;
-  }catch { return fallback }
+  }catch{ return f }
 }
-function saveKey(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
-
-/* ===== Профиль/история/табло ===== */
 function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
-function saveProfile(p){ saveKey(PROFILE_LS_KEY, p||{}); }
+function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})); }
 function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
-function saveHistory(list){ saveKey(CLIENT_HISTORY_KEY, Array.isArray(list)?list:[]); }
+function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 function loadUnavailable(){ return safeParse(UNAVAILABLE_LS_KEY, []); }
-function saveUnavailable(items){ saveKey(UNAVAILABLE_LS_KEY, Array.isArray(items)?items:[]); }
+function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[])); }
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
-function saveDash(list){ saveKey(DASHBOARD_LS_KEY, Array.isArray(list)?list:[]); }
+function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
-/* ===== Меню/настройки (Конструктор) ===== */
-const DEFAULT_MENU = [
+/* синхронизация статусов между табло и историей клиента */
+function syncOrderStatus(id, status){
+  const hist = loadHistory(); let changed = false;
+  for (let i=0;i<hist.length;i++){
+    if (String(hist[i].id) === String(id)){
+      if (hist[i].status !== status){ hist[i] = { ...hist[i], status }; changed = true; }
+      break;
+    }
+  }
+  if (changed) saveHistory(hist);
+}
+
+/* ===== Меню ===== */
+const MENU_CATEGORIES = [
   { key:'burgers', title:'Бургеры', items:[
     { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
     { name:'Говяжий двойной', price:440, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
@@ -150,60 +160,25 @@ const DEFAULT_MENU = [
     { name:'Твистер обычный', price:200 },
     { name:'Твистер обычный с картошкой', price:220 },
     { name:'Твистер макс', price:250 },
-    { name:'Твистер макс с картошкой', price:280 }
+    { name:'Твистер макс с картошкой', price:280 },
   ]},
   { key:'drinks',  title:'Напитки', items:[
     { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Добрый лайм', price:100 },
     { name:'фдэт-уайт', price:100 }, { name:'Раф банан', price:100 }, { name:'Эспрессо', price:100 }
   ]},
-  { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-  { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Курзе с мясом', price:160 }, { name:'Курзе с творогом ', price:210 }, { name:'хинкал слоенный', price:190 }, { name:'Хинкал тонкий', price:190 }, { name:'Хинкал толстый', price:190 } ]},
+  { key:'sushi',   title:'Суши / роллы', items:[
+    { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 }
+  ]},
+  { key:'semi',    title:'Полуфабрикаты', items:[
+    { name:'Курзе с мясом', price:160 }, { name:'Курзе с творогом ', price:210 },
+    { name:'хинкал слоенный', price:190 }, { name:'Хинкал тонкий', price:190 }, { name:'Хинкал толстый', price:190 }
+  ]},
 ];
 
-const DEFAULT_UI = {
-  cardRadiusPx: 20,     // радиус карточек меню
-  showImages: true,     // показывать фото блюд
-  osBaseUrl: ''         // базовый URL Object Storage, напр. https://storage.yandexcloud.net/bucket/
-};
-
-function loadMenuConfig(){ return safeParse(MENU_CONFIG_KEY, DEFAULT_MENU); }
-function saveMenuConfig(menu){ saveKey(MENU_CONFIG_KEY, menu); }
-function loadUiConfig(){ return safeParse(UI_CONFIG_KEY, DEFAULT_UI); }
-function saveUiConfig(cfg){ saveKey(UI_CONFIG_KEY, Object.assign({}, DEFAULT_UI, cfg||{})); }
-
-/* Ссылка на изображение с учётом базового пути */
-function resolveImg(src){
-  const ui = loadUiConfig();
-  const s = (src||'').trim();
-  if (!s) return '';
-  if (/^https?:\/\//i.test(s)) return s;
-  if (ui.osBaseUrl) {
-    // гарантируем единственный слэш между base и относительным путём
-    return ui.osBaseUrl.replace(/\/+$/,'') + '/' + s.replace(/^\/+/, '');
-  }
-  return s;
-}
-
-/* Синхронизация статусов между табло и историей клиента */
-function syncOrderStatus(id, status){
-  let hist = loadHistory(); let changed = false;
-  for (let i=0;i<hist.length;i++){
-    if (String(hist[i].id) === String(id)){
-      if (hist[i].status !== status){ hist[i] = { ...hist[i], status }; changed = true; }
-      break;
-    }
-  }
-  if (changed) saveHistory(hist);
-}
-
-/* ===== Анимация / свайпы ===== */
+/* ===== анимация/тапы (+/−) ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
-function animateScrollX(el, to, {duration=280, onEnd}={}){
-  const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; }
-  const start=performance.now();
-  function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); }
-  requestAnimationFrame(step);
-}
+function animateScrollX(el, to, {duration=280, onEnd}={}){ const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; } const start=performance.now(); function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); } requestAnimationFrame(step); }
+
 function bindTapIncDec(catPager, counts, recalcTotal){
   let downX=0, downY=0, pressedEl=null;
   catPager.addEventListener('pointerdown',(e)=>{ const btn=e.target.closest('button[data-act]'); if(!btn) return; pressedEl=btn; downX=e.clientX; downY=e.clientY; });
@@ -219,9 +194,6 @@ function bindTapIncDec(catPager, counts, recalcTotal){
 
 /* ===== Order ===== */
 function OrderView(){
-  const ui = loadUiConfig();
-  document.documentElement.style.setProperty('--card-radius', (ui.cardRadiusPx||20)+'px');
-
   const root=el(`
     <div class="relative">
       <section class="sticky-top mb-2">
@@ -248,26 +220,25 @@ function OrderView(){
   `);
 
   const categoryBar=root.querySelector('#categoryBar'); const catPager=root.querySelector('#catPager');
-  const totalEl=root.querySelector('#totalVal'); const confirmBtn=root.querySelector('#confirmBtn'); const cartBadge=root.querySelector('#cartBadge');
+  const totalEl=root.querySelector('#totalVal');
+  const confirmBtn=root.querySelector('#confirmBtn'); const cartBadge=root.querySelector('#cartBadge');
 
   setBodyScrollLock(true);
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
-  const menu = loadMenuConfig(); // <-- берём из конструктора
-  function panelW(){ return catPager.getBoundingClientRect().width || 1; }
+  const panelW=()=> catPager.getBoundingClientRect().width || 1;
 
   // chips
-  menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
+  MENU_CATEGORIES.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
-  function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
+  function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(MENU_CATEGORIES.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(MENU_CATEGORIES[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(MENU_CATEGORIES[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
   categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
 
   function buildPanels(){
     catPager.innerHTML='';
-    menu.forEach((cat)=>{
+    MENU_CATEGORIES.forEach((cat)=>{
       const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
-      (cat.items||[]).forEach(it=>{
+      cat.items.forEach(it=>{
         const q=counts[it.name]||0; const disabled=unavailableClient.has(it.name);
-        const imgSrc = ui.showImages ? (resolveImg(it.img)||'https://placehold.co/110x70?text=food') : '';
         list.appendChild(el(`
           <div class="menu-card ${disabled?'opacity-50':''}">
             <div class="flex-1 min-w-0">
@@ -279,7 +250,7 @@ function OrderView(){
                 <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc" ${disabled?'disabled':''}>+</button>
               </div>
             </div>
-            ${ ui.showImages ? `<img src="${imgSrc}" class="menu-card-img" alt="">` : '' }
+            <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`));
       });
       list.appendChild(el(`<div class="h-24"></div>`));
@@ -303,14 +274,30 @@ function OrderView(){
     applyHeights(); setTimeout(applyHeights,60);
   }
 
-  function applyHeights(){ const headerH=document.getElementById('appHeader').getBoundingClientRect().height; const chipsH=root.querySelector('.sticky-top')?.getBoundingClientRect().height||0; const confirmH=document.getElementById('confirmBar').getBoundingClientRect().height; const availH=Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8); const first=catPager.querySelector('.menu-card'); const cardH=first?Math.ceil(first.getBoundingClientRect().height):104; const h=Math.min(availH, cardH*4 + 12*3 + 4); root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px'); goToIndex(activeIdx,{animate:false}); }
+  // FIXED: robust applyHeights using root elements
+  function applyHeights(){
+    try{
+      const headerH = document.getElementById('appHeader')?.getBoundingClientRect().height || 0;
+      const chipsH  = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
+      const confirmH= root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
+
+      const availH = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+      const first  = root.querySelector('.menu-card');
+      const cardH  = first ? Math.ceil(first.getBoundingClientRect().height) : 104;
+
+      const h = Math.min(availH, cardH*4 + 12*3 + 4);
+      root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px');
+
+      goToIndex(activeIdx,{animate:false});
+    }catch(err){ console.warn('[applyHeights]', err); }
+  }
   window.addEventListener('resize', applyHeights);
 
   catPager.addEventListener('scroll', ()=>{ if (isAnimating) return; if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer); catPager._scrollTimer = setTimeout(()=>{ const idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width||1)); if(idx!==activeIdx){ highlightChip(idx); activeIdx=idx; } }, 80); });
 
-  function recalcTotal(){ let sum=0; menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*it.price )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
+  function recalcTotal(){ let sum=0; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*it.price )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
 
-  // "Повторить заказ"
+  // заполнение из "Повторить заказ"
   (function applyPreselect(){
     const payload = sessionStorage.getItem('repeat_order_items');
     if(!payload) return;
@@ -338,9 +325,8 @@ function OrderView(){
 
   // подтверждение
   confirmBtn.addEventListener('click', ()=>{
-    const items=[]; menu.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
+    const items=[]; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price}); }));
     if(!items.length){ showToast(TOST_SELECT); return; }
-
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
 
     const sumBox = document.getElementById('paySummary');
@@ -350,19 +336,18 @@ function OrderView(){
     document.getElementById('payModal').classList.add('open');
   });
 
-  // сброс
   function resetCounts(){ Object.keys(counts).forEach(k=>counts[k]=0); catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0'); recalcTotal(); }
 
-  // модалка оплаты
   (function bindPayModal(){
     const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
     const close=()=> m.classList.remove('open');
     const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
+
     const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
     const onOk = (e)=>{
       if(e){ e.preventDefault(); e.stopPropagation(); }
       const itemsSel=[]; let total=0;
-      menu.forEach(cat=>cat.items.forEach(it=>{
+      MENU_CATEGORIES.forEach(cat=>cat.items.forEach(it=>{
         const q=counts[it.name]||0; if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price}); total+=q*it.price; }
       }));
       if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
@@ -397,24 +382,16 @@ function ProfileHubView(){
               <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
               <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
             </div>
-            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46c.32-.55.57-1.14.73-1.76l1.73-.29Z" fill="currentColor"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29Z" fill="currentColor"/></svg>
           </div>
         </button>
 
         <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
           <div class="text-base font-semibold">Мои заказы</div>
           <div class="flex items-center gap-3">
-            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6l1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6л1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
             <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
-        </button>
-      </section>
-
-      <!-- КОНСТРУКТОР -->
-      <section>
-        <button id="builderBtn" class="w-full card p-4 flex items-center justify-between">
-          <div class="text-base font-semibold">Конструктор</div>
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </section>
 
@@ -453,12 +430,12 @@ function ProfileHubView(){
       <section id="tabloTapZone">
         <div id="tabloTapHot" aria-label="tablo-tap-hot"></div>
       </section>
+
     </div>
   `);
 
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#ordersBtn').onclick      = ()=> location.hash = '#/history';
-  root.querySelector('#builderBtn').onclick     = ()=> location.hash = '#/builder';
   root.querySelector('#supportBtn').onclick     = ()=> alert('Позже подключим чат техподдержки.');
   root.querySelector('#reviewsBtn').onclick     = ()=> alert('Позже подключим экран отзывов.');
   root.querySelector('#feedbackBtn').onclick    = ()=> location.hash = '#/contact';
@@ -582,7 +559,6 @@ function HistoryView(){
   render(); return root;
 }
 
-/* ===== Табло ===== */
 function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
@@ -600,9 +576,8 @@ function DashboardView(){
     </div>
   `);
   const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
-  const menu = loadMenuConfig();
 
-  function renderStock(){ stockList.innerHTML=''; (menu||[]).forEach(cat=>(cat.items||[]).forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
+  function renderStock(){ stockList.innerHTML=''; MENU_CATEGORIES.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
   root.querySelector('#saveStock').onclick=()=>{ const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
 
@@ -648,212 +623,7 @@ function DashboardView(){
   load(); return root;
 }
 
-/* ===== КОНСТРУКТОР ===== */
-function BuilderView(){
-  const ui = loadUiConfig();
-  let menu = JSON.parse(JSON.stringify(loadMenuConfig())); // клон
-  let catIdx = 0;
-  if (!Array.isArray(menu) || menu.length===0) menu = JSON.parse(JSON.stringify(DEFAULT_MENU));
-
-  function render(){
-    const root=el(`
-      <div class="grid gap-4 pb-24">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Конструктор</h2>
-          <button id="backProfile" class="px-3 py-2 rounded-xl border">Назад</button>
-        </div>
-
-        <!-- Настройки UI -->
-        <section class="card p-4 grid gap-3">
-          <div class="font-semibold">Настройки интерфейса</div>
-          <label class="grid gap-1 text-sm">
-            <span>Базовый URL Object Storage (для картинок):</span>
-            <input id="uiBaseUrl" class="border rounded-xl p-3" placeholder="https://storage.yandexcloud.net/your-bucket/" value="${ui.osBaseUrl||''}">
-          </label>
-          <label class="grid gap-1 text-sm">
-            <span>Радиус карточек, px: <b id="radiusVal">${ui.cardRadiusPx||20}</b></span>
-            <input id="uiRadius" type="range" min="0" max="32" value="${ui.cardRadiusPx||20}">
-          </label>
-          <label class="inline-flex items-center gap-2 text-sm">
-            <input id="uiShowImg" type="checkbox" ${ui.showImages?'checked':''} />
-            <span>Показывать фото блюд</span>
-          </label>
-          <div class="flex gap-2">
-            <button id="uiSave" class="px-3 py-2 rounded-xl bg-black text-white">Сохранить UI</button>
-            <button id="uiApply" class="px-3 py-2 rounded-xl border">Применить к меню</button>
-          </div>
-        </section>
-
-        <!-- Категории/товары -->
-        <section class="card p-4 grid gap-4">
-          <div class="grid gap-2">
-            <div class="flex items-center justify-between">
-              <div class="font-semibold">Категории</div>
-              <div class="flex gap-2">
-                <button id="addCat" class="px-3 py-2 rounded-xl border">Добавить</button>
-                <button id="delCat" class="px-3 py-2 rounded-xl border text-red-600">Удалить</button>
-              </div>
-            </div>
-            <select id="catSelect" class="border rounded-xl p-3">
-              ${menu.map((c,i)=>`<option value="${i}" ${i===catIdx?'selected':''}>${c.title}</option>`).join('')}
-            </select>
-            <input id="catTitle" class="border rounded-xl p-3" placeholder="Название категории" value="${menu[catIdx]?.title||''}">
-            <input id="catKey" class="border rounded-xl p-3 text-sm" placeholder="Ключ (латиницей, уникально)" value="${menu[catIdx]?.key||''}">
-            <button id="saveCat" class="px-3 py-2 rounded-xl bg-black text-white self-start">Сохранить категорию</button>
-          </div>
-
-          <div class="grid gap-2">
-            <div class="flex items-center justify-between">
-              <div class="font-semibold">Товары</div>
-              <button id="addItem" class="px-3 py-2 rounded-xl border">Добавить товар</button>
-            </div>
-            <div id="itemsBox" class="grid gap-2"></div>
-          </div>
-        </section>
-
-        <!-- Импорт/Экспорт -->
-        <section class="card p-4 grid gap-2">
-          <div class="font-semibold">Импорт / Экспорт меню</div>
-          <div class="flex flex-wrap gap-2">
-            <button id="exportMenu" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
-            <label class="px-3 py-2 rounded-xl border cursor-pointer">
-              Импорт JSON
-              <input id="importMenu" type="file" accept="application/json" class="hidden">
-            </label>
-            <button id="saveMenuAll" class="px-3 py-2 rounded-xl bg-black text-white">Сохранить меню</button>
-          </div>
-        </section>
-      </div>
-    `);
-
-    function rerenderItems(){
-      const box = root.querySelector('#itemsBox');
-      const cat = menu[catIdx]; box.innerHTML='';
-      (cat.items||[]).forEach((it,idx)=>{
-        const row = el(`
-          <div class="p-3 border rounded-xl bg-white grid gap-2">
-            <div class="grid md:grid-cols-2 gap-2">
-              <input data-k="name" data-i="${idx}" class="border rounded-xl p-2" placeholder="Название" value="${it.name||''}">
-              <input data-k="price" data-i="${idx}" class="border rounded-xl p-2" placeholder="Цена" inputmode="decimal" value="${it.price||0}">
-            </div>
-            <input data-k="img" data-i="${idx}" class="border rounded-xl p-2" placeholder="Путь или URL картинки" value="${it.img||''}">
-            <div class="flex items-center justify-between">
-              <div class="text-xs text-gray-500 truncate">Предпросмотр: ${resolveImg(it.img)||'—'}</div>
-              <button data-act="del" data-i="${idx}" class="px-3 py-2 rounded-xl border text-red-600">Удалить</button>
-            </div>
-          </div>
-        `);
-        box.appendChild(row);
-      });
-      box.querySelectorAll('input[data-k]').forEach(inp=>{
-        inp.oninput = (e)=>{
-          const i = +inp.dataset.i, k = inp.dataset.k;
-          const v = k==='price' ? Number((inp.value||'').toString().replace(',','.'))||0 : inp.value;
-          menu[catIdx].items[i][k] = v;
-        };
-      });
-      box.querySelectorAll('button[data-act="del"]').forEach(btn=>{
-        btn.onclick = ()=>{
-          const i = +btn.dataset.i;
-          menu[catIdx].items.splice(i,1);
-          rerenderItems();
-        };
-      });
-    }
-
-    // Handlers
-    root.querySelector('#backProfile').onclick = ()=> location.hash='#/profile';
-
-    // UI settings
-    const radiusInput = root.querySelector('#uiRadius');
-    const radiusVal = root.querySelector('#radiusVal');
-    radiusInput.oninput = ()=> radiusVal.textContent = radiusInput.value;
-    root.querySelector('#uiSave').onclick = ()=>{
-      const cfg = {
-        osBaseUrl: root.querySelector('#uiBaseUrl').value.trim(),
-        cardRadiusPx: Number(root.querySelector('#uiRadius').value)||20,
-        showImages: root.querySelector('#uiShowImg').checked
-      };
-      saveUiConfig(cfg);
-      showToast('UI сохранён');
-    };
-    root.querySelector('#uiApply').onclick = ()=>{
-      const cfg = loadUiConfig();
-      document.documentElement.style.setProperty('--card-radius', (cfg.cardRadiusPx||20)+'px');
-      showToast('Настройки применены');
-    };
-
-    // Categories
-    const catSelect = root.querySelector('#catSelect');
-    catSelect.onchange = ()=>{ catIdx = +catSelect.value; root.querySelector('#catTitle').value = menu[catIdx].title||''; root.querySelector('#catKey').value = menu[catIdx].key||''; rerenderItems(); };
-
-    root.querySelector('#addCat').onclick = ()=>{
-      const newKey = 'cat'+(Date.now().toString().slice(-4));
-      menu.push({ key:newKey, title:'Новая категория', items:[] });
-      catIdx = menu.length-1; renderMount(); showToast('Категория добавлена');
-    };
-    root.querySelector('#delCat').onclick = ()=>{
-      if (!menu.length) return;
-      if (!confirm('Удалить категорию?')) return;
-      menu.splice(catIdx,1);
-      catIdx = Math.max(0, catIdx-1);
-      renderMount(); showToast('Категория удалена');
-    };
-    root.querySelector('#saveCat').onclick = ()=>{
-      const t = root.querySelector('#catTitle').value.trim();
-      const k = root.querySelector('#catKey').value.trim() || ('cat'+Date.now());
-      if (!t){ showToast('Название категории пустое'); return; }
-      menu[catIdx].title = t; menu[catIdx].key = k;
-      renderMount(); showToast('Категория сохранена');
-    };
-
-    // Items
-    root.querySelector('#addItem').onclick = ()=>{
-      if (!menu[catIdx].items) menu[catIdx].items=[];
-      menu[catIdx].items.push({ name:'Новый товар', price:0, img:'' });
-      rerenderItems();
-    };
-    rerenderItems();
-
-    // Import/Export
-    root.querySelector('#exportMenu').onclick = ()=>{
-      const data = JSON.stringify(menu, null, 2);
-      const blob = new Blob([data], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='menu_config.json'; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
-    };
-    root.querySelector('#importMenu').onchange = (e)=>{
-      const f = e.target.files && e.target.files[0]; if(!f) return;
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        try{
-          const data = JSON.parse(reader.result);
-          if (!Array.isArray(data)) throw new Error('Ожидается массив категорий');
-          menu = data; catIdx = 0; renderMount(); showToast('Меню импортировано');
-        }catch(err){ alert('Ошибка импорта: '+err.message); }
-      };
-      reader.readAsText(f);
-    };
-    root.querySelector('#saveMenuAll').onclick = ()=>{
-      saveMenuConfig(menu);
-      showToast('Меню сохранено');
-    };
-
-    return root;
-  }
-
-  function renderMount(){
-    const app = document.getElementById('app'); app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(render());
-  }
-  renderMount();
-
-  // cleanup
-  const cleanup = ()=>{};
-  const fakeRoot = document.createElement('div'); fakeRoot.cleanup = cleanup;
-  return fakeRoot;
-}
-
-/* ===== 4-тап зона (табло) ===== */
+/* ===== 4-тап зона только на экране профиля ===== */
 function bindTabloTapZone(){
   const hot = document.getElementById('tabloTapHot');
   if (!hot || hot._bound) return; hot._bound = true;
@@ -875,11 +645,7 @@ function bindTabloTapZone(){
 }
 
 /* ===== Router ===== */
-function mount(view){
-  const app=document.getElementById('app');
-  if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} }
-  app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view);
-}
+function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
 function realRouter(){
   const h=location.hash.split('?')[0];
   if(h==='#/profile'){ mount(ProfileHubView()); bindTabloTapZone(); }
@@ -887,13 +653,12 @@ function realRouter(){
   else if(h==='#/history') mount(HistoryView());
   else if(h==='#/contact') mount(ContactView());
   else if(h==='#/dashboard') mount(DashboardView());
-  else if(h==='#/builder') mount(BuilderView());
   else mount(OrderView());
 }
 function router(){
   const h=location.hash.split('?')[0];
   const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact'||h==='#/builder');
+  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact');
   if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
