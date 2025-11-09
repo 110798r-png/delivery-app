@@ -53,11 +53,9 @@
         <div class="text-2xl font-extrabold tracking-tight" id="brandTitle">ЯмаМото</div>
       </div>
       <div class="flex items-center gap-2">
-        <!-- Шестерёнка (конструктор) -->
         <a id="gearBtn" href="#/builder" class="px-3 py-2 rounded-xl border bg-white" aria-label="settings" role="button" title="Конструктор">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29- .29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.4 1.76-.73l1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76l1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29-.29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.4 1.76-.73l1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76l1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
         </a>
-        <!-- Профиль -->
         <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button" title="Профиль">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
         </a>
@@ -71,7 +69,7 @@
 
   <!-- Оплата -->
   <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl p-5 w/full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
       <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
       <div class="grid gap-1">
@@ -104,7 +102,6 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ===== маршрутизация по умолчанию ===== */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
@@ -135,17 +132,10 @@ function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.s
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
-/* ===== конфиг приложения (меню + тема) ===== */
+/* ===== конфиг (бренд берём из конфига, блок UI убран) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаМото',
-  theme: {
-    cardRadius: 20,
-    imgRadius: 12,
-    imgW: 110,
-    imgH: 70,
-    cardMinH: 104,
-    showPrice: true
-  },
+  theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -170,8 +160,6 @@ const DEFAULT_CONFIG = {
 };
 function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
-
-/* применяем тему в :root переменные */
 function applyTheme(theme){
   const r = document.documentElement;
   r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
@@ -181,8 +169,14 @@ function applyTheme(theme){
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
   document.getElementById('brandTitle').textContent = loadConfig().brandTitle || 'ЯмаМото';
 }
+let MENU_CATEGORIES = loadConfig().menu.slice();
+applyTheme(loadConfig().theme);
 
-/* ===== синхронизация статусов ===== */
+/* ===== утилы ===== */
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
+function animateScrollX(el, to, {duration=280, onEnd}={}){ const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; } const start=performance.now(); function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); } requestAnimationFrame(step); }
+
+/* ===== синхронизация статуса ===== */
 function syncOrderStatus(id, status){
   let hist = loadHistory(); let changed = false;
   for (let i=0;i<hist.length;i++){
@@ -194,19 +188,9 @@ function syncOrderStatus(id, status){
   if (changed) saveHistory(hist);
 }
 
-/* ===== меню из конфига ===== */
-let MENU_CATEGORIES = loadConfig().menu.slice();
-applyTheme(loadConfig().theme);
-
-/* ===== анимация скролла ===== */
-function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
-function animateScrollX(el, to, {duration=280, onEnd}={}){ const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; } const start=performance.now(); function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); } requestAnimationFrame(step); }
-
 /* ===== Order ===== */
 function OrderView(){
-  const cfg = loadConfig();
-  applyTheme(cfg.theme);
-  MENU_CATEGORIES = cfg.menu.slice();
+  const cfg = loadConfig(); applyTheme(cfg.theme); MENU_CATEGORIES = cfg.menu.slice();
 
   const root=el(`
     <div class="relative">
@@ -241,7 +225,6 @@ function OrderView(){
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
   const panelW=()=> catPager.getBoundingClientRect().width || 1;
 
-  // chips
   cfg.menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(cfg.menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(cfg.menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -253,7 +236,7 @@ function OrderView(){
       const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
       cat.items.forEach(it=>{
         const q=counts[it.name]||0; const disabled=unavailableClient.has(it.name);
-        list.appendChild(el(`
+        const row = el(`
           <div class="menu-card ${disabled?'opacity-50':''}">
             <div class="flex-1 min-w-0">
               <div class="font-medium text-sm flex items-center gap-2">${it.name}${disabled?'<span class="badge red">Нет в наличии</span>':''}</div>
@@ -265,7 +248,28 @@ function OrderView(){
               </div>
             </div>
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
-          </div>`));
+          </div>`);
+
+        // ПРЯМАЯ привязка кнопок — надёжно
+        const minusBtn = row.querySelector('button[data-act="dec"]');
+        const plusBtn  = row.querySelector('button[data-act="inc"]');
+        function adjust(delta){
+          const name = it.name;
+          const targetBtn = delta>0 ? plusBtn : minusBtn;
+          if (targetBtn.disabled) return; // нельзя трогать недоступные
+          counts[name] = Math.max(0, (counts[name]||0) + delta);
+          row.querySelector(`[data-q="${CSS.escape(name)}"]`).textContent = counts[name]||0;
+          recalcTotal();
+        }
+        minusBtn.onclick = ()=>adjust(-1);
+        plusBtn.onclick  = ()=>adjust(+1);
+
+        // поддержка клавиатуры
+        [minusBtn,plusBtn].forEach(b=>{
+          b.addEventListener('keydown', (e)=>{ if((e.key==='Enter'||e.key===' ' ) && !b.disabled){ e.preventDefault(); b.click(); }});
+        });
+
+        list.appendChild(row);
       });
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
@@ -278,28 +282,6 @@ function OrderView(){
         if(locked==='x'){ e.preventDefault(); if(Math.abs(dx)>=THRESH()){ used=true; const next=dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } } }, {passive:false});
       ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,()=>{ down=false; used=false; locked=null; }));
     });
-
-    if(!catPager._pmBound){
-      catPager.addEventListener('click', e=>{
-        // игнор кликов, созданных свайп-анимацией
-        if (catPager._ignoreNextClickTs && Date.now()-catPager._ignoreNextClickTs < 200){ e.preventDefault(); e.stopPropagation(); return; }
-        const btn = e.target.closest('button[data-act]');
-        if(!btn) return;
-        if (btn.disabled) return; // <— критично: не даём добавлять «нет в наличии»
-        const act = btn.dataset.act;
-        const name = btn.dataset.name;
-        if(act==='inc') counts[name]=(counts[name]||0)+1;
-        else counts[name]=Math.max(0,(counts[name]||0)-1);
-        catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent=counts[name]||0);
-        recalcTotal();
-      });
-      // клавиатура
-      catPager.addEventListener('keydown', (e)=>{
-        const btn=e.target.closest('button[data-act]'); if(!btn) return;
-        if(e.key==='Enter'||e.key===' '){ e.preventDefault(); if(!btn.disabled) btn.click(); }
-      });
-      catPager._pmBound=true;
-    }
 
     applyHeights(); setTimeout(applyHeights,60);
   }
@@ -332,21 +314,6 @@ function OrderView(){
     confirmBtn.disabled = sum<=0;
     return sum;
   }
-
-  (function applyPreselect(){
-    const payload = sessionStorage.getItem('repeat_order_items');
-    if(!payload) return;
-    try{
-      const items=JSON.parse(payload)||[];
-      items.forEach(it=>{ counts[it.name]= (counts[it.name]||0) + (it.qty||0); });
-      catPager.querySelectorAll('[data-q]').forEach(q=>{
-        const name=q.getAttribute('data-q'); q.textContent = counts[name]||0;
-      });
-      recalcTotal();
-      sessionStorage.removeItem('repeat_order_items');
-      if(sessionStorage.getItem('open_pay_after_repeat')==='1'){ sessionStorage.removeItem('open_pay_after_repeat'); setTimeout(()=>confirmBtn.click(), 150); }
-    }catch{}
-  })();
 
   function updateCartBadge(){
     const list = loadHistory();
@@ -418,7 +385,7 @@ function ProfileHubView(){
               <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
               <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
             </div>
-            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29Z" fill="currentColor"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73л-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29Z" fill="currentColor"/></svg>
           </div>
         </button>
         <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
@@ -452,7 +419,6 @@ function ProfileHubView(){
         <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">Обратная связь
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <!-- пункт Конструктор убран — теперь шестерёнка в шапке -->
       </section>
 
       <section class="card p-4 text-sm leading-relaxed">
@@ -499,8 +465,8 @@ function ContactView(){
   return root;
 }
 
-/* ===== Профиль / История / Табло (как было, с мелкими правками) ===== */
-function ProfileEditView(){
+/* ===== Профиль / История / Табло ===== */
+function ProfileEditView(){ 
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
     <div class="grid gap-4 pb-24">
@@ -530,7 +496,7 @@ function ProfileEditView(){
   return root;
 }
 
-function HistoryView(){
+function HistoryView(){ 
   const root=el(`
     <div class="grid gap-3 pb-24">
       <div class="flex items-center justify-between">
@@ -594,7 +560,7 @@ function HistoryView(){
 }
 
 /* ===== Табло ===== */
-function DashboardView(){
+function DashboardView(){ 
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
@@ -656,7 +622,7 @@ function DashboardView(){
   load(); return root;
 }
 
-/* ===== КОНСТРУКТОР (без блока "Бренд и внешний вид") ===== */
+/* ===== КОНСТРУКТОР (без блока внешнего вида) ===== */
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
@@ -766,7 +732,6 @@ function BuilderView(){
     fr.readAsText(f);
   };
 
-  // применить
   root.querySelector('#applyBtn').onclick=()=>{
     saveConfig(cfg);
     applyTheme(cfg.theme);
@@ -778,7 +743,7 @@ function BuilderView(){
   return root;
 }
 
-/* ===== 4-тап зона с флагом WANT_DASH ===== */
+/* ===== 4-тап зона (с WANT_DASH) ===== */
 function bindTabloTapZone(){
   const hot = document.getElementById('tabloTapHot');
   if (!hot || hot._bound) return; hot._bound = true;
@@ -832,7 +797,7 @@ function router(){
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
 
-/* Header и модалки */
+/* Header + PIN */
 document.addEventListener('DOMContentLoaded', ()=>{
   const profileBtn=document.getElementById('profileBtn');
   const goProfile=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; };
@@ -850,7 +815,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if((pinInput.value||'').length>0){
       sessionStorage.setItem(TABLO_PIN_OK,'1');
       pinM.classList.remove('open');
-      // если хотели в табло — идём сразу туда
       if (sessionStorage.getItem(WANT_DASH)==='1'){ sessionStorage.removeItem(WANT_DASH); location.hash='#/dashboard'; }
       else { router(); }
     } else { showToast('Введите ключ'); }
