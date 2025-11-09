@@ -32,7 +32,7 @@
     .modal.open{ display:flex }
 
     .app-header{ position:sticky; top:0; z-index:100; }
-    button[data-act], #profileBtn, #gearBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
+    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
     .badge.red{ background:#fee2e2; color:#991b1b }
 
@@ -53,9 +53,7 @@
         <div class="text-2xl font-extrabold tracking-tight" id="brandTitle">ЯмаМото</div>
       </div>
       <div class="flex items-center gap-2">
-        <a id="gearBtn" href="#/builder" class="px-3 py-2 rounded-xl border bg-white" aria-label="settings" role="button" title="Конструктор">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29-.29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.4 1.76-.73l1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76l1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
-        </a>
+        <!-- Шестерёнку убрали отсюда -->
         <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button" title="Профиль">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
         </a>
@@ -69,7 +67,7 @@
 
   <!-- Оплата -->
   <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w/full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
       <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
       <div class="grid gap-1">
@@ -132,7 +130,7 @@ function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.s
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
-/* ===== конфиг (бренд берём из конфига, блок UI убран) ===== */
+/* ===== конфиг ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаМото',
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
@@ -225,13 +223,14 @@ function OrderView(){
   const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
   const panelW=()=> catPager.getBoundingClientRect().width || 1;
 
-  cfg.menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
+  loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
-  function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(cfg.menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(cfg.menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
+  function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(loadConfig().menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(loadConfig().menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(loadConfig().menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
   categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
 
   function buildPanels(){
     catPager.innerHTML='';
+    const cfg = loadConfig();
     cfg.menu.forEach((cat)=>{
       const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
       cat.items.forEach(it=>{
@@ -250,24 +249,19 @@ function OrderView(){
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`);
 
-        // ПРЯМАЯ привязка кнопок — надёжно
         const minusBtn = row.querySelector('button[data-act="dec"]');
         const plusBtn  = row.querySelector('button[data-act="inc"]');
         function adjust(delta){
           const name = it.name;
           const targetBtn = delta>0 ? plusBtn : minusBtn;
-          if (targetBtn.disabled) return; // нельзя трогать недоступные
+          if (targetBtn.disabled) return;
           counts[name] = Math.max(0, (counts[name]||0) + delta);
           row.querySelector(`[data-q="${CSS.escape(name)}"]`).textContent = counts[name]||0;
           recalcTotal();
         }
         minusBtn.onclick = ()=>adjust(-1);
         plusBtn.onclick  = ()=>adjust(+1);
-
-        // поддержка клавиатуры
-        [minusBtn,plusBtn].forEach(b=>{
-          b.addEventListener('keydown', (e)=>{ if((e.key==='Enter'||e.key===' ' ) && !b.disabled){ e.preventDefault(); b.click(); }});
-        });
+        [minusBtn,plusBtn].forEach(b=> b.addEventListener('keydown',(e)=>{ if((e.key==='Enter'||e.key===' ')&&!b.disabled){ e.preventDefault(); b.click(); }}));
 
         list.appendChild(row);
       });
@@ -275,7 +269,7 @@ function OrderView(){
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
       // свайп панелей
-      let down=false, used=false, sx=0, sy=0, locked=null; const PIX_LOCK=10, THRESH=()=>Math.max(40, panelW()*0.25);
+      let down=false, used=false, sx=0, sy=0, locked=null; const PIX_LOCK=10, THRESH=()=>Math.max(40, (catPager.getBoundingClientRect().width||1)*0.25);
       vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
       vbox.addEventListener('pointermove',e=>{ if(!down||used||isAnimating) return; const dx=e.clientX-sx, dy=e.clientY-sy;
         if(locked===null){ if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>PIX_LOCK) locked='y'; }
@@ -308,6 +302,7 @@ function OrderView(){
   });
 
   function recalcTotal(){
+    const cfg = loadConfig();
     let sum=0;
     cfg.menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*(it.price||0) ));
     totalEl.textContent=money(sum);
@@ -326,7 +321,8 @@ function OrderView(){
   updateCartBadge();
 
   confirmBtn.addEventListener('click', ()=>{
-    const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=counts[it.name]||0; if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
+    const cfg = loadConfig();
+    const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=(counts[it.name]||0); if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
     if(!items.length){ showToast(TOST_SELECT); return; }
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
 
@@ -350,9 +346,10 @@ function OrderView(){
     const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
     const onOk = (e)=>{
       if(e){ e.preventDefault(); e.stopPropagation(); }
+      const cfg = loadConfig();
       const itemsSel=[]; let total=0;
       cfg.menu.forEach(cat=>cat.items.forEach(it=>{
-        const q=Number(document.querySelector(`[data-q="${CSS.escape(it.name)}"]`)?.textContent||0);
+        const q=(document.querySelector(`[data-q="${CSS.escape(it.name)}"]`)?.textContent||'0')|0;
         if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
       if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
@@ -465,7 +462,7 @@ function ContactView(){
   return root;
 }
 
-/* ===== Профиль / История / Табло ===== */
+/* ===== Профиль / История ===== */
 function ProfileEditView(){ 
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -565,6 +562,11 @@ function DashboardView(){
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Текущие заказы</h2>
+        <!-- КНОПКА КОНСТРУКТОРА — ТОЛЬКО ЗДЕСЬ -->
+        <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white flex items-center gap-2" title="Конструктор">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29-.29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.4 1.76-.73l1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76l1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
+          Конструктор
+        </a>
       </div>
       <div class="p-4 rounded-2xl bg-white border">
         <h3 class="font-semibold mb-3">Наличие товаров</h3>
@@ -721,7 +723,6 @@ function BuilderView(){
     render();
   };
 
-  // импорт/экспорт
   root.querySelector('#exportBtn').onclick=()=>{
     const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yamamoto-config.json'; a.click(); URL.revokeObjectURL(a.href);
@@ -737,9 +738,9 @@ function BuilderView(){
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
     showToast('Сохранено');
-    location.hash='#/order';
+    history.length ? history.back() : (location.hash='#/dashboard');
   };
-  root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
+  root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/dashboard');
   return root;
 }
 
