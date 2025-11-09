@@ -53,7 +53,6 @@
         <div class="text-2xl font-extrabold tracking-tight" id="brandTitle">ЯмаМото</div>
       </div>
       <div class="flex items-center gap-2">
-        <!-- Шестерёнку убрали отсюда -->
         <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white" aria-label="profile" role="button" title="Профиль">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
         </a>
@@ -100,6 +99,10 @@
   <div id="toast" class="toast hidden"></div>
 
 <script>
+/* ===== API URL (ВАШ из API Gateway) ===== */
+const API_URL = 'https://<YOUR_GATEWAY_ID>.apigw.yandexcloud.net';
+
+/* ===== маршрутизация по умолчанию ===== */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
@@ -119,6 +122,19 @@ const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textConte
 const money = (x)=> `${x} руб.`;
 const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
 const TOST_SELECT = 'Пожалуйста, выберите товар';
+
+async function sendOrderToServer(order){
+  try{
+    if(!API_URL || API_URL.includes('<YOUR_GATEWAY_ID>')) return; // не мешаем локальным тестам
+    await fetch(API_URL + '/order', {
+      method: 'POST',
+      headers: { 'content-type':'application/json' },
+      body: JSON.stringify(order)
+    });
+  }catch(e){
+    console.warn('order sync failed:', e);
+  }
+}
 
 function safeParse(k, f){ try{ const v=JSON.parse(localStorage.getItem(k)||'null'); if(v==null) return f; if(Array.isArray(f)) return Array.isArray(v)?v:[]; if(typeof f==='object') return v&&typeof v==='object'?v:{}; return v; }catch{ return f } }
 function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
@@ -249,6 +265,7 @@ function OrderView(){
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`);
 
+        // Локальные обработчики (мобайл/ПК)
         const minusBtn = row.querySelector('button[data-act="dec"]');
         const plusBtn  = row.querySelector('button[data-act="inc"]');
         function adjust(delta){
@@ -280,6 +297,22 @@ function OrderView(){
     applyHeights(); setTimeout(applyHeights,60);
   }
 
+  // Делегирование кликов для ПК (железобетонно)
+  catPager.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn || btn.disabled) return;
+    const name = btn.dataset.name;
+    const delta = btn.dataset.act === 'inc' ? +1 : -1;
+    const cur = parseInt(catPager.querySelector(`[data-q="${CSS.escape(name)}"]`)?.textContent||'0',10) || 0;
+    const next = Math.max(0, cur + delta);
+    catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent = String(next));
+    // обновляем модель
+    if(!isFinite(next)) return;
+    if(!window.__orderCounts) window.__orderCounts = {};
+    window.__orderCounts[name] = next;
+    recalcTotal();
+  });
+
   function applyHeights(){
     try{
       const headerH = document.getElementById('appHeader')?.getBoundingClientRect().height || 0;
@@ -303,6 +336,7 @@ function OrderView(){
 
   function recalcTotal(){
     const cfg = loadConfig();
+    const counts = window.__orderCounts || {};
     let sum=0;
     cfg.menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*(it.price||0) ));
     totalEl.textContent=money(sum);
@@ -322,6 +356,7 @@ function OrderView(){
 
   confirmBtn.addEventListener('click', ()=>{
     const cfg = loadConfig();
+    const counts = window.__orderCounts || {};
     const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=(counts[it.name]||0); if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
     if(!items.length){ showToast(TOST_SELECT); return; }
     if (confirmBtn._busy) return; confirmBtn._busy=true; confirmBtn.disabled=true;
@@ -334,7 +369,7 @@ function OrderView(){
   });
 
   function resetCounts(){
-    Object.keys(counts).forEach(k=> delete counts[k]);
+    window.__orderCounts = {};
     catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
     recalcTotal();
   }
@@ -344,19 +379,23 @@ function OrderView(){
     const close=()=> m.classList.remove('open');
     const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
     const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
-    const onOk = (e)=>{
+    const onOk = async (e)=>{
       if(e){ e.preventDefault(); e.stopPropagation(); }
       const cfg = loadConfig();
+      const counts = window.__orderCounts || {};
       const itemsSel=[]; let total=0;
       cfg.menu.forEach(cat=>cat.items.forEach(it=>{
-        const q=(document.querySelector(`[data-q="${CSS.escape(it.name)}"]`)?.textContent||'0')|0;
+        const q=(counts[it.name]||0);
         if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
       if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
       const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
+      // локально
       const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
       const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
       const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
+      // в облако (асинхронно)
+      sendOrderToServer(order);
       close(); finalize(); resetCounts(); updateCartBadge();
     };
     ['click','pointerup','touchend'].forEach(ev=> ok.addEventListener(ev, onOk, {passive:false}));
@@ -562,7 +601,6 @@ function DashboardView(){
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Текущие заказы</h2>
-        <!-- КНОПКА КОНСТРУКТОРА — ТОЛЬКО ЗДЕСЬ -->
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white flex items-center gap-2" title="Конструктор">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2l-.29 1.73a7.83 7.83 0 0 0-1.76.73l-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76l-1.73.29-.29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76l-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73l.29 1.73h2l.29-1.73c.62-.16 1.21-.4 1.76-.73l1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76l1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
           Конструктор
@@ -624,7 +662,7 @@ function DashboardView(){
   load(); return root;
 }
 
-/* ===== КОНСТРУКТОР (без блока внешнего вида) ===== */
+/* ===== КОНСТРУКТОР (только меню) ===== */
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
