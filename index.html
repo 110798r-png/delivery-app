@@ -86,7 +86,7 @@
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
       <h3 class="text-lg font-semibold">Введите ключ</h3>
-      <input id="pinInput" class="border rounded-xl p-3 w-full text-center" placeholder="введите ключ" inputmode="text">
+      <input id="pinInput" class="border rounded-2xl p-3 w-full text-center" placeholder="введите ключ" inputmode="text">
       <div class="flex justify-end gap-2">
         <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
         <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
@@ -127,17 +127,38 @@ function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.s
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 
+/* ===== API CLIENT (Yandex Cloud) ===== */
+const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net'; // ← замени на свой URL
+
+async function api(op, body = {}) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op, ...body })
+  });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!res.ok) throw new Error(data?.error || ('HTTP '+res.status));
+  return data;
+}
+async function apiGetMenu()              { return api('getMenu'); }
+async function apiSetMenu(menuObj)       { return api('setMenu', menuObj); } // { categories:[...] }
+async function apiGetUnavailable()       { return api('getUnavailable'); }
+async function apiSetUnavailable(items)  { return api('setUnavailable', { items }); }
+async function apiOrdersList()           { return api('list'); }
+async function apiOrderCreate(data)      { return api('create', { data }); }
+async function apiOrderUpdate(id, patch) { return api('update', { id, patch }); }
+async function apiOrderDelete(id)        { return api('delete', { id }); }
+
+// мягкий фолбэк
+async function tryServer(fn, fallback){
+  try { return await fn(); } catch(e) { console.warn('Server call failed:', e); return typeof fallback==='function' ? fallback() : fallback; }
+}
+
 /* ===== конфиг приложения (меню + тема) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаМото',
-  theme: {
-    cardRadius: 20,      // px
-    imgRadius: 12,       // px
-    imgW: 110,
-    imgH: 70,
-    cardMinH: 104,
-    showPrice: true
-  },
+  theme: { cardRadius: 20, imgRadius: 12, imgW: 110, imgH: 70, cardMinH: 104, showPrice: true },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -242,7 +263,8 @@ function OrderView(){
   const confirmBtn=root.querySelector('#confirmBtn'); const cartBadge=root.querySelector('#cartBadge');
 
   setBodyScrollLock(true);
-  const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
+  const counts={}; const scrollMemory=new Map(); let activeIdx=0, isAnimating=false;
+  let unavailableClient = new Set(loadUnavailable());
   const panelW=()=> catPager.getBoundingClientRect().width || 1;
 
   // chips
@@ -311,19 +333,21 @@ function OrderView(){
 
   function recalcTotal(){ let sum=0; cfg.menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*(it.price||0) )); totalEl.textContent=money(sum); confirmBtn.disabled = sum<=0; return sum; }
 
-  (function applyPreselect(){
-    const payload = sessionStorage.getItem('repeat_order_items');
-    if(!payload) return;
-    try{
-      const items=JSON.parse(payload)||[];
-      items.forEach(it=>{ counts[it.name]= (counts[it.name]||0) + (it.qty||0); });
-      catPager.querySelectorAll('[data-q]').forEach(q=>{
-        const name=q.getAttribute('data-q'); q.textContent = counts[name]||0;
-      });
-      recalcTotal();
-      sessionStorage.removeItem('repeat_order_items');
-      if(sessionStorage.getItem('open_pay_after_repeat')==='1'){ sessionStorage.removeItem('open_pay_after_repeat'); setTimeout(()=>confirmBtn.click(), 150); }
-    }catch{}
+  // загрузка меню и списка "нет в наличии" с сервера (если доступен)
+  (async ()=>{
+    const remote = await tryServer(() => apiGetMenu(), null);
+    if (remote && remote.categories){
+      cfg.menu = remote.categories;
+      saveConfig({ ...loadConfig(), menu: cfg.menu });
+      MENU_CATEGORIES = cfg.menu.slice();
+      buildPanels(); // перерисуем на основании сервера
+    }
+    const un = await tryServer(() => apiGetUnavailable(), null);
+    if (un && Array.isArray(un.items)){
+      saveUnavailable(un.items);
+      unavailableClient = new Set(un.items);
+      buildPanels(); // перерисуем, чтобы засерить карточки
+    }
   })();
 
   function updateCartBadge(){
@@ -362,11 +386,32 @@ function OrderView(){
         if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
       if(!itemsSel.length){ showToast(TOST_SELECT); close(); finalize(); return; }
-      const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
-      const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-      const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
-      const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
-      close(); finalize(); resetCounts(); updateCartBadge();
+
+      const orderDraft = {
+        id: 'tmp',
+        createdAt: Date.now(),
+        items: itemsSel,
+        total,
+        pay: sel.value || 'cash',
+        status: 'новый'
+      };
+
+      (async () => {
+        const res = await tryServer(() => apiOrderCreate({ ...orderDraft }), null);
+        const finalOrder = res?.order ? res.order : { ...orderDraft, id: Date.now().toString().slice(-6) };
+
+        const history = loadHistory(); history.unshift(finalOrder); saveHistory(history.slice(0,50));
+        const dash = loadDash(); dash.unshift(finalOrder); saveDash(dash.slice(0,200));
+
+        const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
+
+        close(); finalize(); resetCounts(); updateCartBadge();
+      })().catch(() => {
+        showToast('Не удалось отправить заказ. Сохранён локально.');
+        const history = loadHistory(); history.unshift(orderDraft); saveHistory(history.slice(0,50));
+        const dash = loadDash(); dash.unshift(orderDraft); saveDash(dash.slice(0,200));
+        close(); finalize(); resetCounts(); updateCartBadge();
+      });
     };
     ['click','pointerup','touchend'].forEach(ev=> ok.addEventListener(ev, onOk, {passive:false}));
     ['click','pointerup','touchend'].forEach(ev=> cancel.addEventListener(ev, onCancel, {passive:false}));
@@ -391,7 +436,7 @@ function ProfileHubView(){
               <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
               <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
             </div>
-            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29Z" fill="currentColor"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73л-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29Z" fill="currentColor"/></svg>
           </div>
         </button>
         <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
@@ -477,7 +522,7 @@ function ContactView(){
 }
 
 /* ===== Профиль / История / Табло (как было) ===== */
-function ProfileEditView(){ /* без изменений */ 
+function ProfileEditView(){
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
     <div class="grid gap-4 pb-24">
@@ -507,7 +552,7 @@ function ProfileEditView(){ /* без изменений */
   return root;
 }
 
-function HistoryView(){ /* как было */ 
+function HistoryView(){
   const root=el(`
     <div class="grid gap-3 pb-24">
       <div class="flex items-center justify-between">
@@ -570,8 +615,8 @@ function HistoryView(){ /* как было */
   render(); return root;
 }
 
-/* ===== Табло (как было) ===== */
-function DashboardView(){ /* без изменений функционально */ 
+/* ===== Табло ===== */
+function DashboardView(){
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
@@ -587,10 +632,27 @@ function DashboardView(){ /* без изменений функциональн�
       <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
     </div>
   `);
-  const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList'); let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
+  const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList');
+  let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
+
   function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
-  root.querySelector('#saveStock').onclick=()=>{ const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
+
+  // подгружаем с сервера список недоступных и заказы
+  (async ()=>{
+    const un = await tryServer(() => apiGetUnavailable(), null);
+    if (un && Array.isArray(un.items)){ saveUnavailable(un.items); unavailable = new Set(un.items); renderStock(); }
+    const res = await tryServer(() => apiOrdersList(), null);
+    if (res && Array.isArray(res.orders)){ saveDash(res.orders); dashOrders = res.orders.slice(); load(); }
+  })();
+
+  root.querySelector('#saveStock').onclick= async ()=>{
+    const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+    const ok = await tryServer(() => apiSetUnavailable(checked), null);
+    saveUnavailable(checked); unavailable=new Set(checked);
+    showToast(ok ? 'Наличие сохранено' : 'Наличие сохранено локально');
+  };
+
   function orderCard(o){
     const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
     const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
@@ -615,16 +677,18 @@ function DashboardView(){ /* без изменений функциональн�
           <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100" data-act="delete">Удалить</button>
         </div>
       </div>`);
-    card.addEventListener('click',(e)=>{
+    card.addEventListener('click', async (e)=>{
       const act=e.target.dataset.act; if(!act) return;
       if(act==='save'){
         const status=card.querySelector('[data-k="status"]').value;
+        await tryServer(() => apiOrderUpdate(o.id, { status }), null);
         const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
         if(i>=0){ dashOrders[i]={...dashOrders[i], status}; saveDash(dashOrders); syncOrderStatus(o.id, status); showToast(`Статус #${o.id} обновлён`); }
       }
       if(act==='delete'){
         if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
-        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён с табло`);
+        await tryServer(() => apiOrderDelete(o.id), null);
+        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён`);
       }
     });
     return card;
@@ -761,6 +825,16 @@ function BuilderView(){
   }
   render();
 
+  // автозагрузка меню с сервера
+  (async ()=>{
+    const remote = await tryServer(() => apiGetMenu(), null);
+    if (remote && remote.categories){
+      cfg.menu = remote.categories;
+      saveConfig({ ...loadConfig(), menu: cfg.menu });
+      render();
+    }
+  })();
+
   // добавление категории
   root.querySelector('#addCatBtn').onclick=()=>{
     const id = 'cat'+(Date.now().toString().slice(-5));
@@ -788,12 +862,13 @@ function BuilderView(){
     fr.readAsText(f);
   };
 
-  // применить
-  root.querySelector('#applyBtn').onclick=()=>{
+  // применить (синк на сервер)
+  root.querySelector('#applyBtn').onclick= async ()=>{
     saveConfig(cfg);
+    const ok = await tryServer(() => apiSetMenu({ categories: cfg.menu }), null);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
-    showToast('Сохранено');
+    showToast(ok ? 'Меню сохранено' : 'Меню сохранено локально');
     location.hash='#/order';
   };
   root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
