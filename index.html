@@ -105,7 +105,7 @@ const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net';
 /* ===== RPC клиент к функции через API Gateway ===== */
 async function rpc(payload){
   if(!API_URL) throw new Error('API_URL empty');
-  const res = await fetch(`${API_URL}/order`, {  // важнo: /order
+  const res = await fetch(`${API_URL}/rpc`, {
     method: 'POST',
     headers: { 'content-type':'application/json' },
     body: JSON.stringify(payload||{})
@@ -233,7 +233,11 @@ function OrderView(){
     </div>
   `);
 
-  const categoryBar=root.querySelector('#categoryBar'); const catPager=root.querySelector('#catPager');
+  const categoryBar=root.querySelector('#categoryBar'); 
+  const catPager=root.querySelector('#catPager');
+  const totalEl=root.querySelector('#totalVal');
+  const confirmBtn=root.querySelector('#confirmBtn'); 
+  const cartBadge=root.querySelector('#cartBadge');
 
   setBodyScrollLock(true);
   const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
@@ -264,6 +268,7 @@ function OrderView(){
             </div>
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`);
+
         const minusBtn = row.querySelector('button[data-act="dec"]');
         const plusBtn  = row.querySelector('button[data-act="inc"]');
         function adjust(delta){
@@ -278,6 +283,7 @@ function OrderView(){
         minusBtn.onclick = ()=>adjust(-1);
         plusBtn.onclick  = ()=>adjust(+1);
         [minusBtn,plusBtn].forEach(b=> b.addEventListener('keydown',(e)=>{ if((e.key==='Enter'||e.key===' ')&&!b.disabled){ e.preventDefault(); b.click(); }}));
+
         list.appendChild(row);
       });
       list.appendChild(el(`<div class="h-24"></div>`));
@@ -295,7 +301,7 @@ function OrderView(){
     applyHeights(); setTimeout(applyHeights,60);
   }
 
-  // ПК делегирование
+  // делегирование кликов (ПК)
   catPager.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-act]');
     if(!btn || btn.disabled) return;
@@ -335,27 +341,30 @@ function OrderView(){
     const counts = window.__orderCounts || {};
     let sum=0;
     cfg.menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*(it.price||0) ));
-    document.getElementById('totalVal').textContent=money(sum);
-    document.getElementById('confirmBtn').disabled = sum<=0;
+    totalEl.textContent = money(sum);
+    confirmBtn.disabled = sum<=0;
     return sum;
   }
 
   function updateCartBadge(){
     const list = loadHistory();
     const active = (Array.isArray(list)?list:[]).find(o=>!['завершён','отменён'].includes(o.status||''));
-    const info = root.querySelector('#cartActiveInfo');
-    if(active){ info.textContent = `№ ${active.id} — ${active.status||'новый'}`; document.getElementById('cartBadge').classList.remove('hidden'); }
-    else { document.getElementById('cartBadge').classList.add('hidden'); }
+    const badge = root.querySelector('#cartBadge');
+    const info  = badge.querySelector('#cartActiveInfo');
+    if(active){ info.textContent = `№ ${active.id} — ${active.status||'новый'}`; badge.classList.remove('hidden'); }
+    else { badge.classList.add('hidden'); }
   }
-  document.getElementById('cartBadge').addEventListener('click', ()=> location.hash='#/history');
+  cartBadge.addEventListener('click', ()=> location.hash='#/history');
   updateCartBadge();
 
-  document.getElementById('confirmBtn').addEventListener('click', ()=>{
+  confirmBtn.addEventListener('click', ()=>{
     const cfg = loadConfig();
     const counts = window.__orderCounts || {};
     const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=(counts[it.name]||0); if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
     if(!items.length){ showToast(TOST_SELECT); return; }
-    if (document.getElementById('confirmBtn')._busy) return; document.getElementById('confirmBtn')._busy=true; document.getElementById('confirmBtn').disabled=true;
+    if (confirmBtn._busy) return; 
+    confirmBtn._busy=true; 
+    confirmBtn.disabled=true;
 
     const sumBox = document.getElementById('paySummary');
     let total=0; sumBox.innerHTML = items.map(i=>{ total += i.qty*(i.price||0); return `<div class="flex items-center justify-between"><div class="truncate">${i.name} ×${i.qty}</div><div class="ml-2 whitespace-nowrap">${money(i.qty*(i.price||0))}</div></div>`; }).join('');
@@ -367,14 +376,14 @@ function OrderView(){
   function resetCounts(){
     window.__orderCounts = {};
     catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
-    document.getElementById('totalVal').textContent=money(0);
-    document.getElementById('confirmBtn').disabled = true;
+    totalEl.textContent=money(0);
+    confirmBtn.disabled = true;
   }
 
   (function bindPayModal(){
     const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
     const close=()=> m.classList.remove('open');
-    const finalize = ()=>{ document.getElementById('confirmBtn')._busy=false; document.getElementById('confirmBtn').disabled=false; };
+    const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
     const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
     const onOk = async (e)=>{
       if(e){ e.preventDefault(); e.stopPropagation(); }
@@ -392,7 +401,7 @@ function OrderView(){
       const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
       const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
 
-      // в облако
+      // в облако: op=create
       try{
         const clientId = (p.phone||'web') + '-' + (order.id||'');
         rpc({ op:'create', data:{ clientId, items:itemsSel, total, pay: sel.value||'cash' } }).catch(console.warn);
@@ -423,13 +432,13 @@ function ProfileHubView(){
               <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
               <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
             </div>
-            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20a8 8 0 0 1 16 0H4z" fill="currentColor"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76л1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73л-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29Z" fill="currentColor"/></svg>
           </div>
         </button>
         <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
           <div class="text-base font-semibold">Мои заказы</div>
           <div class="flex items-center gap-3">
-            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6l1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10л1 4H6л1-4Zm-1 6h12л-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
             <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </button>
@@ -561,7 +570,7 @@ function HistoryView(){
         </div>
         <div class="text-xs text-gray-500 mt-1">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
         <div class="mt-3 grid gap-2">
-          ${ (items).map(i=>`
+          ${ items.map(i=>`
             <div class="flex items-center justify-between text-sm">
               <div class="truncate mr-2">${i.name}</div>
               <div class="whitespace-nowrap">${i.qty} × ${i.price} ₽</div>
@@ -597,14 +606,14 @@ function HistoryView(){
   render(); return root;
 }
 
-/* ===== Табло (auto refresh) ===== */
+/* ===== Табло ===== */
 function DashboardView(){ 
   const root=el(`
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Текущие заказы</h2>
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white flex items-center gap-2" title="Конструктор">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm8.94 2.26-1.73-.29a7.83 7.83 0 0 0-.73-1.76l1-1.46-1.41-1.41-1.46 1a7.83 7.83 0 0 0-1.76-.73l-.29-1.73h-2л-.29 1.73a7.83 7.83 0 0 0-1.76.73л-1.46-1-1.41 1.41 1 1.46a7.83 7.83 0 0 0-.73 1.76л-1.73.29-.29 1.73.29 1.73 1.73.29c.16.62.4 1.21.73 1.76л-1 1.46 1.41 1.41 1.46-1c.55.33 1.14.57 1.76.73л.29 1.73h2л.29-1.73c.62-.16 1.21-.4 1.76-.73л1.46 1 1.41-1.41-1-1.46c.33-.55.57-1.14.73-1.76л1.73-.29.29-1.73-.29-1.73Z" fill="currentColor"/></svg>
           Конструктор
         </a>
       </div>
@@ -618,14 +627,14 @@ function DashboardView(){
       <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
     </div>
   `);
-  const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList'); 
+  const list=root.querySelector('#list'); 
+  const stockList=root.querySelector('#stockList'); 
   let unavailable=new Set(loadUnavailable()); 
   let dashOrders=loadDash();
-  let inflight=false, lastHash='', pollTimer=null;
 
   function renderStock(){ 
     stockList.innerHTML=''; 
-    loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{
+    loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ 
       const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); 
       stockList.appendChild(row); 
     })) 
@@ -633,25 +642,32 @@ function DashboardView(){
   renderStock();
   root.querySelector('#saveStock').onclick=()=>{ 
     const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); 
-    saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); 
+    saveUnavailable(checked); 
+    unavailable=new Set(checked); 
+    showToast('Наличие сохранено (локально)'); 
   };
 
   function orderCard(o){
     const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
     const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
     const created=o.createdAt? new Date(o.createdAt): new Date();
-    const colorMap = { 'новый':'bg-yellow-50 border-yellow-300','готовится':'bg-blue-50 border-blue-300','в пути':'bg-purple-50 border-purple-300','готов':'bg-green-50 border-green-300','завершён':'bg-gray-100 border-gray-300','отменён':'bg-red-50 border-red-300' };
+    const colorMap = {
+      'новый':'bg-yellow-50 border-yellow-300','готовится':'bg-blue-50 border-blue-300','в пути':'bg-purple-50 border-purple-300',
+      'готов':'bg-green-50 border-green-300','завершён':'bg-gray-100 border-gray-300','отменён':'bg-red-50 border-red-300'
+    };
     const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
     const itemsHtml = (o.items||[]).map(i => `<div class="flex justify-between text-lg"><div>${i.name}</div><div class="font-semibold">${i.qty} × ${i.price}</div></div>`).join('');
     const card=el(`
-      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
+      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
         <div class="flex items-center justify-between">
           <div class="text-2xl font-extrabold tracking-tight">#${o.id||'—'}</div>
           <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status||'новый'}</span>
         </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         <div class="mt-2 grid gap-1 text-lg">${itemsHtml||'—'}</div>
-        <div class="mt-3 flex items-center justify-between text-xl font-bold"><div>Итого:</div><div>${total} ₽</div></div>
+        <div class="mt-3 flex items-center justify-between text-xl font-bold">
+          <div>Итого:</div><div>${total} ₽</div>
+        </div>
         <div class="mt-2 flex flex-wrap gap-2">
           <label class="text-sm">Статус:</label>
           <select class="border rounded-xl p-2 text-sm" data-k="status">
@@ -662,58 +678,45 @@ function DashboardView(){
         </div>
       </div>
     `);
-    card.addEventListener('click',(e)=>{
+
+    card.addEventListener('click', async (e)=>{
       const act=e.target.dataset.act; if(!act) return;
       if(act==='save'){
         const status=card.querySelector('[data-k="status"]').value;
         const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
         if(i>=0){ dashOrders[i]={...dashOrders[i], status}; saveDash(dashOrders); syncOrderStatus(o.id, status); showToast(`Статус #${o.id} обновлён`); }
-        rpc({op:'update', id:o.id, patch:{status}}).catch(()=>{});
+        try{ rpc({op:'update', id:o.id, patch:{status}}).catch(()=>{}); }catch{}
       }
       if(act==='delete'){
         if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
         dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён`);
-        rpc({op:'delete', id:o.id}).catch(()=>{});
+        try{ rpc({op:'delete', id:o.id}).catch(()=>{}); }catch{}
       }
     });
+
     return card;
   }
 
-  function render(){
-    const unique=new Map(); (dashOrders||[]).forEach(o=>unique.set(String(o.id),o));
+  function load(){
+    const unique=new Map(); dashOrders.forEach(o=>unique.set(String(o.id),o));
     list.innerHTML='';
     if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
     [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) );
   }
 
-  // стартовая отрисовка из локали
-  render();
-
-  // автообновление
-  const calcHash = (orders)=> JSON.stringify((orders||[]).map(o=>[o.id,o.status,o.total,(o.items||[]).length]));
-  async function refresh(){
-    if(inflight || document.visibilityState==='hidden') return;
-    inflight = true;
+  async function loadOrdersFromCloud(){
     try{
       const res = await rpc({ op:'list' });
       if (Array.isArray(res.orders)){
-        const h = calcHash(res.orders);
-        if(h !== lastHash){
-          lastHash = h;
-          dashOrders = res.orders.slice();
-          saveDash(dashOrders);
-          render();
-        }
+        saveDash(res.orders);
+        dashOrders = res.orders.slice();
+        load();
       }
-    }catch(e){ console.warn('poll failed', e); }
-    finally{ inflight = false; }
+    }catch(e){ console.warn('loadOrdersFromCloud', e); }
   }
-  refresh();
-  pollTimer = setInterval(refresh, 4000);
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') refresh(); });
-
-  // очистка при выходе
-  root.cleanup = ()=>{ if(pollTimer) clearInterval(pollTimer); };
+  load();            // первичная отрисовка из локального
+  loadOrdersFromCloud();
+  setInterval(loadOrdersFromCloud, 5000);
 
   return root;
 }
