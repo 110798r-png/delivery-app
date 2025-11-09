@@ -76,8 +76,16 @@
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
-        <a id="profileBtn" href="#/profile" class="px-3 py-2 rounded-xl border bg-white text-black" aria-label="Профиль" role="button" title="Профиль">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/></svg>
+        <!-- Профиль с стрелочкой внутри -->
+        <a id="profileBtn" href="#/profile"
+           class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
+           aria-label="Профиль" role="button" title="Профиль">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor"/>
+          </svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </a>
         <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white select-none" aria-label="Назад" title="Назад">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -131,7 +139,7 @@
 <script>
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net';
-const CONFIG_REMOTE_URL = ''; // <- если положишь JSON меню в Object Storage (public), укажи сюда URL
+const CONFIG_REMOTE_URL = ''; // можно оставить пустым
 
 /* ===== RPC ===== */
 async function rpc(payload){
@@ -218,7 +226,7 @@ function applyTheme(theme){
 let MENU_CATEGORIES = loadConfig().menu.slice();
 applyTheme(loadConfig().theme);
 
-/* Облачная конфигурация (по желанию) */
+/* (опционально) загрузка удалённой конфигурации */
 async function fetchRemoteConfig(){
   if(!CONFIG_REMOTE_URL) return null;
   try{
@@ -232,10 +240,6 @@ async function fetchRemoteConfig(){
     }
     return json;
   }catch{ return null }
-}
-async function publishRemoteConfig(cfg){
-  // Сделай на бэке RPC op:'config_set' или дай pre-signed PUT. Хук оставляю:
-  try{ await rpc({ op:'config_set', config: cfg }); showToast('Меню отправлено в облако'); }catch{ showToast('Не удалось опубликовать в облако'); }
 }
 
 /* ===== анимации ===== */
@@ -406,7 +410,7 @@ function OrderView(){
     const cfg = loadConfig();
     const counts = window.__orderCounts || {};
     const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=(counts[it.name]||0); if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
-    if(!items.length){ return; } // без тоста
+    if(!items.length){ return; }
     if (confirmBtn._busy) return; 
     confirmBtn._busy=true; 
     confirmBtn.disabled=true;
@@ -439,14 +443,12 @@ function OrderView(){
         const q=(counts[it.name]||0);
         if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
-      if(!itemsSel.length){ close(); finalize(); return; } // без тоста
+      if(!itemsSel.length){ close(); finalize(); return; }
       const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
-      // локально
       const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
       const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
       const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
 
-      // в облако
       try{
         const clientId = (p.phone||'web') + '-' + (order.id||'');
         rpc({ op:'create', data:{ clientId, items:itemsSel, total, pay: sel.value||'cash' } }).catch(console.warn);
@@ -643,11 +645,7 @@ function DashboardView(){
       </div>
 
       <div class="p-4 rounded-2xl bg-white border">
-        <div class="flex items-center gap-2 flex-wrap mb-3">
-          <h3 class="font-semibold">Наличие товаров</h3>
-          <button id="cfgPull" class="px-2 py-1 rounded-lg border">Обновить меню из облака</button>
-          <button id="cfgPush" class="px-2 py-1 rounded-lg border">Опубликовать меню</button>
-        </div>
+        <h3 class="font-semibold mb-3">Наличие товаров</h3>
         <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.</p>
         <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
         <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>
@@ -669,15 +667,10 @@ function DashboardView(){
   setSound(soundOn());
   soundBtn.onclick = ()=> setSound(!soundOn());
 
-  // наличие
   function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
   root.querySelector('#saveStock').onclick=()=>{ const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
 
-  root.querySelector('#cfgPull').onclick = async ()=>{ const j=await fetchRemoteConfig(); if(j) { showToast('Меню обновлено из облака'); } else { showToast('Не удалось получить меню'); } };
-  root.querySelector('#cfgPush').onclick = async ()=>{ await publishRemoteConfig(loadConfig()); };
-
-  // карточка заказа
   function orderCard(o){
     const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
     const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
@@ -730,7 +723,6 @@ function DashboardView(){
 
   function load(){
     const unique=new Map(); dashOrders.forEach(o=>unique.set(String(o.id),o));
-    // звук на новые
     const incoming = [...unique.keys()].filter(id=>!knownIds.has(id));
     if(incoming.length && soundOn()){ ding.currentTime = 0; ding.play().catch(()=>{}); }
     knownIds = new Set(unique.keys());
@@ -740,18 +732,11 @@ function DashboardView(){
     [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) );
   }
 
-  // очистка всего
   root.querySelector('#btnClearAll').onclick = async ()=>{
     if(!confirm('Удалить все заказы?')) return;
     const ids = (dashOrders||[]).map(o=>o.id);
     dashOrders = []; saveDash(dashOrders); load();
-    try{
-      // Если реализуешь на бэке:
-      await rpc({ op:'clear' });
-    }catch{
-      // fallback — удалить по одному
-      for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} }
-    }
+    try{ await rpc({ op:'clear' }); }catch{ for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} } }
   };
 
   async function loadOrdersFromCloud(){
@@ -790,11 +775,7 @@ function BuilderView(){
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold">Категории и товары</h3>
-          <div class="flex gap-2">
-            <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
-            <button id="cloudPull" class="px-3 py-2 rounded-xl border">Обновить из облака</button>
-            <button id="cloudPush" class="px-3 py-2 rounded-xl border">Опубликовать</button>
-          </div>
+          <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
         </div>
         <div id="catsBox" class="grid gap-4"></div>
       </section>
@@ -873,9 +854,6 @@ function BuilderView(){
     cfg.menu.push({ key:id, title:'Новая категория', items:[] });
     render();
   };
-
-  root.querySelector('#cloudPull').onclick = async ()=>{ const j=await fetchRemoteConfig(); if(j){ showToast('Меню обновлено из облака'); location.reload(); } else showToast('Не удалось получить меню'); };
-  root.querySelector('#cloudPush').onclick = async ()=>{ await publishRemoteConfig(cfg); };
 
   root.querySelector('#exportBtn').onclick=()=>{
     const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
@@ -961,7 +939,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   bindTabloTapZone();
 
-  // подтянуть меню из облака при старте (если задан URL)
   await fetchRemoteConfig().catch(()=>{});
 
   const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
