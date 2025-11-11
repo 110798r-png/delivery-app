@@ -64,7 +64,6 @@
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
           <div class="sushi-icon" aria-hidden="true">
-            <!-- simple “суши” icon -->
             <svg viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" fill="#fff"/>
               <circle cx="12" cy="12" r="7" fill="#e50000"/>
@@ -76,7 +75,7 @@
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
-        <!-- Профиль с стрелочкой внутри -->
+        <!-- Профиль со стрелочкой -->
         <a id="profileBtn" href="#/profile"
            class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
            aria-label="Профиль" role="button" title="Профиль">
@@ -87,14 +86,11 @@
             <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
-       <button id="backBtn"
-  class="hidden px-3 py-2 rounded-xl border bg-white text-black select-none"
-  aria-label="Назад" title="Назад">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</button>
+        <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white text-black select-none" aria-label="Назад" title="Назад">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
     <div class="header-ghost"></div>
@@ -144,7 +140,7 @@
 <script>
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net';
-const CONFIG_REMOTE_URL = ''; // можно оставить пустым
+const CONFIG_REMOTE_URL = '';
 
 /* ===== RPC ===== */
 async function rpc(payload){
@@ -231,7 +227,7 @@ function applyTheme(theme){
 let MENU_CATEGORIES = loadConfig().menu.slice();
 applyTheme(loadConfig().theme);
 
-/* (опционально) загрузка удалённой конфигурации */
+/* (опционально) удалённая конфигурация */
 async function fetchRemoteConfig(){
   if(!CONFIG_REMOTE_URL) return null;
   try{
@@ -251,7 +247,7 @@ async function fetchRemoteConfig(){
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 function animateScrollX(el, to, {duration=280, onEnd}={}){ const from=el.scrollLeft; const diff=to-from; if(!diff){ onEnd&&onEnd(); return; } const start=performance.now(); function step(ts){ const t=Math.min(1,(ts-start)/duration); el.scrollLeft=from+diff*easeInOutCubic(t); if(t<1) requestAnimationFrame(step); else onEnd&&onEnd(); } requestAnimationFrame(step); }
 
-/* ===== синхронизация статуса в локальной истории + событие для бейджа ===== */
+/* ===== синхронизация статуса локально ===== */
 function syncOrderStatus(id, status){
   let hist = loadHistory(); let changed = false;
   for (let i=0;i<hist.length;i++){
@@ -261,6 +257,28 @@ function syncOrderStatus(id, status){
     }
   }
   if (changed){ saveHistory(hist); window.dispatchEvent(new CustomEvent('orders:history-updated')); }
+}
+
+/* === ПУЛЛИНГ СТАТУСОВ ИЗ ОБЛАКА === */
+async function pullAndMergeStatuses(){
+  try{
+    const cloud = await rpc({ op:'list' });
+    if(!cloud || !Array.isArray(cloud.orders)) return;
+    const byId = new Map(cloud.orders.map(o => [String(o.id), o.status]));
+    const hist = loadHistory();
+    let changed = false;
+    for (let i=0;i<hist.length;i++){
+      const id = String(hist[i].id);
+      if(byId.has(id) && hist[i].status !== byId.get(id)){
+        hist[i] = { ...hist[i], status: byId.get(id) };
+        changed = true;
+      }
+    }
+    if(changed){
+      saveHistory(hist);
+      window.dispatchEvent(new CustomEvent('orders:history-updated'));
+    }
+  }catch(e){ /* тихо */ }
 }
 
 /* ===== Order ===== */
@@ -279,7 +297,6 @@ function OrderView(){
         <div class="flex items-center justify-between gap-3">
           <div class="text-base">
             <span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b>
-            <!-- только иконка корзины -->
             <button id="cartBadge" class="ml-2 align-middle w-9 h-9 rounded-lg border bg-white grid place-items-center hidden" title="Мои заказы">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9h-12L6 6Zm0 0L5 3H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.6" fill="currentColor"/><circle cx="18" cy="20" r="1.6" fill="currentColor"/></svg>
             </button>
@@ -325,20 +342,6 @@ function OrderView(){
             </div>
             <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>`);
-        const minusBtn = row.querySelector('button[data-act="dec"]');
-        const plusBtn  = row.querySelector('button[data-act="inc"]');
-        function adjust(delta){
-          const name = it.name;
-          const targetBtn = delta>0 ? plusBtn : minusBtn;
-          if (targetBtn.disabled) return;
-          if(!window.__orderCounts) window.__orderCounts = {};
-          window.__orderCounts[name] = Math.max(0, (window.__orderCounts[name]||0) + delta);
-          row.querySelector(`[data-q="${CSS.escape(name)}"]`).textContent = window.__orderCounts[name]||0;
-          recalcTotal();
-        }
-        minusBtn.onclick = ()=>adjust(-1);
-        plusBtn.onclick  = ()=>adjust(+1);
-        [minusBtn,plusBtn].forEach(b=> b.addEventListener('keydown',(e)=>{ if((e.key==='Enter'||e.key===' ')&&!b.disabled){ e.preventDefault(); b.click(); }}));
         list.appendChild(row);
       });
       list.appendChild(el(`<div class="h-24"></div>`));
@@ -356,7 +359,7 @@ function OrderView(){
     applyHeights(); setTimeout(applyHeights,60);
   }
 
-  // клики (ПК)
+  /* единый делегированный клик — исключает двойные инкременты */
   catPager.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-act]');
     if(!btn || btn.disabled) return;
@@ -469,7 +472,13 @@ function OrderView(){
 
   buildPanels();
   requestAnimationFrame(()=>{ highlightChip(0); goToIndex(0,{animate:false}); });
-  root.cleanup = ()=> setBodyScrollLock(false);
+
+  /* периодический синк статусов — поддерживает бэйдж актуальным */
+  const syncTimer = setInterval(() => {
+    pullAndMergeStatuses().then(updateCartBadge);
+  }, 7000);
+
+  root.cleanup = ()=> { setBodyScrollLock(false); clearInterval(syncTimer); };
   return root;
 }
 
@@ -497,12 +506,35 @@ function ProfileHubView(){
         </button>
       </section>
 
-      <section class="card p-5">
-        <div class="text-2xl font-extrabold tracking-tight">ЗДЕСЬ БУДЕТ БЛОК ПОД РЕКЛАМУ</div>
+      <!-- Лайв-камера -->
+      <section class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Лайв-камера</h3>
+          <button id="camRefresh" class="px-3 py-2 rounded-xl border">Обновить</button>
+        </div>
+        <img id="camImg" class="rounded-xl border" src="https://placehold.co/800x450?text=Live+camera" alt="Лайв-камера">
       </section>
 
+      <!-- Юридическая информация -->
+      <section class="card p-5 grid gap-2">
+        <h3 class="font-semibold">Юридическая информация</h3>
+        <div class="text-sm text-gray-700">ООО «ЯмаМото» • ОГРН 1234567890123</div>
+        <div class="text-sm text-gray-700">Адрес: г. Махачкала, ул. Примерная, 1</div>
+        <div class="text-sm text-gray-700">Режим работы: 10:00–23:00 ежедневно</div>
+      </section>
+
+      <!-- Отзывы -->
       <section class="grid gap-2">
-        <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">Обратная связь
+        <button class="rowlink text-left flex items-center justify-between" id="reviewsBtn">
+          Отзывы
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="rowlink text-left flex items-center justify-between" id="supportBtn">
+          Техподдержка
+          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">
+          Обратная связь
           <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </section>
@@ -516,6 +548,10 @@ function ProfileHubView(){
   root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
   root.querySelector('#ordersBtn').onclick      = ()=> location.hash = '#/history';
   root.querySelector('#feedbackBtn').onclick    = ()=> location.hash = '#/contact';
+  root.querySelector('#reviewsBtn').onclick     = ()=> alert('Здесь будет экран с отзывами');
+  root.querySelector('#supportBtn').onclick     = ()=> alert('Здесь будет чат/контакты техподдержки');
+  const camImg = root.querySelector('#camImg');
+  root.querySelector('#camRefresh').onclick     = ()=> { const u=new URL(camImg.src); u.searchParams.set('t', Date.now()); camImg.src=u.toString(); };
   return root;
 }
 
@@ -631,7 +667,13 @@ function HistoryView(){
   }
   root.querySelector('#clearAll').onclick=()=>{ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); window.dispatchEvent(new CustomEvent('orders:history-updated')); } };
   root.querySelector('#back').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
-  render(); return root;
+  render();
+
+  /* автосинк статусов на экране истории */
+  const syncTimer = setInterval(pullAndMergeStatuses, 7000);
+  root.cleanup = ()=> clearInterval(syncTimer);
+
+  return root;
 }
 
 /* ===== Табло ===== */
