@@ -266,6 +266,36 @@ async function fetchRemoteConfig(){
     return json;
   }catch{ return null }
 }
+  /* ===== УДАЛЁННОЕ НАЛИЧИЕ ТОВАРОВ ===== */
+
+// стянуть "нет в наличии" с сервера и сохранить локально
+async function fetchUnavailableRemote(){
+  try{
+    const res = await rpc({ op: 'stock_get' });
+    if (res && Array.isArray(res.unavailable)){
+      saveUnavailable(res.unavailable);
+      return res.unavailable;
+    }
+  }catch(e){
+    console.warn('fetchUnavailableRemote', e);
+  }
+  return null;
+}
+
+// отправить список отсутствующих товаров на сервер
+async function pushUnavailableRemote(list){
+  try{
+    await rpc({
+      op: 'stock_set',
+      unavailable: Array.isArray(list) ? list : []
+    });
+    showToast('Наличие обновлено на сервере');
+  }catch(e){
+    console.warn('pushUnavailableRemote', e);
+    showToast('Не удалось обновить наличие на сервере');
+  }
+}
+
 
 /* ===== анимации ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
@@ -821,7 +851,17 @@ function DashboardView(){
 
   function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
-  root.querySelector('#saveStock').onclick=()=>{ const checked=[...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value); saveUnavailable(checked); unavailable=new Set(checked); showToast('Наличие сохранено (локально)'); };
+  root.querySelector('#saveStock').onclick = async () => {
+  const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+
+  // сохраняем локально (чтобы табло сразу обновилось)
+  saveUnavailable(checked);
+  unavailable = new Set(checked);
+  showToast('Наличие сохранено');
+
+  // и пробуем отправить на сервер
+  await pushUnavailableRemote(checked);
+};
 
   function orderCard(o){
     const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
@@ -1092,6 +1132,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindTabloTapZone();
 
   await fetchRemoteConfig().catch(()=>{});
+  
+    // Подтягиваем актуальный список "нет в наличии" с сервера
+  await fetchUnavailableRemote().catch(()=>{});
+
 
   const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
   pinOk.onclick=(e)=>{
