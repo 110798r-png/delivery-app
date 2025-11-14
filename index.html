@@ -331,12 +331,6 @@ function OrderView(){
     </div>
   `);
   
-  // Одноразовая подсказка по навигации
-  if (!localStorage.getItem(NAV_HINT_KEY)) {
-    showToast('Совет: свайпайте категории, профиль — кнопка справа вверху.');
-    localStorage.setItem(NAV_HINT_KEY, '1');
-  }
-  
   const categoryBar=root.querySelector('#categoryBar'); 
   const catPager=root.querySelector('#catPager');
   const totalEl=root.querySelector('#totalVal');
