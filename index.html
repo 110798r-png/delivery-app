@@ -274,6 +274,8 @@ async function fetchUnavailableRemote(){
     const res = await rpc({ op: 'stock_get' });
     if (res && Array.isArray(res.unavailable)){
       saveUnavailable(res.unavailable);
+      // даём знать всем открытым экранчикам, что склад обновился
+      window.dispatchEvent(new CustomEvent('stock:updated'));
       return res.unavailable;
     }
   }catch(e){
@@ -361,15 +363,26 @@ function OrderView(){
     </div>
   `);
   
-  const categoryBar=root.querySelector('#categoryBar'); 
-  const catPager=root.querySelector('#catPager');
-  const totalEl=root.querySelector('#totalVal');
-  const confirmBtn=root.querySelector('#confirmBtn'); 
-  const cartBadge=root.querySelector('#cartBadge');
+const categoryBar=root.querySelector('#categoryBar'); 
+const catPager=root.querySelector('#catPager');
+const totalEl=root.querySelector('#totalVal');
+const confirmBtn=root.querySelector('#confirmBtn'); 
+const cartBadge=root.querySelector('#cartBadge');
 
-  setBodyScrollLock(true);
-  const scrollMemory=new Map(); let activeIdx=0, isAnimating=false; let unavailableClient=new Set(loadUnavailable());
-  const panelW=()=> catPager.getBoundingClientRect().width || 1;
+setBodyScrollLock(true);
+confirmBtn._busy = false; // на всякий случай сбрасываем
+
+const scrollMemory=new Map();
+let activeIdx=0, isAnimating=false;
+let unavailableClient=new Set(loadUnavailable());
+const panelW=()=> catPager.getBoundingClientRect().width || 1;
+
+// при обновлении склада (из табло или при старте) перерисовываем карточки
+function handleStockUpdated(){
+  unavailableClient = new Set(loadUnavailable());
+  buildPanels();
+  recalcTotal();
+}
 
   loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
@@ -523,78 +536,132 @@ confirmBtn.addEventListener('click', ()=>{
     confirmBtn.disabled = true;
   }
 
-  (function bindPayModal(){
-    const m=document.getElementById('payModal'); const ok=document.getElementById('payOk'); const cancel=document.getElementById('payCancel'); const sel=document.getElementById('paySelect');
-    const close=()=> m.classList.remove('open');
-    const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
-    const onCancel = (e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } close(); finalize(); };
-    const onOk = async (e)=>{
-      if(e){ e.preventDefault(); e.stopPropagation(); }
+   (function bindPayModal(){
+    const m = document.getElementById('payModal');
+    const ok = document.getElementById('payOk');
+    const cancel = document.getElementById('payCancel');
+    const sel = document.getElementById('paySelect');
+
+    const close = () => m.classList.remove('open');
+    const finalize = () => {
+      confirmBtn._busy = false;
+      confirmBtn.disabled = false;
+    };
+
+    const onCancel = (e) => {
+      if (e){ e.preventDefault(); e.stopPropagation(); }
+      close();
+      finalize();
+    };
+
+    const onOk = async (e) => {
+      if (e){ e.preventDefault(); e.stopPropagation(); }
+
       const cfg = loadConfig();
       const counts = window.__orderCounts || {};
-      const itemsSel=[]; let total=0;
-      cfg.menu.forEach(cat=>cat.items.forEach(it=>{
-        const q=(counts[it.name]||0);
-        if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
+      const itemsSel = [];
+      let total = 0;
+
+      cfg.menu.forEach(cat => cat.items.forEach(it => {
+        const q = (counts[it.name] || 0);
+        if (q > 0){
+          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
+          total += q * (it.price || 0);
+        }
       }));
-      if(!itemsSel.length){ close(); finalize(); return; }
-    const order = {
-  id: Date.now().toString().slice(-6),
-  createdAt: Date.now(),
-  items: itemsSel,
-  total,
-  pay: sel.value || 'cash',
-  status: 'новый'
-};
 
-const history = loadHistory();
-history.unshift(order);
-saveHistory(history.slice(0, 50));
+      if (!itemsSel.length){
+        close();
+        finalize();
+        return;
+      }
 
-const dash = loadDash();
-dash.unshift(order);
-saveDash(dash.slice(0, 200));
+      // Обновляем способ оплаты по умолчанию в профиле
+      const p = loadProfile();
+      p.paymentMethod = sel.value || 'cash';
+      saveProfile(p);
 
-const p = loadProfile();
-p.paymentMethod = sel.value || 'cash';
-saveProfile(p);
+      let orderToSave = null;
 
-try {
-  // Берём стабильный clientId и добавляем id заказа для уникальности,
-  // чтобы не ломать возможную логику на бэке.
-  const baseId = getClientId();
-  const clientId = baseId + '-' + (order.id || '');
+      // Пытаемся создать заказ на сервере и взять "правильный" id
+      try {
+        const baseId = getClientId(); // стабильно привязан к телефону/гостю
+        const clientId = baseId;
 
-  rpc({
-    op: 'create',
-    data: {
-      clientId,
-      items: itemsSel,
-      total,
-      pay: sel.value || 'cash'
-    }
-  }).catch(console.warn);
-} catch (e) {
-  console.warn('RPC error', e);
-}
+        const res = await rpc({
+          op: 'create',
+          data: {
+            clientId,
+            items: itemsSel,
+            total,
+            pay: sel.value || 'cash'
+          }
+        });
 
-      close(); finalize(); resetCounts();
+        if (res && res.order){
+          orderToSave = res.order;
+        } else if (res && res.dedup && res.order){
+          // случай дедупликации — сервер вернул уже существующий заказ
+          orderToSave = res.order;
+        }
+      } catch (err){
+        console.warn('RPC create error', err);
+      }
+
+      // Если сервер недоступен — локальный заказ (fallback)
+      if (!orderToSave){
+        const now = Date.now();
+        orderToSave = {
+          id: 'tmp-' + now.toString().slice(-6),
+          createdAt: now,
+          items: itemsSel,
+          total,
+          pay: sel.value || 'cash',
+          status: 'новый (локально)'
+        };
+        showToast('Заказ сохранён локально (нет связи с сервером)');
+      }
+
+      // Сохраняем заказ в истории клиента и в локальном табло
+      const history = loadHistory();
+      history.unshift(orderToSave);
+      saveHistory(history.slice(0, 50));
+
+      const dash = loadDash();
+      dash.unshift(orderToSave);
+      saveDash(dash.slice(0, 200));
+
+      close();
+      finalize();
+      resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     };
-    ['click','pointerup','touchend'].forEach(ev=> ok.addEventListener(ev, onOk, {passive:false}));
-    ['click','pointerup','touchend'].forEach(ev=> cancel.addEventListener(ev, onCancel, {passive:false}));
-    m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
+
+    ['click','pointerup','touchend'].forEach(ev => ok.addEventListener(ev, onOk, { passive:false }));
+    ['click','pointerup','touchend'].forEach(ev => cancel.addEventListener(ev, onCancel, { passive:false }));
+    m.onclick = (e) => { if (e.target === m) onCancel(e); };
   })();
 
   buildPanels();
-  requestAnimationFrame(()=>{ highlightChip(0); goToIndex(0,{animate:false}); });
+  requestAnimationFrame(()=>{ 
+    highlightChip(0);
+    goToIndex(0,{animate:false});
+    recalcTotal(); // чтобы после возврата из профиля кнопка "Подтвердить" была в корректном состоянии
+  });
+
+  // слушаем обновление склада (после загрузки с сервера или изменения на табло)
+  window.addEventListener('stock:updated', handleStockUpdated);
 
   /* периодический синк статусов — поддерживает бэйдж актуальным */
   const syncTimer = setInterval(() => {
     pullAndMergeStatuses().then(updateCartBadge);
   }, 7000);
 
-  root.cleanup = ()=> { setBodyScrollLock(false); clearInterval(syncTimer); };
+  root.cleanup = ()=> { 
+    setBodyScrollLock(false);
+    clearInterval(syncTimer);
+    window.removeEventListener('stock:updated', handleStockUpdated);
+  };
   return root;
 }
 
@@ -851,13 +918,16 @@ function DashboardView(){
 
   function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
-  root.querySelector('#saveStock').onclick = async () => {
+root.querySelector('#saveStock').onclick = async () => {
   const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
 
   // сохраняем локально (чтобы табло сразу обновилось)
   saveUnavailable(checked);
   unavailable = new Set(checked);
   showToast('Наличие сохранено');
+
+  // сообщаем всем клиентам (открытым вкладкам), что склад обновился
+  window.dispatchEvent(new CustomEvent('stock:updated'));
 
   // и пробуем отправить на сервер
   await pushUnavailableRemote(checked);
