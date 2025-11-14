@@ -171,6 +171,9 @@ const CONFIG_LS_KEY      = 'app_config_v1';
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
 const WANT_DASH          = 'WANT_DASH';
 const SOUND_ON_KEY       = 'sound_on_v1';
+const CLIENT_ID_KEY      = 'client_id_v1';
+const NAV_HINT_KEY       = 'nav_hint_shown_v1';
+
 
 /* ===== утилиты ===== */
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
@@ -186,6 +189,27 @@ function loadUnavailable(){ return safeParse(UNAVAILABLE_LS_KEY, []); }
 function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[])); }
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
+function getClientId(){
+  let id = localStorage.getItem(CLIENT_ID_KEY);
+  if (id) return id;
+
+  const p = loadProfile();
+  if (p && p.phone){
+    // Привязываем ID к телефону, убираем пробелы
+    id = 'tel:' + p.phone.replace(/\s+/g,'');
+  } else {
+    // Гостевой ID, если телефона ещё нет
+    id = 'guest-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
+  }
+  localStorage.setItem(CLIENT_ID_KEY, id);
+  return id;
+}
+
+function isProfileFilled(){
+  const p = loadProfile();
+  return Boolean(p && p.name && p.phone && p.address);
+}
+
 
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
@@ -306,7 +330,13 @@ function OrderView(){
       </div>
     </div>
   `);
-
+  
+  // Одноразовая подсказка по навигации
+  if (!localStorage.getItem(NAV_HINT_KEY)) {
+    showToast('Совет: свайпайте категории, профиль — кнопка справа вверху.');
+    localStorage.setItem(NAV_HINT_KEY, '1');
+  }
+  
   const categoryBar=root.querySelector('#categoryBar'); 
   const catPager=root.querySelector('#catPager');
   const totalEl=root.querySelector('#totalVal');
@@ -413,22 +443,54 @@ function OrderView(){
   cartBadge.addEventListener('click', ()=> location.hash='#/history');
   updateCartBadge();
   window.addEventListener('orders:history-updated', updateCartBadge);
+confirmBtn.addEventListener('click', ()=>{
+  const cfg = loadConfig();
+  const counts = window.__orderCounts || {};
+  const items = [];
 
-  confirmBtn.addEventListener('click', ()=>{
-    const cfg = loadConfig();
-    const counts = window.__orderCounts || {};
-    const items=[]; cfg.menu.forEach(cat=>cat.items.forEach(it=>{ const q=(counts[it.name]||0); if(q>0) items.push({name:it.name, qty:q, price:it.price||0}); }));
-    if(!items.length){ return; }
-    if (confirmBtn._busy) return; 
-    confirmBtn._busy=true; 
-    confirmBtn.disabled=true;
+  cfg.menu.forEach(cat => cat.items.forEach(it => {
+    const q = (counts[it.name] || 0);
+    if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
+  }));
 
-    const sumBox = document.getElementById('paySummary');
-    let total=0; sumBox.innerHTML = items.map(i=>{ total += i.qty*(i.price||0); return `<div class="flex items-center justify-between"><div class="truncate">${i.name} ×${i.qty}</div><div class="ml-2 whitespace-nowrap">${money(i.qty*(i.price||0))}</div></div>`; }).join('');
-    sumBox.insertAdjacentHTML('beforeend', `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold"><div>Итого</div><div>${money(total)}</div></div>`);
-    const prof=loadProfile(); const sel=document.getElementById('paySelect'); sel.value = prof.paymentMethod||'cash';
-    document.getElementById('payModal').classList.add('open');
-  });
+  if (!items.length){ 
+    return; 
+  }
+
+  // Проверка профиля перед первым заказом
+  if (!isProfileFilled()){
+    showToast('Заполните данные для доставки в профиле.');
+    location.hash = '#/profile-edit';
+    return;
+  }
+
+  if (confirmBtn._busy) return;
+  confirmBtn._busy = true;
+  confirmBtn.disabled = true;
+
+  const sumBox = document.getElementById('paySummary');
+  let total = 0;
+  sumBox.innerHTML = items.map(i => {
+    total += i.qty * (i.price || 0);
+    return `<div class="flex items-center justify-between">
+      <div class="truncate">${i.name} ×${i.qty}</div>
+      <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
+    </div>`;
+  }).join('');
+
+  sumBox.insertAdjacentHTML(
+    'beforeend',
+    `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
+       <div>Итого</div><div>${money(total)}</div>
+     </div>`
+  );
+
+  const prof = loadProfile();
+  const sel = document.getElementById('paySelect');
+  sel.value = prof.paymentMethod || 'cash';
+  document.getElementById('payModal').classList.add('open');
+});
+
 
   function resetCounts(){
     window.__orderCounts = {};
@@ -452,15 +514,45 @@ function OrderView(){
         if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
       if(!itemsSel.length){ close(); finalize(); return; }
-      const order = { id: Date.now().toString().slice(-6), createdAt: Date.now(), items: itemsSel, total, pay: sel.value||'cash', status:'новый' };
-      const history = loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-      const dash = loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
-      const p=loadProfile(); p.paymentMethod = sel.value||'cash'; saveProfile(p);
+    const order = {
+  id: Date.now().toString().slice(-6),
+  createdAt: Date.now(),
+  items: itemsSel,
+  total,
+  pay: sel.value || 'cash',
+  status: 'новый'
+};
 
-      try{
-        const clientId = (p.phone||'web') + '-' + (order.id||'');
-        rpc({ op:'create', data:{ clientId, items:itemsSel, total, pay: sel.value||'cash' } }).catch(console.warn);
-      }catch(e){ console.warn('RPC error', e); }
+const history = loadHistory();
+history.unshift(order);
+saveHistory(history.slice(0, 50));
+
+const dash = loadDash();
+dash.unshift(order);
+saveDash(dash.slice(0, 200));
+
+const p = loadProfile();
+p.paymentMethod = sel.value || 'cash';
+saveProfile(p);
+
+try {
+  // Берём стабильный clientId и добавляем id заказа для уникальности,
+  // чтобы не ломать возможную логику на бэке.
+  const baseId = getClientId();
+  const clientId = baseId + '-' + (order.id || '');
+
+  rpc({
+    op: 'create',
+    data: {
+      clientId,
+      items: itemsSel,
+      total,
+      pay: sel.value || 'cash'
+    }
+  }).catch(console.warn);
+} catch (e) {
+  console.warn('RPC error', e);
+}
 
       close(); finalize(); resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
@@ -601,7 +693,26 @@ function ProfileEditView(){
     </div>
   `);
   root.querySelector('#paydef').value = p.paymentMethod;
-  root.querySelector('#pSave').onclick=()=>{ const p2={ name:root.querySelector('#pName').value.trim(), phone:root.querySelector('#pPhone').value.trim(), address:root.querySelector('#pAddr').value.trim(), paymentMethod:root.querySelector('#paydef').value }; saveProfile(p2); showToast('Профиль сохранён'); location.hash='#/profile'; };
+  root.querySelector('#pSave').onclick = () => {
+  const p2 = {
+    name: root.querySelector('#pName').value.trim(),
+    phone: root.querySelector('#pPhone').value.trim(),
+    address: root.querySelector('#pAddr').value.trim(),
+    paymentMethod: root.querySelector('#paydef').value
+  };
+  saveProfile(p2);
+
+  // Обновляем clientId, если появился нормальный телефон
+  if (p2.phone){
+    const currentId = localStorage.getItem(CLIENT_ID_KEY);
+    if (!currentId || currentId.startsWith('guest-')){
+      localStorage.setItem(CLIENT_ID_KEY, 'tel:' + p2.phone.replace(/\s+/g,''));
+    }
+  }
+
+  showToast('Профиль сохранён');
+  location.hash = '#/profile';
+};
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
