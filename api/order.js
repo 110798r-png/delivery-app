@@ -1,8 +1,8 @@
 // api/order.js
 
 export default async function handler(req, res) {
-  // Vercel всегда даёт сюда тело уже распарсенное как объект (если json)
-  const ycUrl = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/order';
+  // 👉 сюда ставим твой Яндекс API Gateway:
+  const ycUrl = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net";
 
   try {
     const ycRes = await fetch(ycUrl, {
@@ -12,7 +12,6 @@ export default async function handler(req, res) {
       body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
     });
 
-    // если Яндекс ответил НЕ 200 — всё равно пробросим то, что пришло
     const text = await ycRes.text();
     let data;
     try {
@@ -28,3 +27,4 @@ export default async function handler(req, res) {
     res.status(200).json({ error: 'proxy-failed' });
   }
 }
+
