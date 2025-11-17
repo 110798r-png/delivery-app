@@ -203,6 +203,10 @@ function saveHistory(list){
 function saveUnavailable(items){
   localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[]));
 }
+  
+function loadUnavailable(){
+  return safeParse(UNAVAILABLE_LS_KEY, []);
+}
 
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 
@@ -390,7 +394,7 @@ async function pullAndMergeStatuses(){
 }
 
 /* ===== Order ===== */
-function buildPanels(){
+function OrderView(){
   const cfg = loadConfig(); applyTheme(cfg.theme); MENU_CATEGORIES = cfg.menu.slice();
 
   const root=el(`
@@ -432,7 +436,7 @@ const panelW=()=> catPager.getBoundingClientRect().width || 1;
 // при обновлении склада (из табло или при старте) перерисовываем карточки
 function handleStockUpdated(){
   unavailableClient = new Set(loadUnavailable());
-  buildPanels();
+  rebuildMenu();
   recalcTotal();
 }
   loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
@@ -440,7 +444,7 @@ function handleStockUpdated(){
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(loadConfig().menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(loadConfig().menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(loadConfig().menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
   categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
 
-  function buildPanels(){
+  function rebuildMenu(){
     catPager.innerHTML='';
     const cfg = loadConfig();
     cfg.menu.forEach((cat)=>{
@@ -680,18 +684,11 @@ function handleStockUpdated(){
     m.onclick = (e)=>{ if(e.target===m) onCancel(e); };
   })();
 
-    // только click, без touchend/pointerup
-    ok.addEventListener('click', onOk);
-    cancel.addEventListener('click', onCancel);
-    m.onclick = (e) => { if (e.target === m) onCancel(e); };
-  })();
-
   buildPanels();
   requestAnimationFrame(()=>{ 
     highlightChip(0); 
     goToIndex(0,{animate:false});
     recalcTotal();      // актуализируем сумму
-    maybeShowNavHint(); // подсказка навигации один раз
   });
 
   // реагируем на изменения склада, которые приходят с сервера или из табло
@@ -781,6 +778,24 @@ function ProfileHubView(){
   root.querySelector('#supportBtn').onclick     = ()=> alert('Здесь будет чат/контакты техподдержки');
   const camImg = root.querySelector('#camImg');
   root.querySelector('#camRefresh').onclick     = ()=> { const u=new URL(camImg.src); u.searchParams.set('t', Date.now()); camImg.src=u.toString(); };
+  return root;
+}
+  function ContactView(){
+  const p = Object.assign({ phone:'' }, loadProfile());
+  const root = el(`
+    <div class="grid gap-4 pb-24">
+      <div class="flex items-center gap-3">
+        <button id="backOnly" class="px-3 py-2 rounded-xl border bg-white" aria-label="Назад">←</button>
+        <div class="text-lg font-semibold">Обратная связь</div>
+      </div>
+      <section class="card p-4 text-sm grid gap-2">
+        <div>Почта: <a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
+        <div>Тел.: <a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
+        ${ p.phone ? `<div class="text-xs text-gray-500">Ваш телефон в профиле: ${p.phone}</div>` : '' }
+      </section>
+    </div>
+  `);
+  root.querySelector('#backOnly').onclick = ()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
 
@@ -1218,7 +1233,7 @@ function realRouter(){
   else if(h==='#/contact') mount(ContactView());
   else if(h==='#/dashboard') mount(DashboardView());
   else if(h==='#/builder') mount(BuilderView());
-  else mount(buildPanels());
+  else mount(OrderView());
 }
 function router(){
   const h=location.hash.split('?')[0];
