@@ -141,6 +141,53 @@
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net';
 const CONFIG_REMOTE_URL = '';
+// === PUSH / VAPID ===
+const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64  = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}  
+async function initPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('Push not supported');
+    return;
+  }
+
+  const reg = await navigator.serviceWorker.ready;
+
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+      });
+    } catch (e) {
+      console.warn('Push subscribe error', e);
+      return;
+    }
+  }
+
+  try {
+    await rpc({
+      op: 'push_subscribe',
+      clientId: getClientId(),
+      subscription: sub
+    });
+  } catch (e) {
+    console.warn('push_subscribe RPC error', e);
+  }
+}
+
 
 /* ===== RPC ===== */
 async function rpc(payload){
@@ -1320,6 +1367,31 @@ function calcConfigVersion(cfg) {
   };
   pinCancel.onclick=()=>{ pinM.classList.remove('open'); sessionStorage.removeItem(WANT_DASH); location.hash='#/profile'; };
   pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
+ // --- Регистрация service worker ---
+  if ('serviceWorker' in navigator) {
+    try {
+      await navigator.serviceWorker.register('/sw.js');
+      console.log('Service worker registered');
+    } catch (e) {
+      console.warn('SW registration failed', e);
+    }
+  }
+
+  // --- Запрос разрешения и подписка ---
+  if ('Notification' in window) {
+    if (Notification.permission === 'default') {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          initPushSubscription().catch(()=>{});
+        }
+      } catch (e) {
+        console.warn('Notification permission error', e);
+      }
+    } else if (Notification.permission === 'granted') {
+      initPushSubscription().catch(()=>{});
+    }
+  }
 });
 </script>
 </body>
