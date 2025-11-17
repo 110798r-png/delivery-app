@@ -684,12 +684,13 @@ function handleStockUpdated(){
     m.onclick = (e)=>{ if(e.target===m) onCancel(e); };
   })();
 
-  buildPanels();
+  rebuildMenu();
   requestAnimationFrame(()=>{ 
     highlightChip(0); 
     goToIndex(0,{animate:false});
     recalcTotal();      // актуализируем сумму
   });
+
 
   // реагируем на изменения склада, которые приходят с сервера или из табло
   window.addEventListener('stock:updated', handleStockUpdated);
