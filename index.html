@@ -288,7 +288,9 @@ function applyTheme(theme){
 }
 let MENU_CATEGORIES = loadConfig().menu.slice();
 applyTheme(loadConfig().theme);
-
+  
+lastConfigVersion = calcConfigVersion(loadConfig());
+  
 /* (опционально) удалённая конфигурация + меню с сервера */
 async function fetchRemoteConfig(){
   // Вариант 1: отдельный JSON по URL (если когда-нибудь появится)
@@ -413,7 +415,7 @@ function OrderView(){
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6h15l-1.5 9h-12L6 6Zm0 0L5 3H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.6" fill="currentColor"/><circle cx="18" cy="20" r="1.6" fill="currentColor"/></svg>
             </button>
           </div>
-          <button id="confirmBtn" class="px-4 py-3 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>Подтвердить заказ</button>
+          <button id="confirmBtn" class="px-4 py-3 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>Корзина</button>
         </div>
       </div>
     </div>
@@ -423,7 +425,6 @@ const categoryBar=root.querySelector('#categoryBar');
 const catPager=root.querySelector('#catPager');
 const totalEl=root.querySelector('#totalVal');
 const confirmBtn=root.querySelector('#confirmBtn'); 
-const cartBadge=root.querySelector('#cartBadge');
 
 setBodyScrollLock(true);
 confirmBtn._busy = false; // на всякий случай сбрасываем
@@ -526,14 +527,6 @@ function handleStockUpdated(){
     return sum;
   }
 
-  function updateCartBadge(){
-    const list = loadHistory();
-    const active = (Array.isArray(list)?list:[]).find(o=>!['завершён','отменён'].includes(o.status||''));
-    if(active){ cartBadge.classList.remove('hidden'); }
-    else { cartBadge.classList.add('hidden'); }
-  }
-  cartBadge.addEventListener('click', ()=> location.hash='#/history');
-  updateCartBadge();
   window.addEventListener('orders:history-updated', updateCartBadge);
   confirmBtn.addEventListener('click', ()=>{
     const cfg = loadConfig();
@@ -696,9 +689,42 @@ function handleStockUpdated(){
   window.addEventListener('stock:updated', handleStockUpdated);
 
   /* периодический синк статусов — поддерживает бэйдж актуальным */
-  const syncTimer = setInterval(() => {
-    pullAndMergeStatuses().then(updateCartBadge);
-  }, 7000);
+  /* периодический синк статусов и наличия */
+  const syncTimer = setInterval(async () => {
+        // подтягиваем обновлённое меню
+    try {
+      const cfgRemote = await fetchRemoteConfig();
+      if (cfgRemote) {
+        const v = calcConfigVersion(cfgRemote);
+        if (v !== lastConfigVersion) {
+          lastConfigVersion = v;
+          // локально уже сохранено внутри fetchRemoteConfig -> loadConfig вернёт то же
+          rebuildMenu();
+          recalcTotal();
+        }
+      }
+    } catch (e) {
+      // тихо игнорируем
+    }
+
+    // обновляем статусы заказов
+    await pullAndMergeStatuses();
+    updateCartBadge();
+
+    // подтягиваем актуальный список "нет в наличии" с сервера
+    const before = new Set(unavailableClient);
+    const remote = await fetchUnavailableRemote().catch(()=>null);
+    if (remote && Array.isArray(remote)) {
+      const after = new Set(remote);
+      // если есть реальные изменения — перерисовываем меню
+      if (before.size !== after.size ||
+          [...before].some(x => !after.has(x))) {
+        unavailableClient = after;
+        rebuildMenu();
+        recalcTotal();
+      }
+    }
+  }, 4000);
 
   root.cleanup = ()=> { 
     setBodyScrollLock(false);
@@ -1267,6 +1293,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindTabloTapZone();
 
   await fetchRemoteConfig().catch(()=>{});
+  let lastConfigVersion = 0;
+
+function calcConfigVersion(cfg) {
+  try {
+    return JSON.stringify(cfg.menu || []).length;
+  } catch {
+    return 0;
+  }
+}
+
   
     // Подтягиваем актуальный список "нет в наличии" с сервера
   await fetchUnavailableRemote().catch(()=>{});
