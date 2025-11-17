@@ -1,45 +1,37 @@
-// sw.js
+// ----------- SAFE SW FOR YOUR DELIVERY APP -----------
 
-self.addEventListener('push', event => {
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    data = { title: 'Уведомление', body: event.data ? event.data.text() : '' };
-  }
-
-  const title = data.title || 'ЯмаMoto';
-  const body  = data.body  || 'Новое уведомление';
-  const icon  = data.icon  || '/https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css'; // положишь свой логотип
-  const url   = data.url   || '/#/history';
-
-  const options = {
-    body,
-    icon,
-    badge: icon,
-    data: { url },
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+self.addEventListener("install", (event) => {
+    self.skipWaiting();
 });
 
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/#/history';
+self.addEventListener("activate", (event) => {
+    clients.claim();
+});
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientsArr => {
-      for (const client of clientsArr) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(url);
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(url);
-      }
-    })
-  );
+// Не трогаем и не кэшируем RPC (иначе всё ломается!)
+self.addEventListener("fetch", (event) => {
+    const url = new URL(event.request.url);
+
+    // 1) Не перехватываем RPC → даём идти напрямую
+    if (url.pathname.endsWith("/rpc")) return;
+
+    // 2) Не трогаем POST
+    if (event.request.method !== "GET") {
+        return; // пропускаем
+    }
+
+    // 3) Остальное можно кешировать если хочешь
+    event.respondWith(
+        caches.open("static-v1").then(async (cache) => {
+            const cached = await cache.match(event.request);
+            if (cached) return cached;
+            try {
+                const fresh = await fetch(event.request);
+                cache.put(event.request, fresh.clone());
+                return fresh;
+            } catch {
+                return cached || Response.error();
+            }
+        })
+    );
 });
