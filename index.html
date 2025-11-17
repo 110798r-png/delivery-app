@@ -184,11 +184,42 @@ function safeParse(k, f){ try{ const v=JSON.parse(localStorage.getItem(k)||'null
 function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
 function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})); }
 function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
-function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-function loadUnavailable(){ return safeParse(UNAVAILABLE_LS_KEY, []); }
-function saveUnavailable(items){ localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[])); }
+function saveHistory(list){
+  const arr = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  const uniq = [];
+
+  for (const o of arr){
+    if (!o) continue;
+    const id = String(o.id ?? '');
+    // если id пустой — всё равно добавим, но дубликаты с тем же id выкинем
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    uniq.push(o);
+  }
+  localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(uniq));
+}
+
+function saveUnavailable(items){
+  localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[]));
+}
+
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
-function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
+
+function saveDash(list){
+  const arr = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  const uniq = [];
+
+  for (const o of arr){
+    if (!o) continue;
+    const id = String(o.id ?? '');
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    uniq.push(o);
+  }
+  localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(uniq));
+}
 function getClientId(){
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (id) return id;
@@ -207,9 +238,12 @@ function getClientId(){
 
 function isProfileFilled(){
   const p = loadProfile();
-  return Boolean(p && p.name && p.phone && p.address);
+  if (!p) return false;
+  const name = (p.name || '').trim();
+  const phone = (p.phone || '').trim();
+  const addr  = (p.address || '').trim();
+  return !!(name && phone && addr);
 }
-
 
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
@@ -251,43 +285,56 @@ function applyTheme(theme){
 let MENU_CATEGORIES = loadConfig().menu.slice();
 applyTheme(loadConfig().theme);
 
-/* (опционально) удалённая конфигурация */
+/* (опционально) удалённая конфигурация + меню с сервера */
 async function fetchRemoteConfig(){
-  if(!CONFIG_REMOTE_URL) return null;
-  try{
-    const res = await fetch(CONFIG_REMOTE_URL, { cache:'no-cache' });
-    if(!res.ok) return null;
-    const json = await res.json();
-    if(json && json.menu){
-      saveConfig(json);
-      applyTheme(json.theme||{});
-      MENU_CATEGORIES = json.menu.slice();
+  // Вариант 1: отдельный JSON по URL (если когда-нибудь появится)
+  if (CONFIG_REMOTE_URL){
+    try{
+      const res = await fetch(CONFIG_REMOTE_URL, { cache:'no-cache' });
+      if(res.ok){
+        const json = await res.json();
+        if(json && json.menu){
+          saveConfig(json);
+          applyTheme(json.theme||{});
+          MENU_CATEGORIES = json.menu.slice();
+          return json;
+        }
+      }
+    }catch(e){
+      console.warn('fetchRemoteConfig URL', e);
     }
-    return json;
-  }catch{ return null }
+  }
+
+  // Вариант 2: RPC к нашему бэку — общий конфиг для всех устройств
+  try{
+    const res = await rpc({ op: 'config_get' });
+    if (res && res.config && Array.isArray(res.config.menu)){
+      saveConfig(res.config);
+      applyTheme(res.config.theme||{});
+      MENU_CATEGORIES = res.config.menu.slice();
+      return res.config;
+    }
+  }catch(e){
+    console.warn('fetchRemoteConfig RPC', e);
+  }
+  return null;
 }
-  /* ===== УДАЛЁННОЕ НАЛИЧИЕ ТОВАРОВ ===== */
+
+/* ===== УДАЛЁННОЕ НАЛИЧИЕ ТОВАРОВ ===== */
 
 // стянуть "нет в наличии" с сервера и сохранить локально
 async function fetchUnavailableRemote(){
   try{
-    // новый нормальный op, как на бэке
     const res = await rpc({ op: 'getUnavailable' });
-
-    // бэкенд возвращает { items: [...] }
-    const list = Array.isArray(res && res.items) ? res.items : [];
-
-    // сохраняем в localStorage
-    saveUnavailable(list);
-
-    // уведомляем все открытые экраны, что склад обновился
-    window.dispatchEvent(new CustomEvent('stock:updated'));
-
-    return list;
+    const items = Array.isArray(res?.items) ? res.items : [];
+    if (items.length){
+      saveUnavailable(items);
+      return items;
+    }
   }catch(e){
     console.warn('fetchUnavailableRemote', e);
-    return null;
   }
+  return null;
 }
 
 // отправить список отсутствующих товаров на сервер
@@ -303,7 +350,6 @@ async function pushUnavailableRemote(list){
     showToast('Не удалось обновить наличие на сервере');
   }
 }
-
 
 /* ===== анимации ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
@@ -485,54 +531,53 @@ function handleStockUpdated(){
   cartBadge.addEventListener('click', ()=> location.hash='#/history');
   updateCartBadge();
   window.addEventListener('orders:history-updated', updateCartBadge);
-confirmBtn.addEventListener('click', ()=>{
-  const cfg = loadConfig();
-  const counts = window.__orderCounts || {};
-  const items = [];
+  confirmBtn.addEventListener('click', ()=>{
+    const cfg = loadConfig();
+    const counts = window.__orderCounts || {};
+    const items = [];
 
-  cfg.menu.forEach(cat => cat.items.forEach(it => {
-    const q = (counts[it.name] || 0);
-    if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
-  }));
+    cfg.menu.forEach(cat => cat.items.forEach(it => {
+      const q = (counts[it.name] || 0);
+      if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
+    }));
 
-  if (!items.length){ 
-    return; 
-  }
+    if (!items.length){ 
+      return; 
+    }
 
-  // Проверка профиля перед первым заказом
-  if (!isProfileFilled()){
-    showToast('Заполните данные для доставки в профиле.');
-    location.hash = '#/profile-edit';
-    return;
-  }
+    // Проверка профиля перед заказом
+    if (!isProfileFilled()){
+      showToast('Заполните данные для доставки в профиле.');
+      location.hash = '#/profile-edit';
+      return;
+    }
 
-  if (confirmBtn._busy) return;
-  confirmBtn._busy = true;
-  confirmBtn.disabled = true;
+    if (confirmBtn._busy) return;
+    confirmBtn._busy = true;
+    confirmBtn.disabled = true;
 
-  const sumBox = document.getElementById('paySummary');
-  let total = 0;
-  sumBox.innerHTML = items.map(i => {
-    total += i.qty * (i.price || 0);
-    return `<div class="flex items-center justify-between">
-      <div class="truncate">${i.name} ×${i.qty}</div>
-      <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
-    </div>`;
-  }).join('');
+    const sumBox = document.getElementById('paySummary');
+    let total = 0;
+    sumBox.innerHTML = items.map(i => {
+      total += i.qty * (i.price || 0);
+      return `<div class="flex items-center justify-between">
+        <div class="truncate">${i.name} ×${i.qty}</div>
+        <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
+      </div>`;
+    }).join('');
 
-  sumBox.insertAdjacentHTML(
-    'beforeend',
-    `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
-       <div>Итого</div><div>${money(total)}</div>
-     </div>`
-  );
+    sumBox.insertAdjacentHTML(
+      'beforeend',
+      `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
+         <div>Итого</div><div>${money(total)}</div>
+       </div>`
+    );
 
-  const prof = loadProfile();
-  const sel = document.getElementById('paySelect');
-  sel.value = prof.paymentMethod || 'cash';
-  document.getElementById('payModal').classList.add('open');
-});
-
+    const prof = loadProfile();
+    const sel = document.getElementById('paySelect');
+    sel.value = prof.paymentMethod || 'cash';
+    document.getElementById('payModal').classList.add('open');
+  });
 
   function resetCounts(){
     window.__orderCounts = {};
@@ -541,108 +586,99 @@ confirmBtn.addEventListener('click', ()=>{
     confirmBtn.disabled = true;
   }
 
-    (function bindPayModal(){
-    const m      = document.getElementById('payModal');
-    const ok     = document.getElementById('payOk');
+  (function bindPayModal(){
+    const m = document.getElementById('payModal');
+    const ok = document.getElementById('payOk');
     const cancel = document.getElementById('payCancel');
-    const sel    = document.getElementById('paySelect');
+    const sel = document.getElementById('paySelect');
 
-    if (!m || !ok || !cancel || !sel) return;
+    const close = ()=> m.classList.remove('open');
+    const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
 
-    // чтобы не навесить обработчики несколько раз
-    if (ok._bound) return;
-    ok._bound = true;
-
-    const close = () => m.classList.remove('open');
-    const finalize = () => {
-      confirmBtn._busy = false;
-      confirmBtn.disabled = false;
-    };
-
-    const onCancel = (e) => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    const onCancel = (e)=>{
+      if(e){ e.preventDefault(); e.stopPropagation(); }
       close();
       finalize();
     };
 
-    const onOk = async (e) => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    const onOk = async (e)=>{
+      if(e){ e.preventDefault(); e.stopPropagation(); }
 
       const cfg = loadConfig();
       const counts = window.__orderCounts || {};
-      const itemsSel = [];
-      let total = 0;
+      const itemsSel=[]; let total=0;
 
-      cfg.menu.forEach(cat => cat.items.forEach(it => {
-        const q = (counts[it.name] || 0);
-        if (q > 0) {
-          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
-          total += q * (it.price || 0);
-        }
+      cfg.menu.forEach(cat=>cat.items.forEach(it=>{
+        const q=(counts[it.name]||0);
+        if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
       }));
 
-      if (!itemsSel.length) {
+      if(!itemsSel.length){
         close();
         finalize();
         return;
       }
 
-      const p = loadProfile();
-      p.paymentMethod = sel.value || 'cash';
-      saveProfile(p);
-
-      // базовый локальный ордер (на случай, если сервер не ответил)
-      let order = {
-        id: Date.now().toString().slice(-6),
-        createdAt: Date.now(),
-        items: itemsSel,
-        total,
-        pay: sel.value || 'cash',
-        status: 'новый'
-      };
-
-      try {
-        // стабильный ID клиента (привязан к телефону / гостю)
-        const clientId = getClientId();
-
+      try{
+        // отправляем заказ на сервер и получаем настоящий id
         const res = await rpc({
           op: 'create',
           data: {
-            clientId,
+            clientId: getClientId(),
             items: itemsSel,
             total,
             pay: sel.value || 'cash'
           }
         });
 
-        // если бэкенд вернул ордер – используем его как истину (там нормальный id, времени и т.п.)
-        if (res && res.order) {
-          order = { ...order, ...res.order };
-        }
-      } catch (e) {
-        console.warn('RPC error', e);
-        // в этом случае остаётся локальный order с timestamp-id
+        const order = res && res.order ? res.order : {
+          id: Date.now().toString().slice(-6),
+          createdAt: Date.now(),
+          items: itemsSel,
+          total,
+          pay: sel.value || 'cash',
+          status: 'новый'
+        };
+
+        // локальная история
+        const history = loadHistory();
+        history.unshift(order);
+        saveHistory(history.slice(0,50));
+
+        // локальное табло (до синка с сервера)
+        const dash = loadDash();
+        dash.unshift(order);
+        saveDash(dash.slice(0,200));
+
+        const p = loadProfile();
+        p.paymentMethod = sel.value || 'cash';
+        saveProfile(p);
+
+      }catch(err){
+        console.warn('RPC create error', err);
+        showToast('Не удалось отправить заказ, попробуйте ещё раз.');
+        finalize();
+        return;
       }
-
-      const history = loadHistory();
-      history.unshift(order);
-      saveHistory(history.slice(0, 50));
-
-      const dash = loadDash();
-      dash.unshift(order);
-      saveDash(dash.slice(0, 200));
 
       close();
       finalize();
       resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     };
+
+    // снимаем старые обработчики, если были
+    if (ok._handler) ok.removeEventListener('click', ok._handler);
+    if (cancel._handler) cancel.removeEventListener('click', cancel._handler);
+
+    ok._handler = onOk;
+    cancel._handler = onCancel;
+
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+
+    m.onclick = (e)=>{ if(e.target===m) onCancel(e); };
+  })();
 
     // только click, без touchend/pointerup
     ok.addEventListener('click', onOk);
@@ -749,26 +785,6 @@ function ProfileHubView(){
 }
 
 /* ===== Контакты ===== */
-function ContactView(){
-  const p=Object.assign({ phone:'', }, loadProfile());
-  const root=el(`
-    <div class="grid gap-4 pb-24">
-      <div class="flex items-center gap-3">
-        <button id="backOnly" class="px-3 py-2 rounded-xl border bg-white" aria-label="Назад">←</button>
-        <div class="text-lg font-semibold">Обратная связь</div>
-      </div>
-      <section class="card p-4 text-sm grid gap-2">
-        <div>Почта: <a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
-        <div>Тел.: <a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
-        ${ p.phone ? `<div class="text-xs text-gray-500">Ваш телефон в профиле: ${p.phone}</div>` : '' }
-      </section>
-    </div>
-  `);
-  root.querySelector('#backOnly').onclick = ()=> history.length ? history.back() : (location.hash='#/profile');
-  return root;
-}
-
-/* ===== Редактор профиля ===== */
 function ProfileEditView(){ 
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
   const root=el(`
@@ -779,15 +795,13 @@ function ProfileEditView(){
           <input id="pName" class="border rounded-xl p-3" placeholder="Имя Фамилия" value="${p.name||''}">
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
           <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
+          <div id="pError" class="text-xs text-red-600"></div>
           <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
           <select id="paydef" class="border rounded-xl p-3">
             <option value="cash">Наличные</option>
             <option value="card">Банковская карта</option>
             <option value="transfer">Перевод</option>
           </select>
-          <p id="profileError" class="text-xs text-red-600 mt-1 hidden">
-          Заполните профиль полностью
-          </p>
           <div class="flex gap-2">
             <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
             <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
@@ -798,39 +812,30 @@ function ProfileEditView(){
   `);
   root.querySelector('#paydef').value = p.paymentMethod;
 
-  root.querySelector('#pSave').onclick = () => {
-    const errEl = root.querySelector('#profileError');
+  const errEl = root.querySelector('#pError');
 
+  root.querySelector('#pSave').onclick = () => {
     const p2 = {
       name: root.querySelector('#pName').value.trim(),
       phone: root.querySelector('#pPhone').value.trim(),
       address: root.querySelector('#pAddr').value.trim(),
       paymentMethod: root.querySelector('#paydef').value
     };
-
-    const filled = Boolean(p2.name && p2.phone && p2.address);
-
-    if (!filled) {
-      // показываем красную подсказку
-      errEl.classList.remove('hidden');
-    } else {
-      errEl.classList.add('hidden');
-    }
-
     saveProfile(p2);
 
     // Обновляем clientId, если появился нормальный телефон
-    if (p2.phone) {
+    if (p2.phone){
       const currentId = localStorage.getItem(CLIENT_ID_KEY);
-      if (!currentId || currentId.startsWith('guest-')) {
+      if (!currentId || currentId.startsWith('guest-')){
         localStorage.setItem(CLIENT_ID_KEY, 'tel:' + p2.phone.replace(/\s+/g,''));
       }
     }
 
-    showToast('Профиль сохранён');
-
-    // если профиль полный — уходим назад в профиль
-    if (filled) {
+    if (!isProfileFilled()){
+      errEl.textContent = 'Заполните профиль полностью (имя, телефон и адрес).';
+    } else {
+      errEl.textContent = '';
+      showToast('Профиль сохранён');
       location.hash = '#/profile';
     }
   };
@@ -1159,13 +1164,25 @@ function BuilderView(){
     fr.readAsText(f);
   };
 
-  root.querySelector('#applyBtn').onclick=()=>{
+  root.querySelector('#applyBtn').onclick=async ()=>{
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
-    showToast('Сохранено');
+
+    // пробуем сохранить общий конфиг на сервере
+    try{
+      await rpc({ op: 'config_set', config: cfg });
+    }catch(e){
+      console.warn('config_set error', e);
+      showToast('Меню сохранено локально, но сервер недоступен');
+      history.length ? history.back() : (location.hash='#/dashboard');
+      return;
+    }
+
+    showToast('Меню сохранено (сервер)');
     history.length ? history.back() : (location.hash='#/dashboard');
   };
+  
   root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/dashboard');
   return root;
 }
