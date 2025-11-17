@@ -1,1 +1,10 @@
-
+{
+  "name": "yamamoto-delivery-backend",
+  "version": "1.0.0",
+  "description": "Backend for Yamamoto delivery app",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "web-push": "^3.5.0"
+  }
+}
