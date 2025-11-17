@@ -333,7 +333,6 @@ function applyTheme(theme){
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
   document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
 }
-let MENU_CATEGORIES = loadConfig().menu.slice();
 applyTheme(loadConfig().theme);
   
 lastConfigVersion = calcConfigVersion(loadConfig());
