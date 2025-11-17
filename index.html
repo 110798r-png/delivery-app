@@ -333,10 +333,18 @@ function applyTheme(theme){
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
   document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
 }
-applyTheme(loadConfig().theme);
-  
-lastConfigVersion = calcConfigVersion(loadConfig());
-  
+function calcConfigVersion(cfg) {
+  try {
+    return JSON.stringify((cfg && cfg.menu) || []).length;
+  } catch {
+    return 0;
+  }
+}
+
+// глобальные переменные по меню / конфигу
+let MENU_CATEGORIES = loadConfig().menu.slice();
+let lastConfigVersion = calcConfigVersion(loadConfig());
+
 /* (опционально) удалённая конфигурация + меню с сервера */
 async function fetchRemoteConfig(){
   // Вариант 1: отдельный JSON по URL (если когда-нибудь появится)
@@ -1322,19 +1330,7 @@ function router(){
 }
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
-
-  function calcConfigVersion(cfg) {
-  try {
-    return JSON.stringify(cfg.menu || []).length;
-  } catch {
-    return 0;
-  }
-}
-
-let MENU_CATEGORIES = loadConfig().menu.slice();
-applyTheme(loadConfig().theme);
-let lastConfigVersion = calcConfigVersion(loadConfig());
- 
+  
 /* Header + PIN */
 document.addEventListener('DOMContentLoaded', async ()=>{
   const profileBtn=document.getElementById('profileBtn');
