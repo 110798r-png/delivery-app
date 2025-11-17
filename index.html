@@ -541,11 +541,17 @@ confirmBtn.addEventListener('click', ()=>{
     confirmBtn.disabled = true;
   }
 
-   (function bindPayModal(){
-    const m = document.getElementById('payModal');
-    const ok = document.getElementById('payOk');
+    (function bindPayModal(){
+    const m      = document.getElementById('payModal');
+    const ok     = document.getElementById('payOk');
     const cancel = document.getElementById('payCancel');
-    const sel = document.getElementById('paySelect');
+    const sel    = document.getElementById('paySelect');
+
+    if (!m || !ok || !cancel || !sel) return;
+
+    // чтобы не навесить обработчики несколько раз
+    if (ok._bound) return;
+    ok._bound = true;
 
     const close = () => m.classList.remove('open');
     const finalize = () => {
@@ -554,13 +560,19 @@ confirmBtn.addEventListener('click', ()=>{
     };
 
     const onCancel = (e) => {
-      if (e){ e.preventDefault(); e.stopPropagation(); }
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       close();
       finalize();
     };
 
     const onOk = async (e) => {
-      if (e){ e.preventDefault(); e.stopPropagation(); }
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
 
       const cfg = loadConfig();
       const counts = window.__orderCounts || {};
@@ -569,29 +581,35 @@ confirmBtn.addEventListener('click', ()=>{
 
       cfg.menu.forEach(cat => cat.items.forEach(it => {
         const q = (counts[it.name] || 0);
-        if (q > 0){
+        if (q > 0) {
           itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
           total += q * (it.price || 0);
         }
       }));
 
-      if (!itemsSel.length){
+      if (!itemsSel.length) {
         close();
         finalize();
         return;
       }
 
-      // Обновляем способ оплаты по умолчанию в профиле
       const p = loadProfile();
       p.paymentMethod = sel.value || 'cash';
       saveProfile(p);
 
-      let orderToSave = null;
+      // базовый локальный ордер (на случай, если сервер не ответил)
+      let order = {
+        id: Date.now().toString().slice(-6),
+        createdAt: Date.now(),
+        items: itemsSel,
+        total,
+        pay: sel.value || 'cash',
+        status: 'новый'
+      };
 
-      // Пытаемся создать заказ на сервере и взять "правильный" id
       try {
-        const baseId = getClientId(); // стабильно привязан к телефону/гостю
-        const clientId = baseId;
+        // стабильный ID клиента (привязан к телефону / гостю)
+        const clientId = getClientId();
 
         const res = await rpc({
           op: 'create',
@@ -603,37 +621,21 @@ confirmBtn.addEventListener('click', ()=>{
           }
         });
 
-        if (res && res.order){
-          orderToSave = res.order;
-        } else if (res && res.dedup && res.order){
-          // случай дедупликации — сервер вернул уже существующий заказ
-          orderToSave = res.order;
+        // если бэкенд вернул ордер – используем его как истину (там нормальный id, времени и т.п.)
+        if (res && res.order) {
+          order = { ...order, ...res.order };
         }
-      } catch (err){
-        console.warn('RPC create error', err);
+      } catch (e) {
+        console.warn('RPC error', e);
+        // в этом случае остаётся локальный order с timestamp-id
       }
 
-      // Если сервер недоступен — локальный заказ (fallback)
-      if (!orderToSave){
-        const now = Date.now();
-        orderToSave = {
-          id: 'tmp-' + now.toString().slice(-6),
-          createdAt: now,
-          items: itemsSel,
-          total,
-          pay: sel.value || 'cash',
-          status: 'новый (локально)'
-        };
-        showToast('Заказ сохранён локально (нет связи с сервером)');
-      }
-
-      // Сохраняем заказ в истории клиента и в локальном табло
       const history = loadHistory();
-      history.unshift(orderToSave);
+      history.unshift(order);
       saveHistory(history.slice(0, 50));
 
       const dash = loadDash();
-      dash.unshift(orderToSave);
+      dash.unshift(order);
       saveDash(dash.slice(0, 200));
 
       close();
@@ -642,8 +644,9 @@ confirmBtn.addEventListener('click', ()=>{
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     };
 
-    ['click','pointerup','touchend'].forEach(ev => ok.addEventListener(ev, onOk, { passive:false }));
-    ['click','pointerup','touchend'].forEach(ev => cancel.addEventListener(ev, onCancel, { passive:false }));
+    // только click, без touchend/pointerup
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
     m.onclick = (e) => { if (e.target === m) onCancel(e); };
   })();
 
@@ -782,6 +785,9 @@ function ProfileEditView(){
             <option value="card">Банковская карта</option>
             <option value="transfer">Перевод</option>
           </select>
+          <p id="profileError" class="text-xs text-red-600 mt-1 hidden">
+          Заполните профиль полностью
+          </p>
           <div class="flex gap-2">
             <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
             <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
@@ -791,26 +797,44 @@ function ProfileEditView(){
     </div>
   `);
   root.querySelector('#paydef').value = p.paymentMethod;
+
   root.querySelector('#pSave').onclick = () => {
-  const p2 = {
-    name: root.querySelector('#pName').value.trim(),
-    phone: root.querySelector('#pPhone').value.trim(),
-    address: root.querySelector('#pAddr').value.trim(),
-    paymentMethod: root.querySelector('#paydef').value
-  };
-  saveProfile(p2);
+    const errEl = root.querySelector('#profileError');
 
-  // Обновляем clientId, если появился нормальный телефон
-  if (p2.phone){
-    const currentId = localStorage.getItem(CLIENT_ID_KEY);
-    if (!currentId || currentId.startsWith('guest-')){
-      localStorage.setItem(CLIENT_ID_KEY, 'tel:' + p2.phone.replace(/\s+/g,''));
+    const p2 = {
+      name: root.querySelector('#pName').value.trim(),
+      phone: root.querySelector('#pPhone').value.trim(),
+      address: root.querySelector('#pAddr').value.trim(),
+      paymentMethod: root.querySelector('#paydef').value
+    };
+
+    const filled = Boolean(p2.name && p2.phone && p2.address);
+
+    if (!filled) {
+      // показываем красную подсказку
+      errEl.classList.remove('hidden');
+    } else {
+      errEl.classList.add('hidden');
     }
-  }
 
-  showToast('Профиль сохранён');
-  location.hash = '#/profile';
-};
+    saveProfile(p2);
+
+    // Обновляем clientId, если появился нормальный телефон
+    if (p2.phone) {
+      const currentId = localStorage.getItem(CLIENT_ID_KEY);
+      if (!currentId || currentId.startsWith('guest-')) {
+        localStorage.setItem(CLIENT_ID_KEY, 'tel:' + p2.phone.replace(/\s+/g,''));
+      }
+    }
+
+    showToast('Профиль сохранён');
+
+    // если профиль полный — уходим назад в профиль
+    if (filled) {
+      location.hash = '#/profile';
+    }
+  };
+
   root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
   return root;
 }
