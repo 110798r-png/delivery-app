@@ -271,25 +271,31 @@ async function fetchRemoteConfig(){
 // стянуть "нет в наличии" с сервера и сохранить локально
 async function fetchUnavailableRemote(){
   try{
-    const res = await rpc({ op: 'stock_get' });
-    if (res && Array.isArray(res.unavailable)){
-      saveUnavailable(res.unavailable);
-      // даём знать всем открытым экранчикам, что склад обновился
-      window.dispatchEvent(new CustomEvent('stock:updated'));
-      return res.unavailable;
-    }
+    // новый нормальный op, как на бэке
+    const res = await rpc({ op: 'getUnavailable' });
+
+    // бэкенд возвращает { items: [...] }
+    const list = Array.isArray(res && res.items) ? res.items : [];
+
+    // сохраняем в localStorage
+    saveUnavailable(list);
+
+    // уведомляем все открытые экраны, что склад обновился
+    window.dispatchEvent(new CustomEvent('stock:updated'));
+
+    return list;
   }catch(e){
     console.warn('fetchUnavailableRemote', e);
+    return null;
   }
-  return null;
 }
 
 // отправить список отсутствующих товаров на сервер
 async function pushUnavailableRemote(list){
   try{
     await rpc({
-      op: 'stock_set',
-      unavailable: Array.isArray(list) ? list : []
+      op: 'setUnavailable',
+      items: Array.isArray(list) ? list : []
     });
     showToast('Наличие обновлено на сервере');
   }catch(e){
@@ -338,7 +344,7 @@ async function pullAndMergeStatuses(){
 }
 
 /* ===== Order ===== */
-function OrderView(){
+function buildPanels(){
   const cfg = loadConfig(); applyTheme(cfg.theme); MENU_CATEGORIES = cfg.menu.slice();
 
   const root=el(`
@@ -383,7 +389,6 @@ function handleStockUpdated(){
   buildPanels();
   recalcTotal();
 }
-
   loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(loadConfig().menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(loadConfig().menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(loadConfig().menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -644,12 +649,13 @@ confirmBtn.addEventListener('click', ()=>{
 
   buildPanels();
   requestAnimationFrame(()=>{ 
-    highlightChip(0);
+    highlightChip(0); 
     goToIndex(0,{animate:false});
-    recalcTotal(); // чтобы после возврата из профиля кнопка "Подтвердить" была в корректном состоянии
+    recalcTotal();      // актуализируем сумму
+    maybeShowNavHint(); // подсказка навигации один раз
   });
 
-  // слушаем обновление склада (после загрузки с сервера или изменения на табло)
+  // реагируем на изменения склада, которые приходят с сервера или из табло
   window.addEventListener('stock:updated', handleStockUpdated);
 
   /* периодический синк статусов — поддерживает бэйдж актуальным */
@@ -662,6 +668,7 @@ confirmBtn.addEventListener('click', ()=>{
     clearInterval(syncTimer);
     window.removeEventListener('stock:updated', handleStockUpdated);
   };
+
   return root;
 }
 
@@ -918,20 +925,21 @@ function DashboardView(){
 
   function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
   renderStock();
-root.querySelector('#saveStock').onclick = async () => {
-  const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')].map(i => i.value);
+  root.querySelector('#saveStock').onclick = async () => {
+    const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')]
+      .map(i => i.value);
 
-  // сохраняем локально (чтобы табло сразу обновилось)
-  saveUnavailable(checked);
-  unavailable = new Set(checked);
-  showToast('Наличие сохранено');
+    // сохраняем локально (на этом же устройстве)
+    saveUnavailable(checked);
+    unavailable = new Set(checked);
+    showToast('Наличие сохранено');
 
-  // сообщаем всем клиентам (открытым вкладкам), что склад обновился
-  window.dispatchEvent(new CustomEvent('stock:updated'));
+    // уведомляем все открытые экраны (в этом же браузере), что склад изменился
+    window.dispatchEvent(new CustomEvent('stock:updated'));
 
-  // и пробуем отправить на сервер
-  await pushUnavailableRemote(checked);
-};
+    // и пробуем отправить на сервер, чтобы другие устройства смогли подтянуть
+    await pushUnavailableRemote(checked);
+  };
 
   function orderCard(o){
     const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
@@ -1169,7 +1177,7 @@ function realRouter(){
   else if(h==='#/contact') mount(ContactView());
   else if(h==='#/dashboard') mount(DashboardView());
   else if(h==='#/builder') mount(BuilderView());
-  else mount(OrderView());
+  else mount(buildPanels());
 }
 function router(){
   const h=location.hash.split('?')[0];
