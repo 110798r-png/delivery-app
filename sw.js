@@ -10,7 +10,7 @@ self.addEventListener('push', event => {
 
   const title = data.title || 'ЯмаMoto';
   const body  = data.body  || 'Новое уведомление';
-  const icon  = data.icon  || '/icon-192.png'; // положишь свой логотип
+  const icon  = data.icon  || '/https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css'; // положишь свой логотип
   const url   = data.url   || '/#/history';
 
   const options = {
