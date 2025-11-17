@@ -1,15 +1,24 @@
-// api/order.js
+// api/order.js — proxy с Vercel к Яндекс API Gateway
 
-export default async function handler(req, res) {
-  // 👉 сюда ставим твой Яндекс API Gateway:
-  const ycUrl = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net";
+const YC_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
+
+module.exports = async function handler(req, res) {
+  // Разрешим только POST, остальное — 405
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
-    const ycRes = await fetch(ycUrl, {
+    const body =
+      typeof req.body === 'string'
+        ? req.body
+        : JSON.stringify(req.body || {});
+
+    const ycRes = await fetch(YC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // если вдруг пришла строка — всё равно отправим строкой
-      body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
+      body,
     });
 
     const text = await ycRes.text();
@@ -20,11 +29,11 @@ export default async function handler(req, res) {
       data = { raw: text };
     }
 
+    // просто прокидываем статус и тело дальше
     res.status(ycRes.status).json(data);
   } catch (err) {
     console.error('YC proxy error:', err);
-    // фронт поймёт это и сохранит заказ локально
+    // фронт это поймёт и покажет ошибку / сохранит локально
     res.status(200).json({ error: 'proxy-failed' });
   }
-}
-
+};
