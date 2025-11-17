@@ -192,7 +192,7 @@ async function initPushSubscription() {
 /* ===== RPC ===== */
 async function rpc(payload){
   if(!API_URL) throw new Error('API_URL empty');
-  const res = await fetch(`${API_URL}/rpc`, {
+  const res = await fetch(`API_URL/rpc`, {
     method: 'POST',
     headers: { 'content-type':'application/json' },
     body: JSON.stringify(payload||{})
