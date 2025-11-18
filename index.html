@@ -446,6 +446,7 @@ async function pullAndMergeStatuses(){
         changed = true;
       }
     }
+    setInterval(pullAndMergeStatuses, 5000);
     if(changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
@@ -1037,6 +1038,16 @@ function DashboardView(){
       <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
     </div>
   `);
+    function handleVisibilityChange(){
+    if (document.visibilityState === 'visible' && hiddenNewCount > 0){
+      // показываем тост, что пока вас не было, прилетели заказы
+      showToast(`Новых заказов: ${hiddenNewCount}`);
+      hiddenNewCount = 0;
+    }
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
 
   const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList');
   let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
@@ -1045,6 +1056,10 @@ function DashboardView(){
   const soundBtn = root.querySelector('#soundToggle');
   const soundOn = ()=> localStorage.getItem(SOUND_ON_KEY)==='1';
   const setSound = (on)=>{ localStorage.setItem(SOUND_ON_KEY, on?'1':'0'); soundBtn.classList.toggle('bg-green-50', on); soundBtn.classList.toggle('border-green-600', on); };
+  
+    let hiddenNewCount = 0;   // сколько новых заказов пришло, пока вкладка была скрыта
+  let pollTimer = null;     // таймер опроса сервера
+
 
   setSound(soundOn());
   soundBtn.onclick = ()=> setSound(!soundOn());
@@ -1118,10 +1133,38 @@ function DashboardView(){
   }
 
   function load(){
-    const unique=new Map(); dashOrders.forEach(o=>unique.set(String(o.id),o));
-    const incoming = [...unique.keys()].filter(id=>!knownIds.has(id));
-    if(incoming.length && soundOn()){ ding.currentTime = 0; ding.play().catch(()=>{}); }
+    const unique = new Map();
+    dashOrders.forEach(o => unique.set(String(o.id), o));
+
+    const incoming = [...unique.keys()].filter(id => !knownIds.has(id));
+
+    if (incoming.length) {
+      if (document.visibilityState === 'visible') {
+        // вкладка видима — можно пробовать играть звук
+        if (soundOn()) {
+          try {
+            ding.currentTime = 0;
+            ding.play().catch(() => {
+              // если браузер заблокировал autoplay — просто игнорируем
+            });
+          } catch {}
+        }
+      } else {
+        // вкладка скрыта — звук не трогаем, просто накапливаем количество
+        hiddenNewCount += incoming.length;
+      }
+    }
+
     knownIds = new Set(unique.keys());
+
+    list.innerHTML = '';
+    if (unique.size === 0) {
+      list.innerHTML = `<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`;
+      return;
+    }
+    [...unique.values()].forEach(o => list.appendChild(orderCard(o)));
+  }
+
 
     list.innerHTML='';
     if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
@@ -1145,9 +1188,15 @@ function DashboardView(){
       }
     }catch(e){ console.warn('loadOrdersFromCloud', e); }
   }
-  load();            
+   load();
   loadOrdersFromCloud();
-  setInterval(loadOrdersFromCloud, 5000);
+  pollTimer = setInterval(loadOrdersFromCloud, 5000);
+
+  // когда уходим с экрана табло — чистим за собой
+  root.cleanup = () => {
+    if (pollTimer) clearInterval(pollTimer);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
 
   return root;
 }
