@@ -450,9 +450,19 @@ async function pullAndMergeStatuses(){
 
 /* ===== Order ===== */
 function OrderView(){
-  const cfg = loadConfig(); applyTheme(cfg.theme); MENU_CATEGORIES = cfg.menu.slice();
+  const cfg = loadConfig();
+  applyTheme(cfg.theme || {});
+  MENU_CATEGORIES = cfg.menu.slice();
 
-  const root=el(`
+  // безопасный esc для селекторов [data-q="..."]
+  const escAttr = (val) => {
+    if (window.CSS && typeof CSS.escape === 'function'){
+      return CSS.escape(val);
+    }
+    return String(val).replace(/"/g, '\\"');
+  };
+
+  const root = el(`
     <div class="relative">
       <section class="sticky-top mb-2">
         <div class="glass-panel rounded-2xl px-3 py-3">
@@ -481,27 +491,30 @@ function OrderView(){
       </div>
     </div>
   `);
-   
-const categoryBar=root.querySelector('#categoryBar'); 
-const catPager=root.querySelector('#catPager');
-const totalEl=root.querySelector('#totalVal');
-const confirmBtn=root.querySelector('#confirmBtn'); 
 
-setBodyScrollLock(true);
-confirmBtn._busy = false; // на всякий случай сбрасываем
+  const categoryBar = root.querySelector('#categoryBar');
+  const catPager    = root.querySelector('#catPager');
+  const totalEl     = root.querySelector('#totalVal');
+  const confirmBtn  = root.querySelector('#confirmBtn');
 
-const scrollMemory=new Map();
-let activeIdx=0, isAnimating=false;
-let unavailableClient=new Set(loadUnavailable());
-const panelW=()=> catPager.getBoundingClientRect().width || 1;
+  setBodyScrollLock(true);
+  confirmBtn._busy = false;
 
-// при обновлении склада (из табло или при старте) перерисовываем карточки
-function handleStockUpdated(){
-  unavailableClient = new Set(loadUnavailable());
-  rebuildMenu();
-  recalcTotal();
-}
-    function applyRepeatOrder(){
+  let activeIdx         = 0;
+  let isAnimating       = false;
+  let unavailableClient = new Set(loadUnavailable());
+  const scrollMemory    = new Map();
+
+  const panelW = () => catPager.getBoundingClientRect().width || 1;
+
+  function handleStockUpdated(){
+    unavailableClient = new Set(loadUnavailable());
+    rebuildMenu();
+    recalcTotal();
+  }
+
+  // автоподстановка повторного заказа из истории
+  function applyRepeatOrder(){
     const raw = sessionStorage.getItem('repeat_order_items');
     if (!raw) return;
 
@@ -530,128 +543,247 @@ function handleStockUpdated(){
     // обновляем интерфейс
     catPager.querySelectorAll('[data-q]').forEach(node => {
       const name = node.getAttribute('data-q');
-      const val = window.__orderCounts[name] || 0;
+      const val  = window.__orderCounts[name] || 0;
       node.textContent = String(val);
     });
 
     recalcTotal();
 
-    if (autoPay) {
+    if (autoPay && !confirmBtn.disabled){
       setTimeout(() => {
         if (!confirmBtn.disabled) confirmBtn.click();
       }, 50);
     }
   }
 
-  loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
-  function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
-  function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(loadConfig().menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(loadConfig().menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(loadConfig().menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
-  categoryBar.addEventListener('click', e=>{ const b=e.target.closest('button[data-idx]'); if(!b||isAnimating) return; goToIndex(+b.dataset.idx,{animate:true}) });
-
-  function rebuildMenu(){
-    catPager.innerHTML='';
-    const cfg = loadConfig();
-    cfg.menu.forEach((cat)=>{
-      const panel=el(`<div class="cat-panel"></div>`), vbox=el(`<div class="v-scroll px-0.5"></div>`), list=el(`<div class="grid gap-3"></div>`);
-      cat.items.forEach(it=>{
-        const q=(window.__orderCounts?.[it.name]||0); const disabled=unavailableClient.has(it.name);
-        const row = el(`
-          <div class="menu-card ${disabled?'opacity-50':''}">
-            <div class="flex-1 min-w-0">
-              <div class="font-medium text-sm flex items-center gap-2">${it.name}${disabled?'<span class="badge red">Нет в наличии</span>':''}</div>
-              ${ cfg.theme.showPrice ? `<div class="text-xs text-gray-500 mt-1">${money(it.price||0)}</div>` : '' }
-              <div class="flex items-center gap-3 mt-3">
-                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${it.name}" data-act="dec" ${disabled?'disabled':''}>−</button>
-                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc" ${disabled?'disabled':''}>+</button>
-              </div>
-            </div>
-            <img src="${it.img||'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
-          </div>`);
-        list.appendChild(row);
-      });
-        rebuildMenu();
-  requestAnimationFrame(()=>{ 
-    highlightChip(0); 
-    goToIndex(0,{animate:false});
-    recalcTotal();
-    applyRepeatOrder();
+  // построение чипов категорий
+  loadConfig().menu.forEach((cat, idx) => {
+    categoryBar.appendChild(
+      el(`
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx === 0 ? 'bg-black text-white border-black' : 'bg-white/50'}"
+          data-idx="${idx}"
+        >
+          ${cat.title}
+        </button>
+      `)
+    );
   });
-      list.appendChild(el(`<div class="h-24"></div>`));
-      vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
-      // свайп
-      let down=false, used=false, sx=0, sy=0, locked=null; const PIX_LOCK=10, THRESH=()=>Math.max(40, (catPager.getBoundingClientRect().width||1)*0.25);
-      vbox.addEventListener('pointerdown',e=>{ if(isAnimating) return; down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null; vbox.setPointerCapture?.(e.pointerId); });
-      vbox.addEventListener('pointermove',e=>{ if(!down||used||isAnimating) return; const dx=e.clientX-sx, dy=e.clientY-sy;
-        if(locked===null){ if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>PIX_LOCK) locked='x'; else if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>PIX_LOCK) locked='y'; }
-        if(locked==='x'){ e.preventDefault(); if(Math.abs(dx)>=THRESH()){ used=true; const next=dx<0?activeIdx+1:activeIdx-1; goToIndex(next,{animate:true}); } } }, {passive:false});
-      ['pointerup','pointercancel','pointerleave'].forEach(evt=> vbox.addEventListener(evt,()=>{ down=false; used=false; locked=null; }));
+  function highlightChip(idx){
+    const buttons = categoryBar.querySelectorAll('button');
+    buttons.forEach((b, i) => {
+      const on = i === idx;
+      b.classList.toggle('bg-black', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-black', on);
+      if (on){
+        b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
     });
-
-    applyHeights(); setTimeout(applyHeights,60);
   }
 
-  /* единый делегированный клик — исключает двойные инкременты */
-  catPager.addEventListener('click', (e)=>{
+  function goToIndex(idx, { animate = true } = {}){
+    const cfg = loadConfig();
+    idx = Math.max(0, Math.min(cfg.menu.length - 1, idx));
+    const target = Math.round(panelW() * idx);
+    highlightChip(idx);
+
+    const box = catPager.children[idx]?.querySelector('.v-scroll');
+
+    if (!animate){
+      // сохранить скролл предыдущей категории
+      const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+      if (old){
+        scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+      }
+      catPager.scrollLeft = target;
+      if (box){
+        box.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+      }
+      activeIdx = idx;
+      return;
+    }
+
+    isAnimating = true;
+    const prevSnap = catPager.style.scrollSnapType;
+    catPager.style.scrollSnapType = 'none';
+
+    const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+    if (old){
+      scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+    }
+
+    animateScrollX(catPager, target, {
+      duration: 280,
+      onEnd(){
+        const cfg2 = loadConfig();
+        const box2 = catPager.children[idx]?.querySelector('.v-scroll');
+        if (box2){
+          box2.scrollTop = scrollMemory.get(cfg2.menu[idx].key) || 0;
+        }
+        activeIdx = idx;
+        isAnimating = false;
+        catPager.style.scrollSnapType = prevSnap || 'x mandatory';
+      }
+    });
+  }
+
+  categoryBar.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-idx]');
+    if (!b || isAnimating) return;
+    goToIndex(+b.dataset.idx, { animate: true });
+  });
+
+  function rebuildMenu(){
+    catPager.innerHTML = '';
+    const cfg = loadConfig();
+
+    cfg.menu.forEach((cat) => {
+      const panel = el(`<div class="cat-panel"></div>`);
+      const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
+      const list  = el(`<div class="grid gap-3"></div>`);
+
+      cat.items.forEach(it => {
+        const q        = (window.__orderCounts?.[it.name] || 0);
+        const disabled = unavailableClient.has(it.name);
+
+        const row = el(`
+          <div class="menu-card ${disabled ? 'opacity-50' : ''}">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm flex items-center gap-2">
+                ${it.name}
+                ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
+              </div>
+              ${
+                cfg.theme.showPrice
+                  ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                  : ''
+              }
+              <div class="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl border"
+                  data-name="${it.name}"
+                  data-act="dec"
+                  ${disabled ? 'disabled' : ''}
+                >−</button>
+                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl bg-black text-white"
+                  data-name="${it.name}"
+                  data-act="inc"
+                  ${disabled ? 'disabled' : ''}
+                >+</button>
+              </div>
+            </div>
+            <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+          </div>
+        `);
+        list.appendChild(row);
+      });
+
+      // отступ снизу, чтобы над баром подтверждения был воздух
+      list.appendChild(el(`<div class="h-24"></div>`));
+
+      vbox.appendChild(list);
+      panel.appendChild(vbox);
+      catPager.appendChild(panel);
+    });
+
+    applyHeights();
+    setTimeout(applyHeights, 60);
+  }
+
+  // обработчик +/− по делегированию (фикс десктопа через escAttr)
+  catPager.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if(!btn || btn.disabled) return;
-    const name = btn.dataset.name;
+    if (!btn || btn.disabled) return;
+
+    const name  = btn.dataset.name;
     const delta = btn.dataset.act === 'inc' ? +1 : -1;
-    const cur = parseInt(catPager.querySelector(`[data-q="${CSS.escape(name)}"]`)?.textContent||'0',10) || 0;
+
+    const selector = `[data-q="${escAttr(name)}"]`;
+
+    const cur = parseInt(
+      catPager.querySelector(selector)?.textContent || '0',
+      10
+    ) || 0;
+
     const next = Math.max(0, cur + delta);
-    catPager.querySelectorAll(`[data-q="${CSS.escape(name)}"]`).forEach(n=> n.textContent = String(next));
-    if(!window.__orderCounts) window.__orderCounts = {};
+
+    catPager.querySelectorAll(selector).forEach(n => {
+      n.textContent = String(next);
+    });
+
+    if (!window.__orderCounts) window.__orderCounts = {};
     window.__orderCounts[name] = next;
     recalcTotal();
   });
 
   function applyHeights(){
-    try{
-      const headerH = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
-      const chipsH  = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
-      const confirmH= root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
-      const availH = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+    try {
+      const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
+      const chipsH   = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
+      const confirmH = root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
+      const availH   = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+
       const first  = root.querySelector('.menu-card');
       const cardH  = first ? Math.ceil(first.getBoundingClientRect().height) : 104;
-      const h = Math.min(availH, cardH*4 + 12*3 + 4);
-      root.querySelectorAll('.v-scroll').forEach(el=> el.style.height=h+'px');
-      goToIndex(activeIdx,{animate:false});
-    }catch(err){}
+      const h      = Math.min(availH, cardH * 4 + 12 * 3 + 4);
+
+      root.querySelectorAll('.v-scroll').forEach(el => el.style.height = h + 'px');
+      goToIndex(activeIdx, { animate: false });
+    } catch (err) {}
   }
+
   window.addEventListener('resize', applyHeights);
 
-  catPager.addEventListener('scroll', ()=>{
+  catPager.addEventListener('scroll', () => {
     if (isAnimating) return;
     if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer);
-    catPager._scrollTimer = setTimeout(()=>{ const idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width||1)); if(idx!==activeIdx){ highlightChip(idx); activeIdx=idx; } }, 80);
+    catPager._scrollTimer = setTimeout(() => {
+      const idx = Math.round(catPager.scrollLeft / (catPager.getBoundingClientRect().width || 1));
+      if (idx !== activeIdx){
+        highlightChip(idx);
+        activeIdx = idx;
+      }
+    }, 80);
   });
 
   function recalcTotal(){
-    const cfg = loadConfig();
+    const cfg    = loadConfig();
     const counts = window.__orderCounts || {};
-    let sum=0;
-    cfg.menu.forEach(cat=>cat.items.forEach(it=> sum += (counts[it.name]||0)*(it.price||0) ));
+    let sum = 0;
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        sum += (counts[it.name] || 0) * (it.price || 0);
+      })
+    );
     totalEl.textContent = money(sum);
-    confirmBtn.disabled = sum<=0;
+    confirmBtn.disabled = sum <= 0;
     return sum;
   }
 
-  confirmBtn.addEventListener('click', ()=>{
-    const cfg = loadConfig();
+  // обработка нажатия "Оформить заказ" → открытие модалки оплаты
+  confirmBtn.addEventListener('click', () => {
+    const cfg    = loadConfig();
     const counts = window.__orderCounts || {};
-    const items = [];
+    const items  = [];
 
-    cfg.menu.forEach(cat => cat.items.forEach(it => {
-      const q = (counts[it.name] || 0);
-      if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
-    }));
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        const q = (counts[it.name] || 0);
+        if (q > 0){
+          items.push({ name: it.name, qty: q, price: it.price || 0 });
+        }
+      })
+    );
 
-    if (!items.length){ 
-      return; 
-    }
+    if (!items.length) return;
 
-    // Проверка профиля перед заказом
     if (!isProfileFilled()){
       showToast('Заполните данные для доставки в профиле.');
       location.hash = '#/profile-edit';
@@ -659,17 +791,19 @@ function handleStockUpdated(){
     }
 
     if (confirmBtn._busy) return;
-    confirmBtn._busy = true;
+    confirmBtn._busy   = true;
     confirmBtn.disabled = true;
 
     const sumBox = document.getElementById('paySummary');
-    let total = 0;
+    let total    = 0;
     sumBox.innerHTML = items.map(i => {
       total += i.qty * (i.price || 0);
-      return `<div class="flex items-center justify-between">
-        <div class="truncate">${i.name} ×${i.qty}</div>
-        <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
-      </div>`;
+      return `
+        <div class="flex items-center justify-between">
+          <div class="truncate">${i.name} ×${i.qty}</div>
+          <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
+        </div>
+      `;
     }).join('');
 
     sumBox.insertAdjacentHTML(
@@ -680,53 +814,65 @@ function handleStockUpdated(){
     );
 
     const prof = loadProfile();
-    const sel = document.getElementById('paySelect');
-    sel.value = prof.paymentMethod || 'cash';
+    const sel  = document.getElementById('paySelect');
+    sel.value  = prof.paymentMethod || 'cash';
     document.getElementById('payModal').classList.add('open');
   });
 
   function resetCounts(){
     window.__orderCounts = {};
-    catPager.querySelectorAll('[data-q]').forEach(n=> n.textContent='0');
-    totalEl.textContent=money(0);
-    confirmBtn.disabled = true;
+    catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
+    totalEl.textContent   = money(0);
+    confirmBtn.disabled   = true;
   }
 
+  // биндим модалку оплаты (payModal)
   (function bindPayModal(){
-    const m = document.getElementById('payModal');
-    const ok = document.getElementById('payOk');
+    const m   = document.getElementById('payModal');
+    const ok  = document.getElementById('payOk');
     const cancel = document.getElementById('payCancel');
     const sel = document.getElementById('paySelect');
 
-    const close = ()=> m.classList.remove('open');
-    const finalize = ()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
+    const close    = () => m.classList.remove('open');
+    const finalize = () => { confirmBtn._busy = false; confirmBtn.disabled = false; };
 
-    const onCancel = (e)=>{
-      if(e){ e.preventDefault(); e.stopPropagation(); }
+    const onCancel = (e) => {
+      if (e){
+        e.preventDefault();
+        e.stopPropagation();
+      }
       close();
       finalize();
     };
 
-    const onOk = async (e)=>{
-      if(e){ e.preventDefault(); e.stopPropagation(); }
+    const onOk = async (e) => {
+      if (e){
+        e.preventDefault();
+        e.stopPropagation();
+      }
 
-      const cfg = loadConfig();
+      const cfg    = loadConfig();
       const counts = window.__orderCounts || {};
-      const itemsSel=[]; let total=0;
+      const itemsSel = [];
+      let total = 0;
 
-      cfg.menu.forEach(cat=>cat.items.forEach(it=>{
-        const q=(counts[it.name]||0);
-        if(q>0){ itemsSel.push({name:it.name, qty:q, price:it.price||0}); total+=q*(it.price||0); }
-      }));
+      cfg.menu.forEach(cat =>
+        cat.items.forEach(it => {
+          const q = (counts[it.name] || 0);
+          if (q > 0){
+            itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
+            total += q * (it.price || 0);
+          }
+        })
+      );
 
-      if(!itemsSel.length){
+      if (!itemsSel.length){
         close();
         finalize();
         return;
       }
 
-      try{
-        // отправляем заказ на сервер и получаем настоящий id
+      try {
         const res = await rpc({
           op: 'create',
           data: {
@@ -746,21 +892,19 @@ function handleStockUpdated(){
           status: 'новый'
         };
 
-        // локальная история
         const history = loadHistory();
         history.unshift(order);
-        saveHistory(history.slice(0,50));
+        saveHistory(history.slice(0, 50));
 
-        // локальное табло (до синка с сервера)
         const dash = loadDash();
         dash.unshift(order);
-        saveDash(dash.slice(0,200));
+        saveDash(dash.slice(0, 200));
 
         const p = loadProfile();
         p.paymentMethod = sel.value || 'cash';
         saveProfile(p);
 
-      }catch(err){
+      } catch (err) {
         console.warn('RPC create error', err);
         showToast('Не удалось отправить заказ, попробуйте ещё раз.');
         finalize();
@@ -773,60 +917,57 @@ function handleStockUpdated(){
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     };
 
-    // снимаем старые обработчики, если были
-    if (ok._handler) ok.removeEventListener('click', ok._handler);
+    if (ok._handler)     ok.removeEventListener('click', ok._handler);
     if (cancel._handler) cancel.removeEventListener('click', cancel._handler);
 
-    ok._handler = onOk;
+    ok._handler     = onOk;
     cancel._handler = onCancel;
 
     ok.addEventListener('click', onOk);
     cancel.addEventListener('click', onCancel);
 
-    m.onclick = (e)=>{ if(e.target===m) onCancel(e); };
+    m.onclick = (e) => { if (e.target === m) onCancel(e); };
   })();
 
   rebuildMenu();
-  requestAnimationFrame(()=>{ 
-    highlightChip(0); 
-    goToIndex(0,{animate:false});
-    recalcTotal();      // актуализируем сумму
+
+  requestAnimationFrame(() => {
+    highlightChip(0);
+    goToIndex(0, { animate:false });
+    recalcTotal();
+    applyRepeatOrder();
   });
 
-
-  // реагируем на изменения склада, которые приходят с сервера или из табло
+  // реагируем на изменения склада
   window.addEventListener('stock:updated', handleStockUpdated);
 
-  /* периодический синк статусов — поддерживает бэйдж актуальным */
-  /* периодический синк статусов и наличия */
+  // периодический синк: конфиг, статусы, наличие
   const syncTimer = setInterval(async () => {
-        // подтягиваем обновлённое меню
+    // конфиг меню
     try {
       const cfgRemote = await fetchRemoteConfig();
-      if (cfgRemote) {
+      if (cfgRemote){
         const v = calcConfigVersion(cfgRemote);
-        if (v !== lastConfigVersion) {
+        if (v !== lastConfigVersion){
           lastConfigVersion = v;
-          // локально уже сохранено внутри fetchRemoteConfig -> loadConfig вернёт то же
           rebuildMenu();
           recalcTotal();
         }
       }
-    } catch (e) {
-      // тихо игнорируем
-    }
+    } catch (e) {}
 
-    // обновляем статусы заказов
-    await pullAndMergeStatuses();
+    // статусы заказов
+    await pullAndMergeStatuses().catch(() => {});
 
-    // подтягиваем актуальный список "нет в наличии" с сервера
+    // наличие с сервера
     const before = new Set(unavailableClient);
-    const remote = await fetchUnavailableRemote().catch(()=>null);
-    if (remote && Array.isArray(remote)) {
+    const remote = await fetchUnavailableRemote().catch(() => null);
+    if (remote && Array.isArray(remote)){
       const after = new Set(remote);
-      // если есть реальные изменения — перерисовываем меню
-      if (before.size !== after.size ||
-          [...before].some(x => !after.has(x))) {
+      if (
+        before.size !== after.size ||
+        [...before].some(x => !after.has(x))
+      ){
         unavailableClient = after;
         rebuildMenu();
         recalcTotal();
@@ -834,14 +975,16 @@ function handleStockUpdated(){
     }
   }, 4000);
 
-  root.cleanup = ()=> { 
+  root.cleanup = () => {
     setBodyScrollLock(false);
     clearInterval(syncTimer);
     window.removeEventListener('stock:updated', handleStockUpdated);
+    window.removeEventListener('resize', applyHeights);
   };
 
   return root;
 }
+
 
 /* ===== Профиль / Хаб ===== */
 function ProfileHubView(){
@@ -996,7 +1139,7 @@ function ProfileEditView(){
 
 /* ===== История ===== */
 function HistoryView(){ 
-  const root=el(`
+  const root = el(`
     <div class="grid gap-3 pb-24">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">Мои заказы</h2>
@@ -1008,34 +1151,44 @@ function HistoryView(){
       <div id="historyList" class="grid gap-3"></div>
     </div>
   `);
-  const box=root.querySelector('#historyList');
+
+  const box = root.querySelector('#historyList');
+
   function cardView(o, idx){
-    const items=o.items||[];
-    const active = !['завершён','отменён'].includes(o.status||'новый');
+    const items = o.items || [];
+    const active = !['завершён','отменён'].includes(o.status || 'новый');
     const chipClass = active ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-700';
-    const outerBg = active ? 'bg-yellow-50 border-yellow-200' : 'bg-white';
-    const elCard = el(`
-      <div class="card p-4 ${outerBg}">
-        <div class="flex items-center justify-between">
-          <div class="text-2xl font-extrabold">№ ${o.id||'—'}</div>
-          <span class="chip ${chipClass}">${o.status||'новый'}</span>
-        </div>
-        <div class="text-xs text-gray-500 mt-1">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
-            const etaText = o.etaUntil
+    const outerBg  = active ? 'bg-yellow-50 border-yellow-200' : 'bg-white';
+
+    const etaText = o.etaUntil
       ? `<div class="text-xs text-gray-700 mt-1">
            Ожидаемое время: ${o.etaMinutes || ''} мин
            (примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})
          </div>`
+      : '';
+
+    const elCard = el(`
+      <div class="card p-4 ${outerBg}">
+        <div class="flex items-center justify-between">
+          <div class="text-2xl font-extrabold">№ ${o.id || '—'}</div>
+          <span class="chip ${chipClass}">${o.status || 'новый'}</span>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">
+          ${o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}
+        </div>
+        ${etaText}
         <div class="mt-3 grid gap-2">
-          ${ items.map(i=>`
-            <div class="flex items-center justify-between text-sm">
-              <div class="truncate mr-2">${i.name}</div>
-              <div class="whitespace-nowrap">${i.qty} × ${i.price} ₽</div>
-            </div>
-          `).join('') }
+          ${
+            items.map(i => `
+              <div class="flex items-center justify-between text-sm">
+                <div class="truncate mr-2">${i.name}</div>
+                <div class="whitespace-nowrap">${i.qty} × ${i.price} ₽</div>
+              </div>
+            `).join('')
+          }
         </div>
         <div class="mt-3 border-t pt-2 flex items-center justify-between">
-          <div class="font-semibold">Итого: ${money(o.total||0)}</div>
+          <div class="font-semibold">Итого: ${money(o.total || 0)}</div>
           <div class="flex gap-2">
             <button class="px-3 py-2 rounded-xl border" data-repeat>Повторить заказ</button>
             <button class="px-3 py-2 rounded-xl border text-red-600" data-del>Удалить</button>
@@ -1043,35 +1196,57 @@ function HistoryView(){
         </div>
       </div>
     `);
-    elCard.querySelector('[data-repeat]').onclick=()=>{
+
+    elCard.querySelector('[data-repeat]').onclick = () => {
       sessionStorage.setItem('repeat_order_items', JSON.stringify(items));
-      sessionStorage.setItem('open_pay_after_repeat','1');
-      location.hash='#/order';
+      sessionStorage.setItem('open_pay_after_repeat', '1');
+      location.hash = '#/order';
     };
-    elCard.querySelector('[data-del]').onclick=()=>{
-      const cur=loadHistory(); cur.splice(idx,1); saveHistory(cur); render(); window.dispatchEvent(new CustomEvent('orders:history-updated'));
+
+    elCard.querySelector('[data-del]').onclick = () => {
+      const cur = loadHistory();
+      cur.splice(idx, 1);
+      saveHistory(cur);
+      render();
+      window.dispatchEvent(new CustomEvent('orders:history-updated'));
     };
+
     return elCard;
   }
+
   function render(){
-    const list=loadHistory(); box.innerHTML='';
-    if(!Array.isArray(list)||!list.length){ box.innerHTML='<div class="text-sm text-gray-400">Пока нет заказов.</div>'; return }
-    list.forEach((o,idx)=> box.appendChild(cardView(o, idx)));
+    const list = loadHistory();
+    box.innerHTML = '';
+    if (!Array.isArray(list) || !list.length){
+      box.innerHTML = '<div class="text-sm text-gray-400">Пока нет заказов.</div>';
+      return;
+    }
+    list.forEach((o, idx) => box.appendChild(cardView(o, idx)));
   }
-  root.querySelector('#clearAll').onclick=()=>{ if(confirm('Очистить всю историю?')){ saveHistory([]); render(); window.dispatchEvent(new CustomEvent('orders:history-updated')); } };
-  root.querySelector('#back').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
+
+  root.querySelector('#clearAll').onclick = () => {
+    if (confirm('Очистить всю историю?')){
+      saveHistory([]);
+      render();
+      window.dispatchEvent(new CustomEvent('orders:history-updated'));
+    }
+  };
+
+  root.querySelector('#back').onclick = () =>
+    history.length ? history.back() : (location.hash = '#/profile');
+
   render();
 
-  /* автосинк статусов на экране истории */
+  // автосинк статусов на экране истории
   const syncTimer = setInterval(pullAndMergeStatuses, 7000);
-  root.cleanup = ()=> clearInterval(syncTimer);
+  root.cleanup = () => clearInterval(syncTimer);
 
   return root;
 }
 
 /* ===== Табло ===== */
 function DashboardView(){ 
-  const root=el(`
+  const root = el(`
     <div class="grid gap-4 max-w-6xl pb-24">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-2">
@@ -1086,112 +1261,162 @@ function DashboardView(){
 
       <div class="p-4 rounded-2xl bg-white border">
         <h3 class="font-semibold mb-3">Наличие товаров</h3>
-        <p class="text-sm text-gray-500 mb-3">Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.</p>
+        <p class="text-sm text-gray-500 mb-3">
+          Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
+        </p>
         <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-        <div class="mt-3"><button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button></div>
+        <div class="mt-3">
+          <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
+        </div>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
-      <div><button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button></div>
+      <div>
+        <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button>
+      </div>
     </div>
   `);
-    function handleVisibilityChange(){
+
+  const list      = root.querySelector('#list');
+  const stockList = root.querySelector('#stockList');
+  let unavailable = new Set(loadUnavailable());
+  let dashOrders  = loadDash();
+
+  let knownIds       = new Set(dashOrders.map(o => String(o.id)));
+  const ding         = document.getElementById('orderDing');
+  const soundBtn     = root.querySelector('#soundToggle');
+  let hiddenNewCount = 0;
+  let pollTimer      = null;
+
+  const soundOn  = () => localStorage.getItem(SOUND_ON_KEY) === '1';
+  const setSound = (on) => {
+    localStorage.setItem(SOUND_ON_KEY, on ? '1' : '0');
+    soundBtn.classList.toggle('bg-green-50', on);
+    soundBtn.classList.toggle('border-green-600', on);
+  };
+
+  setSound(soundOn());
+  soundBtn.onclick = () => setSound(!soundOn());
+
+  function handleVisibilityChange(){
     if (document.visibilityState === 'visible' && hiddenNewCount > 0){
-      // показываем тост, что пока вас не было, прилетели заказы
       showToast(`Новых заказов: ${hiddenNewCount}`);
       hiddenNewCount = 0;
     }
   }
-
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-
-  const list=root.querySelector('#list'); const stockList=root.querySelector('#stockList');
-  let unavailable=new Set(loadUnavailable()); let dashOrders=loadDash();
-  let knownIds = new Set(dashOrders.map(o=>String(o.id)));
-  const ding = document.getElementById('orderDing');
-  const soundBtn = root.querySelector('#soundToggle');
-  const soundOn = ()=> localStorage.getItem(SOUND_ON_KEY)==='1';
-  const setSound = (on)=>{ localStorage.setItem(SOUND_ON_KEY, on?'1':'0'); soundBtn.classList.toggle('bg-green-50', on); soundBtn.classList.toggle('border-green-600', on); };
-  
-    let hiddenNewCount = 0;   // сколько новых заказов пришло, пока вкладка была скрыта
-  let pollTimer = null;     // таймер опроса сервера
-
-
-  setSound(soundOn());
-  soundBtn.onclick = ()=> setSound(!soundOn());
-
-  function renderStock(){ stockList.innerHTML=''; loadConfig().menu.forEach(cat=>cat.items.forEach(item=>{ const row=el(`<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${item.name}" ${unavailable.has(item.name)?'checked':''} /><span>${item.name}</span></label>`); stockList.appendChild(row); })) }
+  function renderStock(){
+    stockList.innerHTML = '';
+    loadConfig().menu.forEach(cat =>
+      cat.items.forEach(item => {
+        const row = el(`
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" value="${item.name}" ${unavailable.has(item.name) ? 'checked' : ''} />
+            <span>${item.name}</span>
+          </label>
+        `);
+        stockList.appendChild(row);
+      })
+    );
+  }
   renderStock();
+
   root.querySelector('#saveStock').onclick = async () => {
     const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')]
       .map(i => i.value);
 
-    // сохраняем локально (на этом же устройстве)
     saveUnavailable(checked);
     unavailable = new Set(checked);
     showToast('Наличие сохранено');
 
-    // уведомляем все открытые экраны (в этом же браузере), что склад изменился
     window.dispatchEvent(new CustomEvent('stock:updated'));
-
-    // и пробуем отправить на сервер, чтобы другие устройства смогли подтянуть
     await pushUnavailableRemote(checked);
   };
 
   function orderCard(o){
-    const clientTotal=(o.items||[]).reduce((s,i)=> s + (i.price||0)*(i.qty||0),0);
-    const total=Math.max(typeof o.total==='number'?o.total:0, clientTotal);
-    const created=o.createdAt? new Date(o.createdAt): new Date();
+    const clientTotal = (o.items || []).reduce(
+      (s, i) => s + (i.price || 0) * (i.qty || 0),
+      0
+    );
+    const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
+    const created = o.createdAt ? new Date(o.createdAt) : new Date();
+
     const colorMap = {
-      'новый':'bg-yellow-50 border-yellow-300','готовится':'bg-blue-50 border-blue-300','в пути':'bg-purple-50 border-purple-300',
-      'готов':'bg-green-50 border-green-300','завершён':'bg-gray-100 border-gray-300','отменён':'bg-red-50 border-red-300'
+      'новый':     'bg-yellow-50 border-yellow-300',
+      'готовится': 'bg-blue-50 border-blue-300',
+      'в пути':    'bg-purple-50 border-purple-300',
+      'готов':     'bg-green-50 border-green-300',
+      'завершён':  'bg-gray-100 border-gray-300',
+      'отменён':   'bg-red-50 border-red-300'
     };
     const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
-    const itemsHtml = (o.items||[]).map(i => `<div class="flex justify-between text-lg"><div>${i.name}</div><div class="font-semibold">${i.qty} × ${i.price}</div></div>`).join('');
-    const card=el(`
-      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
-        <div class="flex items-center justify-between">
-          <div class="text-2xl font-extrabold tracking-tight">#${o.id||'—'}</div>
-          <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status||'новый'}</span>
-        </div>
-        <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
-        <div class="mt-2 grid gap-1 text-lg">${itemsHtml||'—'}</div>
-        <div class="mt-3 flex items-center justify-between text-xl font-bold">
-          <div>Итого:</div><div>${total} ₽</div>
-        </div>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <label class="text-sm">Статус:</label>
-          <select class="border rounded-xl p-2 text-sm" data-k="status">
-            ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}
-          </select>
-          
-              const etaBlock = o.etaUntil
+
+    const itemsHtml = (o.items || []).map(i => `
+      <div class="flex justify-between text-lg">
+        <div>${i.name}</div>
+        <div class="font-semibold">${i.qty} × ${i.price}</div>
+      </div>
+    `).join('');
+
+    const etaBlock = o.etaUntil
       ? `<div class="text-sm text-gray-700 mt-1">
            Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
          </div>`
       : '';
 
-             <label class="text-sm ml-2">Время:</label>
+    const card = el(`
+      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
+        <div class="flex items-center justify-between">
+          <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'новый'}</span>
+        </div>
+        <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
+        ${etaBlock}
+        <div class="mt-2 grid gap-1 text-lg">
+          ${itemsHtml || '—'}
+        </div>
+        <div class="mt-3 flex items-center justify-between text-xl font-bold">
+          <div>Итого:</div><div>${total} ₽</div>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-2 items-center">
+          <label class="text-sm">Статус:</label>
+          <select class="border rounded-xl p-2 text-sm" data-k="status">
+            ${
+              ['новый','готовится','в пути','готов','завершён','отменён']
+                .map(s => `<option ${s === (o.status || 'новый') ? 'selected' : ''}>${s}</option>`)
+                .join('')
+            }
+          </select>
+
+          <label class="text-sm ml-2">Время:</label>
           <select class="border rounded-xl p-2 text-sm" data-k="eta">
             <option value="">—</option>
-            ${[5,10,15,20,25,30].map(m=>`
-              <option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>
-            `).join('')}
+            ${
+              [5,10,15,20,25,30].map(m => `
+                <option value="${m}" ${Number(o.etaMinutes) === m ? 'selected' : ''}>${m} мин</option>
+              `).join('')
+            }
           </select>
+
           <button type="button" class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100" data-act="save">Сохранить</button>
           <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 ml-auto" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
 
-        if(act==='save'){
+    card.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      const act = btn.dataset.act;
+
+      if (act === 'save'){
         const status = card.querySelector('[data-k="status"]').value;
         const etaSel = card.querySelector('[data-k="eta"]').value;
         const etaMinutes = etaSel ? Number(etaSel) : null;
-        const patch = { status };
 
-        if (etaMinutes) {
+        const patch = { status };
+        if (etaMinutes){
           patch.etaMinutes = etaMinutes;
           patch.etaUntil   = Date.now() + etaMinutes * 60 * 1000;
         } else {
@@ -1199,27 +1424,47 @@ function DashboardView(){
           patch.etaUntil   = null;
         }
 
-        const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
-        if(i>=0){
+        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+        if (i >= 0){
           dashOrders[i] = { ...dashOrders[i], ...patch };
           saveDash(dashOrders);
           syncOrderStatus(o.id, patch.status);
-
           showToast(`Статус #${o.id} обновлён`);
         }
 
-        try{ rpc({op:'update', id:o.id, patch}).catch(()=>{}); }catch{}
-      }
+        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
 
-      
-      if(act==='delete'){
-        if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
-        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён`);
-        try{ rpc({op:'delete', id:o.id}).catch(()=>{}); }catch{}
+      } else if (act === 'delete'){
+        if (!card.dataset.confirm){
+          card.dataset.confirm = '1';
+          btn.textContent = 'Точно удалить?';
+          setTimeout(() => {
+            if (card && card.dataset.confirm === '1'){
+              delete card.dataset.confirm;
+              btn.textContent = 'Удалить';
+            }
+          }, 3000);
+          return;
+        }
+
+        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+        saveDash(dashOrders);
+        card.remove();
+        showToast(`Заказ #${o.id} удалён`);
+
+        try { rpc({ op: 'delete', id: o.id }).catch(()=>{}); } catch {}
       }
     });
 
     return card;
+  }
+
+  function renderOrders(){
+    const unique = new Map();
+    dashOrders.forEach(o => unique.set(String(o.id), o));
+    const orders = [...unique.values()];
+    list.innerHTML = '';
+    orders.forEach(o => list.appendChild(orderCard(o)));
   }
 
   function load(){
@@ -1228,32 +1473,35 @@ function DashboardView(){
 
     const incoming = [...unique.keys()].filter(id => !knownIds.has(id));
 
-    if (incoming.length) {
-      if (document.visibilityState === 'visible') {
-        // вкладка видима — можно пробовать играть звук
-        if (soundOn()) {
-          try {
-            ding.currentTime = 0;
-            ding.play().catch(() => {
-              // если браузер заблокировал autoplay — просто игнорируем
-            });
-          } catch {}
-        }
-      } else {
-        // вкладка скрыта — звук не трогаем, просто накапливаем количество
+    if (incoming.length){
+      if (document.visibilityState === 'visible' && soundOn()){
+        try {
+          ding.currentTime = 0;
+          ding.play().catch(()=>{});
+        } catch {}
+      } else if (document.visibilityState === 'hidden'){
         hiddenNewCount += incoming.length;
       }
     }
 
     knownIds = new Set(unique.keys());
-
+    dashOrders = [...unique.values()];
+    renderOrders();
   }
 
-  root.querySelector('#btnClearAll').onclick = async ()=>{
-    if(!confirm('Удалить все заказы?')) return;
-    const ids = (dashOrders||[]).map(o=>o.id);
-    dashOrders = []; saveDash(dashOrders); load();
-    try{ await rpc({ op:'clear' }); }catch{ for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} } }
+  root.querySelector('#btnClearAll').onclick = async () => {
+    if (!confirm('Удалить все заказы?')) return;
+    const ids = (dashOrders || []).map(o => o.id);
+    dashOrders = [];
+    saveDash(dashOrders);
+    load();
+    try {
+      await rpc({ op:'clear' });
+    } catch {
+      for (const id of ids){
+        try { await rpc({ op:'delete', id }); } catch {}
+      }
+    }
   };
 
   async function loadOrdersFromCloud(){
@@ -1264,13 +1512,15 @@ function DashboardView(){
         dashOrders = res.orders.slice();
         load();
       }
-    }catch(e){ console.warn('loadOrdersFromCloud', e); }
+    } catch(e){
+      console.warn('loadOrdersFromCloud', e);
+    }
   }
-   load();
+
+  load();
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 5000);
 
-  // когда уходим с экрана табло — чистим за собой
   root.cleanup = () => {
     if (pollTimer) clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
