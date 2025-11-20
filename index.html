@@ -55,6 +55,18 @@
     .sushi-icon svg{ width:24px; height:24px; }
     .header-row{ padding:10px 12px; }
     .header-ghost{ height:8px; }
+    /* Отключаем выделение текста у основных интерактивов */
+button, a, svg, .brand-strip, .header-row {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Убираем рамку фокуса с кнопок/ссылок (чтобы не "залипала" после тапов) */
+button:focus, a:focus {
+  outline: none;
+  box-shadow: none;
+}
   </style>
 </head>
 <body>
@@ -137,6 +149,43 @@
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
 
+  <script>
+// ==== ПОЛИФИЛЫ ДЛЯ СТАРЫХ/КАПРИЗНЫХ БРАУЗЕРОВ ====
+
+// matches
+if (!Element.prototype.matches) {
+  Element.prototype.matches =
+    Element.prototype.msMatchesSelector ||
+    Element.prototype.webkitMatchesSelector ||
+    function (selector) {
+      const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
+      let i = matches.length;
+      while (--i >= 0 && matches.item(i) !== this) {}
+      return i > -1;
+    };
+}
+
+// closest
+if (!Element.prototype.closest) {
+  Element.prototype.closest = function (selector) {
+    let el = this;
+    while (el && el.nodeType === 1) {
+      if (el.matches(selector)) return el;
+      el = el.parentElement || el.parentNode;
+    }
+    return null;
+  };
+}
+
+// CSS.escape
+if (!window.CSS) window.CSS = {};
+if (typeof window.CSS.escape !== 'function') {
+  window.CSS.escape = function (value) {
+    return String(value).replace(/"/g, '\\"');
+  };
+}
+</script>
+  
 <script>
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = '/api/order';
