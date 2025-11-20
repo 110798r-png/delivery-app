@@ -1436,7 +1436,7 @@ function DashboardView(){
 
     window.dispatchEvent(new CustomEvent('stock:updated'));
     await pushUnavailableRemote(checked);
-    // Обновляем свой UI (чтоб галочки снялись2222)
+    };
   root.querySelector('#resetStock').onclick = async () => {
   // Локально считаем, что всё в наличии
   saveUnavailable([]);
