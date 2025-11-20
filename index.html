@@ -237,20 +237,8 @@ function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||
 function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
 function saveHistory(list){
   const arr = Array.isArray(list) ? list : [];
-  const seen = new Set();
-  const uniq = [];
-
-  for (const o of arr){
-    if (!o) continue;
-    const id = String(o.id ?? '');
-    // если id пустой — всё равно добавим, но дубликаты с тем же id выкинем
-    if (id && seen.has(id)) continue;
-    if (id) seen.add(id);
-    uniq.push(o);
-  }
-  localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(uniq));
+  localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(arr));
 }
-
 function saveUnavailable(items){
   localStorage.setItem(UNAVAILABLE_LS_KEY, JSON.stringify(Array.isArray(items)?items:[]));
 }
@@ -263,17 +251,7 @@ function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 
 function saveDash(list){
   const arr = Array.isArray(list) ? list : [];
-  const seen = new Set();
-  const uniq = [];
-
-  for (const o of arr){
-    if (!o) continue;
-    const id = String(o.id ?? '');
-    if (id && seen.has(id)) continue;
-    if (id) seen.add(id);
-    uniq.push(o);
-  }
-  localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(uniq));
+  localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(arr));
 }
 function getClientId(){
   let id = localStorage.getItem(CLIENT_ID_KEY);
@@ -436,22 +414,39 @@ async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
     if(!cloud || !Array.isArray(cloud.orders)) return;
-    const byId = new Map(cloud.orders.map(o => [String(o.id), o.status]));
+
+    const byId = new Map(cloud.orders.map(o => [String(o.id), o]));
     const hist = loadHistory();
     let changed = false;
+
     for (let i=0;i<hist.length;i++){
       const id = String(hist[i].id);
-      if(byId.has(id) && hist[i].status !== byId.get(id)){
-        hist[i] = { ...hist[i], status: byId.get(id) };
+      const fromCloud = byId.get(id);
+      if (!fromCloud) continue;
+
+      // мержим не только статус, но и ETA (под пункт E)
+      const next = {
+        ...hist[i],
+        status: fromCloud.status,
+        etaMinutes: fromCloud.etaMinutes,
+        etaUntil: fromCloud.etaUntil,
+      };
+
+      if (JSON.stringify(next) !== JSON.stringify(hist[i])) {
+        hist[i] = next;
         changed = true;
       }
     }
+
     if(changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     }
-  }catch(e){ /* тихо */ }
+  }catch(e){
+    console.warn('pullAndMergeStatuses error', e);
+  }
 }
+
 
 /* ===== Order ===== */
 function OrderView(){
@@ -506,6 +501,48 @@ function handleStockUpdated(){
   rebuildMenu();
   recalcTotal();
 }
+    function applyRepeatOrder(){
+    const raw = sessionStorage.getItem('repeat_order_items');
+    if (!raw) return;
+
+    sessionStorage.removeItem('repeat_order_items');
+    const autoPay = sessionStorage.getItem('open_pay_after_repeat') === '1';
+    sessionStorage.removeItem('open_pay_after_repeat');
+
+    let items = [];
+    try { items = JSON.parse(raw) || []; } catch {}
+    if (!Array.isArray(items) || !items.length) return;
+
+    window.__orderCounts = window.__orderCounts || {};
+
+    const cfg = loadConfig();
+    const namesSet = new Set(
+      cfg.menu.flatMap(cat => cat.items.map(it => it.name))
+    );
+
+    items.forEach(it => {
+      if (!namesSet.has(it.name)) return;
+      const q = Number(it.qty || it.count || 0);
+      if (q <= 0) return;
+      window.__orderCounts[it.name] = q;
+    });
+
+    // обновляем интерфейс
+    catPager.querySelectorAll('[data-q]').forEach(node => {
+      const name = node.getAttribute('data-q');
+      const val = window.__orderCounts[name] || 0;
+      node.textContent = String(val);
+    });
+
+    recalcTotal();
+
+    if (autoPay) {
+      setTimeout(() => {
+        if (!confirmBtn.disabled) confirmBtn.click();
+      }, 50);
+    }
+  }
+
   loadConfig().menu.forEach((cat,idx)=> categoryBar.appendChild(el(`<button type="button" class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx===0?'bg-black text-white border-black':'bg-white/50'}" data-idx="${idx}">${cat.title}</button>`)));
   function highlightChip(idx){ categoryBar.querySelectorAll('button').forEach((b,i)=>{ const on=i===idx; b.classList.toggle('bg-black',on); b.classList.toggle('text-white',on); b.classList.toggle('border-black',on); if(on) b.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'}); }); }
   function goToIndex(idx,{animate=true}={}){ idx=Math.max(0,Math.min(loadConfig().menu.length-1,idx)); const target=Math.round(panelW()*idx); highlightChip(idx); if(!animate){ catPager.scrollLeft=target; activeIdx=idx; return } isAnimating=true; const prevSnap=catPager.style.scrollSnapType; catPager.style.scrollSnapType='none'; const old=catPager.children[activeIdx]?.querySelector('.v-scroll'); if(old){ scrollMemory.set(loadConfig().menu[activeIdx].key, old.scrollTop); } animateScrollX(catPager, target, { duration:280, onEnd(){ const box=catPager.children[idx]?.querySelector('.v-scroll'); if(box){ box.scrollTop = scrollMemory.get(loadConfig().menu[idx].key)||0; } activeIdx=idx; isAnimating=false; catPager.style.scrollSnapType=prevSnap||'x mandatory'; }}); }
@@ -533,6 +570,13 @@ function handleStockUpdated(){
           </div>`);
         list.appendChild(row);
       });
+        rebuildMenu();
+  requestAnimationFrame(()=>{ 
+    highlightChip(0); 
+    goToIndex(0,{animate:false});
+    recalcTotal();
+    applyRepeatOrder();
+  });
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list); panel.appendChild(vbox); catPager.appendChild(panel);
 
@@ -977,6 +1021,11 @@ function HistoryView(){
           <span class="chip ${chipClass}">${o.status||'новый'}</span>
         </div>
         <div class="text-xs text-gray-500 mt-1">${o.createdAt? new Date(o.createdAt).toLocaleString():''}</div>
+            const etaText = o.etaUntil
+      ? `<div class="text-xs text-gray-700 mt-1">
+           Ожидаемое время: ${o.etaMinutes || ''} мин
+           (примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})
+         </div>`
         <div class="mt-3 grid gap-2">
           ${ items.map(i=>`
             <div class="flex items-center justify-between text-sm">
@@ -1116,20 +1165,53 @@ function DashboardView(){
           <select class="border rounded-xl p-2 text-sm" data-k="status">
             ${['новый','готовится','в пути','готов','завершён','отменён'].map(s=>`<option ${s===(o.status||'новый')?'selected':''}>${s}</option>`).join('')}
           </select>
+          
+              const etaBlock = o.etaUntil
+      ? `<div class="text-sm text-gray-700 mt-1">
+           Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+         </div>`
+      : '';
+
+             <label class="text-sm ml-2">Время:</label>
+          <select class="border rounded-xl p-2 text-sm" data-k="eta">
+            <option value="">—</option>
+            ${[5,10,15,20,25,30].map(m=>`
+              <option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>
+            `).join('')}
+          </select>
           <button type="button" class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100" data-act="save">Сохранить</button>
           <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 ml-auto" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
 
-    card.addEventListener('click', async (e)=>{
-      const act=e.target.dataset.act; if(!act) return;
-      if(act==='save'){
-        const status=card.querySelector('[data-k="status"]').value;
-        const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
-        if(i>=0){ dashOrders[i]={...dashOrders[i], status}; saveDash(dashOrders); syncOrderStatus(o.id, status); showToast(`Статус #${o.id} обновлён`); }
-        try{ rpc({op:'update', id:o.id, patch:{status}}).catch(()=>{}); }catch{}
+        if(act==='save'){
+        const status = card.querySelector('[data-k="status"]').value;
+        const etaSel = card.querySelector('[data-k="eta"]').value;
+        const etaMinutes = etaSel ? Number(etaSel) : null;
+        const patch = { status };
+
+        if (etaMinutes) {
+          patch.etaMinutes = etaMinutes;
+          patch.etaUntil   = Date.now() + etaMinutes * 60 * 1000;
+        } else {
+          patch.etaMinutes = null;
+          patch.etaUntil   = null;
+        }
+
+        const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
+        if(i>=0){
+          dashOrders[i] = { ...dashOrders[i], ...patch };
+          saveDash(dashOrders);
+          syncOrderStatus(o.id, patch.status);
+
+          showToast(`Статус #${o.id} обновлён`);
+        }
+
+        try{ rpc({op:'update', id:o.id, patch}).catch(()=>{}); }catch{}
       }
+
+      
       if(act==='delete'){
         if(!card.dataset.confirm){ card.dataset.confirm='1'; e.target.textContent='Точно удалить?'; setTimeout(()=>{ if(card&&card.dataset.confirm==='1'){ delete card.dataset.confirm; e.target.textContent='Удалить' }},3000); return }
         dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id)); saveDash(dashOrders); card.remove(); showToast(`Заказ #${o.id} удалён`);
@@ -1165,12 +1247,6 @@ function DashboardView(){
 
     knownIds = new Set(unique.keys());
 
-  }
-
-
-    list.innerHTML='';
-    if(unique.size===0){ list.innerHTML=`<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`; return }
-    [...unique.values()].forEach(o=> list.appendChild(orderCard(o)) );
   }
 
   root.querySelector('#btnClearAll').onclick = async ()=>{
