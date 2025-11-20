@@ -446,7 +446,6 @@ async function pullAndMergeStatuses(){
         changed = true;
       }
     }
-    setInterval(pullAndMergeStatuses, 5000);
     if(changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
@@ -465,11 +464,26 @@ function OrderView(){
           <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
         </div>
       </section>
-      <section><div id="catPager" class="no-scrollbar"></div></section>
+
+      <section>
+        <div id="catPager" class="no-scrollbar"></div>
+      </section>
+
       <div id="confirmBar" class="confirm-bar">
         <div class="flex items-center justify-between gap-3">
           <div class="text-base">
-            <span class="text-gray-600">Итого:</span> <b id="totalVal">0 руб.</b>
+            <span class="text-gray-600">Итого:</span>
+            <b id="totalVal">0 руб.</b>
+          </div>
+          <button
+            id="confirmBtn"
+            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled
+          >
+            Оформить заказ
+          </button>
+        </div>
+      </div>
     </div>
   `);
    
@@ -1151,12 +1165,6 @@ function DashboardView(){
 
     knownIds = new Set(unique.keys());
 
-    list.innerHTML = '';
-    if (unique.size === 0) {
-      list.innerHTML = `<div class="p-5 rounded-2xl bg-white border text-gray-500 col-span-full">Пока нет заказов.</div>`;
-      return;
-    }
-    [...unique.values()].forEach(o => list.appendChild(orderCard(o)));
   }
 
 
