@@ -1363,16 +1363,16 @@ function DashboardView(){
         </div>
       </div>
 
-      <div class="p-4 rounded-2xl bg-white border">
-        <h3 class="font-semibold mb-3">Наличие товаров</h3>
-        <p class="text-sm text-gray-500 mb-3">
-          Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
-        </p>
         <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-        <div class="mt-3">
-          <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
-        </div>
-      </div>
+  <div class="mt-3 flex gap-2">
+    <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">
+      Сохранить
+    </button>
+    <button id="resetStock" class="px-3 py-2 rounded-xl border">
+      Все в наличии
+    </button>
+  </div>
+</div>
 
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
       <div>
@@ -1436,7 +1436,28 @@ function DashboardView(){
 
     window.dispatchEvent(new CustomEvent('stock:updated'));
     await pushUnavailableRemote(checked);
-  };
+    // Обновляем свой UI (чтоб галочки снялись2222)
+  root.querySelector('#resetStock').onclick = async () => {
+  // Локально считаем, что всё в наличии
+  saveUnavailable([]);
+  unavailable = new Set();
+
+  // Обновляем свой UI (чтоб галочки снялись)
+  renderStock();
+
+  // Сообщаем другим экранам этого же браузера
+  window.dispatchEvent(new CustomEvent('stock:updated'));
+
+  // Пишем на сервер пустой список, чтобы другие устройства при синке тоже обнулили
+  try {
+    await pushUnavailableRemote([]);
+    showToast('Все товары в наличии');
+  } catch (e) {
+    console.warn('resetStock error', e);
+    showToast('Не удалось отправить на сервер, но локально всё в наличии');
+  }
+};
+
 
   function orderCard(o){
     const clientTotal = (o.items || []).reduce(
