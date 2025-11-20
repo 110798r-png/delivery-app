@@ -1,6 +1,6 @@
 // ----------- SAFE SW FOR YOUR DELIVERY APP -----------
 
-const CACHE_NAME = 'static-v2';
+const CACHE_NAME = 'static-v3';
 
 self.addEventListener("install", (event) => {
   // сразу активируем новую версию SW
