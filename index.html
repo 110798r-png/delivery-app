@@ -417,10 +417,13 @@ async function fetchRemoteConfig(){
 async function fetchUnavailableRemote(){
   try{
     const res = await rpc({ op: 'getUnavailable' });
+
+    // на бэке мы всегда возвращаем { items: [...] }
     const items = Array.isArray(res?.items) ? res.items : [];
 
-    // Сохраняем ВСЕГДА, даже если список пустой
+    // ВАЖНО: сохраняем ВСЕГДА, даже если список пустой
     saveUnavailable(items);
+
     return items;
   }catch(e){
     console.warn('fetchUnavailableRemote', e);
