@@ -111,41 +111,24 @@ button:focus, a:focus {
   </div>
 
   <!-- Оплата -->
-    <div id="payModal" class="modal">
-  <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-    <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
-    <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
-
-    <div class="grid gap-1">
-      <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
-      <select id="paySelect" class="border rounded-xl p-3 w-full">
-        <option value="cash">Наличные</option>
-        <option value="card">Банковская карта</option>
-        <option value="transfer">Перевод</option>
-      </select>
-    </div>
-
-    <!-- ✅ Тип заказа ВНУТРИ модалки -->
-    <div class="grid gap-1">
-      <div class="text-sm text-gray-600">Тип заказа</div>
-      <div id="deliveryToggle" class="flex gap-2">
-        <button type="button" data-delivery="delivery"
-          class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-black text-white border-black">
-          Доставка
-        </button>
-        <button type="button" data-delivery="pickup"
-          class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-white">
-          Самовывоз
-        </button>
+  <div id="payModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
+      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
+      <div class="grid gap-1">
+        <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
+        <select id="paySelect" class="border rounded-xl p-3 w-full">
+          <option value="cash">Наличные</option>
+          <option value="card">Банковская карта</option>
+          <option value="transfer">Перевод</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
+        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
       </div>
     </div>
-
-    <div class="flex justify-end gap-2">
-      <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
-      <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
-    </div>
   </div>
-</div>
 
   <!-- Ключ для табло -->
   <div id="pinModal" class="modal">
@@ -542,39 +525,21 @@ function OrderView(){
         <div id="catPager" class="no-scrollbar"></div>
       </section>
 
-<div id="confirmBar" class="confirm-bar">
-  <div class="flex items-center justify-between gap-3">
-    
-    <!-- слева: итого + корзина -->
-    <div class="flex items-center gap-2 text-base">
-      <span class="text-gray-600">Итого:</span>
-      <b id="totalVal">0 руб.</b>
-
-      <!-- кнопка корзины -->
-      <button id="cartBtn"
-        class="ml-1 w-10 h-10 rounded-xl border bg-white grid place-items-center active:scale-95"
-        aria-label="Корзина" title="Корзина"
-        type="button">
-        <!-- простая иконка корзины -->
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M6 6h15l-1.5 9h-12L6 6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          <circle cx="9" cy="20" r="1.5" fill="currentColor"/>
-          <circle cx="18" cy="20" r="1.5" fill="currentColor"/>
-          <path d="M6 6L5 3H2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- справа: кнопка уже, НЕ flex-1 -->
-    <button
-      id="confirmBtn"
-      class="px-4 py-2 rounded-xl bg-black text-white disabled:opacity-40 disabled:cursor-not-allowed w-44"
-      disabled
-    >
-      Оформить заказ
-    </button>
-  </div>
-</div>
+      <div id="confirmBar" class="confirm-bar">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-base">
+            <span class="text-gray-600">Итого:</span>
+            <b id="totalVal">0 руб.</b>
+          </div>
+          <button
+            id="confirmBtn"
+            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled
+          >
+            Оформить заказ
+          </button>
+        </div>
+      </div>
     </div>
   `);
 
@@ -582,44 +547,6 @@ function OrderView(){
   const catPager    = root.querySelector('#catPager');
   const totalEl     = root.querySelector('#totalVal');
   const confirmBtn  = root.querySelector('#confirmBtn');
-  
-   // ===== корзина-кнопка =====
-const cartBtn = root.querySelector('#cartBtn');
-if (cartBtn) {
-  cartBtn.addEventListener('click', () => {
-    location.hash = '#/cart';
-  });
-}
-
- // === delivery toggle в payModal ===
-let deliveryType = 'delivery'; // 'delivery' | 'pickup'
-const deliveryToggle = document.getElementById('deliveryToggle');
-
-function renderDeliveryToggle(){
-  if (!deliveryToggle) return;
-  const btns = deliveryToggle.querySelectorAll('button[data-delivery]');
-  btns.forEach(b => {
-    const on = b.dataset.delivery === deliveryType;
-    b.classList.toggle('bg-black', on);
-    b.classList.toggle('text-white', on);
-    b.classList.toggle('border-black', on);
-    b.classList.toggle('bg-white', !on);
-  });
-}
-
-if (deliveryToggle && !deliveryToggle._bound){
-  deliveryToggle._bound = true;
-  deliveryToggle.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-delivery]');
-    if (!b) return;
-    deliveryType = b.dataset.delivery;  // 'delivery' или 'pickup'
-    renderDeliveryToggle();
-  });
-}
-
-  deliveryToggle?.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-delivery]');
-  });
 
   setBodyScrollLock(true);
   confirmBtn._busy = false;
@@ -635,8 +562,8 @@ if (deliveryToggle && !deliveryToggle._bound){
     unavailableClient = new Set(loadUnavailable());
     rebuildMenu();
     recalcTotal();
-  }  
-  
+  }
+
   // автоподстановка повторного заказа из истории
   function applyRepeatOrder(){
     const raw = sessionStorage.getItem('repeat_order_items');
@@ -997,7 +924,6 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
     const prof = loadProfile();
     const sel  = document.getElementById('paySelect');
     sel.value  = prof.paymentMethod || 'cash';
-    renderDeliveryToggle();
     document.getElementById('payModal').classList.add('open');
   });
 
@@ -1057,24 +983,22 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
       try {
         const res = await rpc({
           op: 'create',
-                  data: {
+          data: {
             clientId: getClientId(),
             items: itemsSel,
             total,
-            pay: sel.value || 'cash',
-            deliveryType
+            pay: sel.value || 'cash'
           }
         });
 
-       const order = res && res.order ? res.order : {
-  id: Date.now().toString().slice(-6),
-  createdAt: Date.now(),
-  items: itemsSel,
-  total,
-  pay: sel.value || 'cash',
-  status: 'новый',
-  deliveryType: deliveryType
-};
+        const order = res && res.order ? res.order : {
+          id: Date.now().toString().slice(-6),
+          createdAt: Date.now(),
+          items: itemsSel,
+          total,
+          pay: sel.value || 'cash',
+          status: 'новый'
+        };
 
         const history = loadHistory();
         history.unshift(order);
@@ -1432,66 +1356,6 @@ function HistoryView(){
 
   return root;
 }
-   /* ===== Корзина (текущий заказ) ===== */
-function CartView(){
-  const cfg = loadConfig();
-  const counts = window.__orderCounts || {};
-  const items = [];
-
-  cfg.menu.forEach(cat =>
-    cat.items.forEach(it => {
-      const q = counts[it.name] || 0;
-      if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
-    })
-  );
-
-  let total = items.reduce((s,i)=> s + i.qty*i.price, 0);
-
-  const root = el(`
-    <div class="grid gap-3 pb-24">
-      <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Корзина</h2>
-        <button id="backToOrder" class="px-3 py-2 rounded-xl border">Назад</button>
-      </div>
-
-      <div class="card p-4 grid gap-2" id="cartList"></div>
-
-      <div class="card p-4 flex items-center justify-between font-semibold">
-        <div>Итого</div>
-        <div>${money(total)}</div>
-      </div>
-
-      <button id="clearCart" class="px-3 py-2 rounded-xl border text-red-600">
-        Очистить корзину
-      </button>
-    </div>
-  `);
-
-  const listBox = root.querySelector('#cartList');
-
-  if (!items.length){
-    listBox.innerHTML = '<div class="text-sm text-gray-400">Корзина пустая.</div>';
-  } else {
-    listBox.innerHTML = items.map(i => `
-      <div class="flex items-center justify-between text-sm border-b last:border-b-0 py-2">
-        <div class="truncate mr-2">${i.name} ×${i.qty}</div>
-        <div class="whitespace-nowrap">${money(i.qty*i.price)}</div>
-      </div>
-    `).join('');
-  }
-
-  root.querySelector('#backToOrder').onclick = ()=> location.hash = '#/order';
-
-  root.querySelector('#clearCart').onclick = ()=>{
-    if (!confirm('Очистить корзину?')) return;
-    window.__orderCounts = {};
-    showToast('Корзина очищена');
-    location.hash = '#/order';
-    window.dispatchEvent(new CustomEvent('orders:history-updated'));
-  };
-
-  return root;
-}
 
 /* ===== Табло ===== */
 function DashboardView(){ 
@@ -1651,9 +1515,6 @@ if (!list || !stockList) {
         <div class="flex items-center justify-between">
           <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
           <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'новый'}</span>
-        </div>
-                <div class="text-sm mt-1 font-semibold">
-          ${o.deliveryType === 'pickup' ? '🏠 Самовывоз' : '🛵 Доставка'}
         </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         ${etaBlock}
@@ -1977,13 +1838,12 @@ function realRouter(){
   else if(h==='#/contact') mount(ContactView());
   else if(h==='#/dashboard') mount(DashboardView());
   else if(h==='#/builder') mount(BuilderView());
-  else if(h==='#/cart') mount(CartView());
   else mount(OrderView());
 }
 function router(){
   const h=location.hash.split('?')[0];
   const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact'||h==='#/builder'||h==='#/cart');
+  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact'||h==='#/builder');
   if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
