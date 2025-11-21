@@ -130,6 +130,22 @@ button:focus, a:focus {
     </div>
   </div>
 
+        <!-- Тип заказа: доставка/самовывоз -->
+      <div class="grid gap-1">
+        <div class="text-sm text-gray-600">Тип заказа</div>
+        <div id="deliveryToggle" class="flex gap-2">
+          <button type="button" data-delivery="delivery"
+            class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-black text-white border-black">
+            Доставка
+          </button>
+          <button type="button" data-delivery="pickup"
+            class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-white">
+            Самовывоз
+          </button>
+        </div>
+      </div>
+
+  
   <!-- Ключ для табло -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
@@ -548,6 +564,29 @@ function OrderView(){
   const totalEl     = root.querySelector('#totalVal');
   const confirmBtn  = root.querySelector('#confirmBtn');
 
+    // --- delivery toggle в payModal ---
+  const payModal = document.getElementById('payModal');
+  const deliveryToggle = document.getElementById('deliveryToggle');
+
+  function renderDeliveryToggle(){
+    if (!deliveryToggle) return;
+    const btns = deliveryToggle.querySelectorAll('button[data-delivery]');
+    btns.forEach(b => {
+      const on = b.dataset.delivery === deliveryType;
+      b.classList.toggle('bg-black', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-black', on);
+      b.classList.toggle('bg-white', !on);
+    });
+  }
+
+  deliveryToggle?.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-delivery]');
+    if (!b) return;
+    deliveryType = b.dataset.delivery;
+    renderDeliveryToggle();
+  });
+
   setBodyScrollLock(true);
   confirmBtn._busy = false;
 
@@ -562,7 +601,10 @@ function OrderView(){
     unavailableClient = new Set(loadUnavailable());
     rebuildMenu();
     recalcTotal();
-  }
+  }  
+  
+    let deliveryType = 'delivery'; // 'delivery' | 'pickup'
+
 
   // автоподстановка повторного заказа из истории
   function applyRepeatOrder(){
@@ -924,6 +966,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
     const prof = loadProfile();
     const sel  = document.getElementById('paySelect');
     sel.value  = prof.paymentMethod || 'cash';
+        // синхронизируем UI переключателя
+    renderDeliveryToggle();
     document.getElementById('payModal').classList.add('open');
   });
 
@@ -983,11 +1027,12 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
       try {
         const res = await rpc({
           op: 'create',
-          data: {
+                  data: {
             clientId: getClientId(),
             items: itemsSel,
             total,
-            pay: sel.value || 'cash'
+            pay: sel.value || 'cash',
+            deliveryType
           }
         });
 
@@ -998,6 +1043,7 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
           total,
           pay: sel.value || 'cash',
           status: 'новый'
+         deliveryType
         };
 
         const history = loadHistory();
@@ -1515,6 +1561,9 @@ if (!list || !stockList) {
         <div class="flex items-center justify-between">
           <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
           <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'новый'}</span>
+        </div>
+                <div class="text-sm mt-1 font-semibold">
+          ${o.deliveryType === 'pickup' ? '🏠 Самовывоз' : '🛵 Доставка'}
         </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         ${etaBlock}
