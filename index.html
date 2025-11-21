@@ -1036,15 +1036,15 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
           }
         });
 
-        const order = res && res.order ? res.order : {
-          id: Date.now().toString().slice(-6),
-          createdAt: Date.now(),
-          items: itemsSel,
-          total,
-          pay: sel.value || 'cash',
-          status: 'новый'
-         deliveryType
-        };
+       const order = res && res.order ? res.order : {
+  id: Date.now().toString().slice(-6),
+  createdAt: Date.now(),
+  items: itemsSel,
+  total,
+  pay: sel.value || 'cash',
+  status: 'новый',
+  deliveryType: deliveryType
+};
 
         const history = loadHistory();
         history.unshift(order);
