@@ -1647,7 +1647,7 @@ function DashboardView(){
 
   load();
   loadOrdersFromCloud();
-  pollTimer = setInterval(loadOrdersFromCloud, 5000);
+  pollTimer = setInterval(loadOrdersFromCloud, 12000);
 
   root.cleanup = () => {
     if (pollTimer) clearInterval(pollTimer);
@@ -1847,7 +1847,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   ['click','pointerup','touchend'].forEach(ev=> profileBtn.addEventListener(ev, goProfile, {passive:false}));
 
   const backBtn=document.getElementById('backBtn');
-  const goOrder=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } history.length ? history.back() : (location.hash='#/order'); };
+ const goOrder = (e) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  location.hash = '#/order';
+};
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
   bindTabloTapZone();
