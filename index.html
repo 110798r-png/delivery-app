@@ -111,24 +111,42 @@ button:focus, a:focus {
   </div>
 
   <!-- Оплата -->
-  <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
-      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
-      <div class="grid gap-1">
-        <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
-        <select id="paySelect" class="border rounded-xl p-3 w-full">
-          <option value="cash">Наличные</option>
-          <option value="card">Банковская карта</option>
-          <option value="transfer">Перевод</option>
-        </select>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
-        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+    <div id="payModal" class="modal">
+  <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+    <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
+    <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
+
+    <div class="grid gap-1">
+      <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
+      <select id="paySelect" class="border rounded-xl p-3 w-full">
+        <option value="cash">Наличные</option>
+        <option value="card">Банковская карта</option>
+        <option value="transfer">Перевод</option>
+      </select>
+    </div>
+
+    <!-- ✅ Тип заказа ВНУТРИ модалки -->
+    <div class="grid gap-1">
+      <div class="text-sm text-gray-600">Тип заказа</div>
+      <div id="deliveryToggle" class="flex gap-2">
+        <button type="button" data-delivery="delivery"
+          class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-black text-white border-black">
+          Доставка
+        </button>
+        <button type="button" data-delivery="pickup"
+          class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-white">
+          Самовывоз
+        </button>
       </div>
     </div>
+
+    <div class="flex justify-end gap-2">
+      <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
+      <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+    </div>
   </div>
+</div>
+
 
         <!-- Тип заказа: доставка/самовывоз -->
       <div class="grid gap-1">
@@ -586,7 +604,9 @@ function OrderView(){
 const cartBtn = root.querySelector('#cartBtn');
 if (cartBtn) {
   cartBtn.addEventListener('click', () => {
-
+    location.hash = '#/cart';
+  });
+}
 
  // === delivery toggle в payModal ===
 let deliveryType = 'delivery'; // 'delivery' | 'pickup'
