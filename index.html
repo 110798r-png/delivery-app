@@ -797,6 +797,22 @@ function OrderView(){
 
     applyHeights();
     setTimeout(applyHeights, 60);
+    vbox.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;   // ✅ ВАЖНО
+  if (isAnimating) return;
+  down   = true;
+  used   = false;
+  sx     = e.clientX;
+  sy     = e.clientY;
+  locked = null;
+  vbox.setPointerCapture?.(e.pointerId);
+});
+
+vbox.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'touch') return;   // ✅ ВАЖНО
+  if (!down || used || isAnimating) return;
+  ...
+}, { passive:false });
   }
 
   // обработчик +/− по делегированию
@@ -1063,8 +1079,8 @@ function OrderView(){
 
     // наличие с сервера
     const before = new Set(unavailableClient);
-    const remote = await fetchUnavailableRemote().catch(() => null);
-    if (remote && Array.isArray(remote)){
+   const remote = await fetchUnavailableRemote().catch(() => []);
+if (Array.isArray(remote)){
       const after = new Set(remote);
       if (
         before.size !== after.size ||
@@ -1396,8 +1412,7 @@ if (!list || !stockList) {
   return root;
 }
 
-  const list      = root.querySelector('#list');
-  const stockList = root.querySelector('#stockList');
+  
   let unavailable = new Set(loadUnavailable());
   let dashOrders  = loadDash();
 
@@ -1570,6 +1585,7 @@ if (!list || !stockList) {
           saveDash(dashOrders);
           syncOrderStatus(o.id, patch.status);
           showToast(`Статус #${o.id} обновлён`);
+          renderOrders();          // ✅ чтобы UI не ждал polling
         }
 
         try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
