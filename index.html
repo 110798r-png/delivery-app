@@ -147,23 +147,6 @@ button:focus, a:focus {
   </div>
 </div>
 
-
-        <!-- Тип заказа: доставка/самовывоз -->
-      <div class="grid gap-1">
-        <div class="text-sm text-gray-600">Тип заказа</div>
-        <div id="deliveryToggle" class="flex gap-2">
-          <button type="button" data-delivery="delivery"
-            class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-black text-white border-black">
-            Доставка
-          </button>
-          <button type="button" data-delivery="pickup"
-            class="flex-1 px-3 py-2 rounded-xl border text-sm font-semibold bg-white">
-            Самовывоз
-          </button>
-        </div>
-      </div>
-
-  
   <!-- Ключ для табло -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
@@ -610,7 +593,6 @@ if (cartBtn) {
 
  // === delivery toggle в payModal ===
 let deliveryType = 'delivery'; // 'delivery' | 'pickup'
-
 const deliveryToggle = document.getElementById('deliveryToggle');
 
 function renderDeliveryToggle(){
@@ -637,9 +619,6 @@ if (deliveryToggle && !deliveryToggle._bound){
 
   deliveryToggle?.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-delivery]');
-    if (!b) return;
-    deliveryType = b.dataset.delivery;
-    renderDeliveryToggle();
   });
 
   setBodyScrollLock(true);
@@ -658,9 +637,6 @@ if (deliveryToggle && !deliveryToggle._bound){
     recalcTotal();
   }  
   
-    let deliveryType = 'delivery'; // 'delivery' | 'pickup'
-
-
   // автоподстановка повторного заказа из истории
   function applyRepeatOrder(){
     const raw = sessionStorage.getItem('repeat_order_items');
