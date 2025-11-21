@@ -686,120 +686,124 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  function rebuildMenu(){
-    catPager.innerHTML = '';
-    const cfg = loadConfig();
+ function rebuildMenu(){
+  catPager.innerHTML = '';
+  const cfg = loadConfig();
 
-    cfg.menu.forEach((cat) => {
-      const panel = el(`<div class="cat-panel"></div>`);
-      const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
-      const list  = el(`<div class="grid gap-3"></div>`);
+  cfg.menu.forEach((cat) => {
+    const panel = el(`<div class="cat-panel"></div>`);
+    const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
+    const list  = el(`<div class="grid gap-3"></div>`);
 
-      cat.items.forEach(it => {
-        const q        = (window.__orderCounts?.[it.name] || 0);
-        const disabled = unavailableClient.has(it.name);
+    cat.items.forEach(it => {
+      const q        = (window.__orderCounts?.[it.name] || 0);
+      const disabled = unavailableClient.has(it.name);
 
-        const row = el(`
-          <div class="menu-card ${disabled ? 'opacity-50' : ''}">
-            <div class="flex-1 min-w-0">
-              <div class="font-medium text-sm flex items-center gap-2">
-                ${it.name}
-                ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
-              </div>
-              ${
-                cfg.theme.showPrice
-                  ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
-                  : ''
-              }
-              <div class="flex items-center gap-3 mt-3">
-                <button
-                  type="button"
-                  class="w-8 h-8 rounded-xl border"
-                  data-name="${it.name}"
-                  data-act="dec"
-                  ${disabled ? 'disabled' : ''}
-                >−</button>
-                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-                <button
-                  type="button"
-                  class="w-8 h-8 rounded-xl bg-black text-white"
-                  data-name="${it.name}"
-                  data-act="inc"
-                  ${disabled ? 'disabled' : ''}
-                >+</button>
-              </div>
+      const row = el(`
+        <div class="menu-card ${disabled ? 'opacity-50' : ''}">
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-sm flex items-center gap-2">
+              ${it.name}
+              ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
             </div>
-            <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+            ${
+              cfg.theme.showPrice
+                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                : ''
+            }
+            <div class="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                class="w-8 h-8 rounded-xl border"
+                data-name="${it.name}"
+                data-act="dec"
+                ${disabled ? 'disabled' : ''}
+              >−</button>
+              <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-xl bg-black text-white"
+                data-name="${it.name}"
+                data-act="inc"
+                ${disabled ? 'disabled' : ''}
+              >+</button>
+            </div>
           </div>
-        `);
-        list.appendChild(row);
-      });
+          <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+        </div>
+      `);
+      list.appendChild(row);
+    });
 
-      // отступ снизу, чтобы над баром подтверждения был воздух
-      list.appendChild(el(`<div class="h-24"></div>`));
+    list.appendChild(el(`<div class="h-24"></div>`));
 
-      vbox.appendChild(list);
-      panel.appendChild(vbox);
-      catPager.appendChild(panel);
+    vbox.appendChild(list);
+    panel.appendChild(vbox);
+    catPager.appendChild(panel);
 
-      // === свайп по категориям (восстановили) ===
-    // === свайп по категориям (только для touch) ===
-let down  = false;
-let used  = false;
-let sx    = 0;
-let sy    = 0;
-let locked = null;
+    // === свайп по категориям (ТОЛЬКО touch) ===
+    let down   = false;
+    let used   = false;
+    let sx     = 0;
+    let sy     = 0;
+    let locked = null;
 
-const PIX_LOCK = 10;
-const THRESH = () =>
-  Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
+    const PIX_LOCK = 10;
+    const THRESH = () =>
+      Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
 
-vbox.addEventListener('pointerdown', (e) => {
-  if (e.pointerType !== 'touch') return;   // 💥 ВАЖНО — ПК и мышь игнорируем
-  if (isAnimating) return;
+    vbox.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      if (isAnimating) return;
 
-  down   = true;
-  used   = false;
-  sx     = e.clientX;
-  sy     = e.clientY;
-  locked = null;
+      down   = true;
+      used   = false;
+      sx     = e.clientX;
+      sy     = e.clientY;
+      locked = null;
 
-  vbox.setPointerCapture?.(e.pointerId);
-});
+      vbox.setPointerCapture?.(e.pointerId);
+    });
 
-vbox.addEventListener('pointermove', (e) => {
-  if (e.pointerType !== 'touch') return;   // 💥 ВАЖНО
-  if (!down || used || isAnimating) return;
+    vbox.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'touch') return;
+      if (!down || used || isAnimating) return;
 
-  const dx = e.clientX - sx;
-  const dy = e.clientY - sy;
+      const dx = e.clientX - sx;
+      const dy = e.clientY - sy;
 
-  if (locked === null) {
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) {
-      locked = 'x';
-    } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) {
-      locked = 'y';
-    }
-  }
+      if (locked === null){
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK){
+          locked = 'x';
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK){
+          locked = 'y';
+        }
+      }
 
-  if (locked === 'x') {
-    e.preventDefault(); // блокируем вертикальный скролл
-    if (Math.abs(dx) >= THRESH()) {
-      used = true;
-      const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
-      goToIndex(next, { animate: true });
-    }
-  }
-}, { passive:false });
+      if (locked === 'x'){
+        e.preventDefault();
+        if (Math.abs(dx) >= THRESH()){
+          used = true;
+          const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
+          goToIndex(next, { animate:true });
+        }
+      }
+    }, { passive:false });
 
-['pointerup','pointercancel','pointerleave'].forEach(evt =>
-  vbox.addEventListener(evt, () => {
-    down   = false;
-    used   = false;
-    locked = null;
-  })
-);
-// === конец свайпа ===
+    ['pointerup','pointercancel','pointerleave'].forEach(evt =>
+      vbox.addEventListener(evt, () => {
+        down   = false;
+        used   = false;
+        locked = null;
+      })
+    );
+    // === конец свайпа ===
+  });
+
+  // ВАЖНО: высоты вызываем ОДИН раз после сборки всех панелей
+  applyHeights();
+  setTimeout(applyHeights, 60);
+}
 
     applyHeights();
     setTimeout(applyHeights, 60);
@@ -817,7 +821,6 @@ vbox.addEventListener('pointermove', (e) => {
 vbox.addEventListener('pointermove', (e) => {
   if (e.pointerType !== 'touch') return;   // ✅ ВАЖНО
   if (!down || used || isAnimating) return;
-  ...
 }, { passive:false });
   }
 
