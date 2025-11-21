@@ -1353,36 +1353,48 @@ function HistoryView(){
 
 /* ===== Табло ===== */
 function DashboardView(){ 
-  const root = el(`
-    <div class="grid gap-4 max-w-6xl pb-24">
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-2">
-          <h2 class="text-xl font-semibold">Текущие заказы</h2>
-          <button id="soundToggle" class="px-3 py-1.5 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
-        </div>
-        <div class="flex items-center gap-2">
-          <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
-          <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
-        </div>
+const root = el(`
+  <div class="grid gap-4 max-w-6xl pb-24">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-semibold">Текущие заказы</h2>
+        <button id="soundToggle" class="px-3 py-1.5 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
       </div>
-
-        <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-  <div class="mt-3 flex gap-2">
-    <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">
-      Сохранить
-    </button>
-    <button id="resetStock" class="px-3 py-2 rounded-xl border">
-      Все в наличии
-    </button>
-  </div>
-</div>
-
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
-      <div>
-        <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button>
+      <div class="flex items-center gap-2">
+        <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
+        <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
       </div>
     </div>
-  `);
+
+    <div class="p-4 rounded-2xl bg-white border">
+      <h3 class="font-semibold mb-3">Наличие товаров</h3>
+      <p class="text-sm text-gray-500 mb-3">
+        Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
+      </p>
+
+      <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
+
+      <div class="mt-3 flex gap-2">
+        <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
+        <button id="resetStock" class="px-3 py-2 rounded-xl border">Все в наличии</button>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
+
+    <div>
+      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button>
+    </div>
+  </div>
+`);
+  const list = root.querySelector('#list');
+const stockList = root.querySelector('#stockList');
+
+if (!list || !stockList) {
+  console.error('DashboardView: missing #list or #stockList', { list, stockList });
+  showToast('Табло сломано: нет контейнеров list/stockList');
+  return root;
+}
 
   const list      = root.querySelector('#list');
   const stockList = root.querySelector('#stockList');
