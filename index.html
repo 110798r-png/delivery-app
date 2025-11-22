@@ -969,5 +969,701 @@
 
   })();
   </script>
+  
+<script>
+(function(){
+  // берём всё из ЧАСТИ 1
+  const {
+    rpc, mount,
+    loadConfig, saveConfig, applyTheme,
+    loadDash, saveDash,
+    showToast,
+    PIN_CODE,
+    TABLO_PIN_OK,
+    WANT_ADMIN_ROUTE,
+    SOUND_ON_KEY
+  } = window.__APP__;
+
+  const WANT_EXIT_BOARD = 'WANT_EXIT_BOARD';
+
+  /* =========================
+     PIN МОДАЛКА (вход/выход)
+     ========================= */
+  function bindPinModalOnce(){
+    const pinM = document.getElementById('pinModal');
+    const pinOk = document.getElementById('pinOk');
+    const pinCancel = document.getElementById('pinCancel');
+    const pinInput = document.getElementById('pinInput');
+    if (!pinM || !pinOk || !pinCancel || !pinInput) return;
+    if (pinM._bound) return;
+    pinM._bound = true;
+
+    function closePin(){ pinM.classList.remove('open'); }
+
+    pinOk.onclick = (e)=>{
+      e && e.preventDefault();
+      const val = (pinInput.value||'').trim();
+      if (!val){
+        showToast('Введите PIN');
+        return;
+      }
+      if (val !== PIN_CODE){
+        showToast('Неверный PIN');
+        pinInput.value='';
+        return;
+      }
+
+      sessionStorage.setItem(TABLO_PIN_OK, '1');
+      closePin();
+      pinInput.value='';
+
+      // если хотели выйти с публичного табло
+      if (sessionStorage.getItem(WANT_EXIT_BOARD)==='1'){
+        sessionStorage.removeItem(WANT_EXIT_BOARD);
+        sessionStorage.removeItem(TABLO_PIN_OK); // чтобы следующий вход снова просил PIN
+        location.hash = '#/order';
+        return;
+      }
+
+      // куда хотели войти
+      const want = sessionStorage.getItem(WANT_ADMIN_ROUTE);
+      sessionStorage.removeItem(WANT_ADMIN_ROUTE);
+
+      if (want && want !== '1'){
+        location.hash = want;
+      } else {
+        // если было просто "1" — по умолчанию кухня
+        location.hash = '#/dashboard';
+      }
+    };
+
+    pinCancel.onclick = ()=>{
+      closePin();
+      pinInput.value='';
+      sessionStorage.removeItem(WANT_ADMIN_ROUTE);
+      sessionStorage.removeItem(WANT_EXIT_BOARD);
+      location.hash = '#/order';
+    };
+
+    pinM.onclick = (e)=>{ if (e.target===pinM) pinCancel.onclick(); };
+  }
+
+  /* =========================================================
+     ===================== ЭКРАН 2: КУХНЯ =====================
+     ========================================================= */
+  function DashboardView(){
+    const root = el(`
+      <div class="grid gap-4 max-w-6xl pb-24 px-2 md:px-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <h2 class="text-xl font-semibold">Табло кухни</h2>
+            <button id="soundToggle"
+                    class="px-3 py-1.5 rounded-xl border bg-white"
+                    title="Звук уведомлений">🔔 Звук</button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <a href="#/builder"
+               class="px-3 py-2 rounded-xl border bg-white"
+               title="Конструктор">Конструктор</a>
+            <a href="#/board"
+               class="px-3 py-2 rounded-xl border bg-white"
+               title="Публичное табло">Публичное табло</a>
+            <button id="btnClearAll"
+                    class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">
+              Очистить всё
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
+
+        <div>
+          <button class="px-3 py-2 rounded-xl border"
+                  onclick="location.hash='#/order'">Назад</button>
+        </div>
+      </div>
+    `);
+
+    const list = root.querySelector('#list');
+    if (!list) return root;
+
+    let dashOrders  = loadDash();
+    let knownIds    = new Set(dashOrders.map(o => String(o.id)));
+    const ding      = document.getElementById('orderDing');
+    const soundBtn  = root.querySelector('#soundToggle');
+    let hiddenNewCount = 0;
+    let pollTimer = null;
+
+    const soundOn  = () => localStorage.getItem(SOUND_ON_KEY) === '1';
+    const setSound = (on) => {
+      localStorage.setItem(SOUND_ON_KEY, on ? '1' : '0');
+      soundBtn.classList.toggle('bg-green-50', on);
+      soundBtn.classList.toggle('border-green-600', on);
+    };
+    setSound(soundOn());
+    soundBtn.onclick = () => setSound(!soundOn());
+
+    function handleVisibilityChange(){
+      if (document.visibilityState === 'visible' && hiddenNewCount > 0){
+        showToast(`Новых заказов: ${hiddenNewCount}`);
+        hiddenNewCount = 0;
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    function orderCard(o){
+      const created = o.createdAt ? new Date(o.createdAt) : new Date();
+      const itemsHtml = (o.items || []).map(i => `
+        <div class="flex justify-between text-lg">
+          <div>${i.name}</div>
+          <div class="font-semibold">${i.qty} × ${i.price}</div>
+        </div>
+      `).join('');
+
+      const statusColor =
+        o.status === 'готов'
+          ? 'bg-green-50 border-green-300'
+          : 'bg-blue-50 border-blue-300';
+
+      const card = el(`
+        <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3"
+             data-id="${o.id}">
+          <div class="flex items-center justify-between">
+            <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+            <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">
+              ${o.status || 'готовится'}
+            </span>
+          </div>
+
+          <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
+
+          <div class="mt-2 grid gap-1 text-lg">
+            ${itemsHtml || '—'}
+          </div>
+
+          <div class="mt-3 flex items-center justify-between text-xl font-bold">
+            <div>Итого:</div><div>${o.total || 0} ₽</div>
+          </div>
+
+          <div class="mt-2 flex flex-wrap gap-2 items-center">
+            <label class="text-sm">Статус:</label>
+            <select class="border rounded-xl p-2 text-sm" data-k="status">
+              <option ${o.status==='готовится'?'selected':''}>готовится</option>
+              <option ${o.status==='готов'?'selected':''}>готов</option>
+            </select>
+
+            <button type="button"
+                    class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100"
+                    data-act="save">Сохранить</button>
+            <button type="button"
+                    class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 ml-auto"
+                    data-act="delete">Удалить</button>
+          </div>
+        </div>
+      `);
+
+      card.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const act = btn.dataset.act;
+
+        if (act === 'save'){
+          const status = card.querySelector('[data-k="status"]').value;
+
+          const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+          if (i >= 0){
+            dashOrders[i] = { ...dashOrders[i], status };
+            saveDash(dashOrders);
+            renderOrders();
+            showToast(`Статус #${o.id} обновлён`);
+          }
+
+          rpc({ op: 'update', id: o.id, patch: { status } }).catch(()=>{});
+
+        } else if (act === 'delete'){
+          if (!confirm('Удалить заказ?')) return;
+
+          dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+          saveDash(dashOrders);
+          renderOrders();
+          showToast(`Заказ #${o.id} удалён`);
+
+          rpc({ op: 'delete', id: o.id }).catch(()=>{});
+        }
+      });
+
+      return card;
+    }
+
+    function renderOrders(){
+      const unique = new Map();
+      dashOrders.forEach(o => unique.set(String(o.id), o));
+      const orders = [...unique.values()];
+      list.innerHTML = '';
+      orders.forEach(o => list.appendChild(orderCard(o)));
+    }
+
+    function detectNewOrders(){
+      const unique = new Map(dashOrders.map(o => [String(o.id), o]));
+      const incoming = [...unique.keys()].filter(id => !knownIds.has(id));
+
+      if (incoming.length){
+        if (document.visibilityState === 'visible' && soundOn()){
+          try {
+            ding.currentTime = 0;
+            ding.play().catch(()=>{});
+          } catch {}
+        } else if (document.visibilityState === 'hidden'){
+          hiddenNewCount += incoming.length;
+        }
+      }
+
+      knownIds = new Set(unique.keys());
+    }
+
+    root.querySelector('#btnClearAll').onclick = async () => {
+      if (!confirm('Удалить все заказы?')) return;
+      const ids = (dashOrders || []).map(o => o.id);
+      dashOrders = [];
+      saveDash(dashOrders);
+      renderOrders();
+      try {
+        await rpc({ op:'clear' });
+      } catch {
+        for (const id of ids){
+          rpc({ op:'delete', id }).catch(()=>{});
+        }
+      }
+    };
+
+    async function loadOrdersFromCloud(){
+      try{
+        const res = await rpc({ op:'list' });
+        if (Array.isArray(res.orders)){
+          dashOrders = res.orders.slice();
+          saveDash(dashOrders);
+          detectNewOrders();
+          renderOrders();
+        }
+      } catch(e){
+        // тихо, если оффлайн — работаем на локале
+        renderOrders();
+      }
+    }
+
+    renderOrders();
+    loadOrdersFromCloud();
+    pollTimer = setInterval(loadOrdersFromCloud, 6000);
+
+    root.cleanup = () => {
+      if (pollTimer) clearInterval(pollTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+
+    return root;
+  }
+
+  /* =========================================================
+     ============== ЭКРАН 3: ПУБЛИЧНОЕ ТАБЛО ==================
+     ========================================================= */
+  function PublicBoardView(){
+    const root = el(`
+      <div class="w-full h-full px-6 py-4 bg-black text-white">
+        <div class="grid grid-cols-2 gap-6 mb-4">
+          <div class="text-center">
+            <div class="text-3xl font-extrabold tracking-wide">ГОТОВИТСЯ</div>
+          </div>
+          <div class="text-center">
+            <div class="text-3xl font-extrabold tracking-wide">ГОТОВ</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+          <div id="prepCol" class="grid gap-3 content-start"></div>
+          <div id="readyCol" class="grid gap-3 content-start"></div>
+        </div>
+
+        <!-- скрытая зона выхода 8-тап -->
+        <div id="boardExitHot"
+             style="position:fixed; right:0; bottom:0; width:220px; height:140px; z-index:9999; opacity:0;">
+        </div>
+      </div>
+    `);
+
+    const app = document.getElementById('app');
+    app && app.classList.remove('phone-shell');
+
+    const prepCol  = root.querySelector('#prepCol');
+    const readyCol = root.querySelector('#readyCol');
+    const exitHot  = root.querySelector('#boardExitHot');
+
+    let orders = loadDash();
+    let pollTimer = null;
+
+    function numCard(id){
+      return el(`
+        <div class="rounded-2xl border border-white/25 bg-white/5 
+                    text-center py-4 text-5xl font-extrabold tracking-widest">
+          #${id}
+        </div>
+      `);
+    }
+
+    function render(){
+      orders = loadDash();
+
+      const prep  = orders.filter(o => (o.status||'готовится') !== 'готов');
+      const ready = orders.filter(o => (o.status||'') === 'готов');
+
+      prepCol.innerHTML = '';
+      readyCol.innerHTML = '';
+
+      if (!prep.length)  prepCol.innerHTML  = `<div class="text-white/40 text-2xl font-semibold text-center py-10">—</div>`;
+      if (!ready.length) readyCol.innerHTML = `<div class="text-white/40 text-2xl font-semibold text-center py-10">—</div>`;
+
+      prep.forEach(o => prepCol.appendChild(numCard(o.id)));
+      ready.forEach(o => readyCol.appendChild(numCard(o.id)));
+    }
+
+    async function pull(){
+      try{
+        const res = await rpc({ op:'list' });
+        if (Array.isArray(res.orders)){
+          saveDash(res.orders);
+        }
+      }catch(e){ }
+      render();
+    }
+
+    render();
+    pull();
+    pollTimer = setInterval(pull, 4000);
+
+    // 8-тап → PIN → выход
+    (function bindExit(){
+      if (!exitHot || exitHot._bound) return;
+      exitHot._bound=true;
+
+      let taps=0, first=0, timer=null;
+      const windowMs=1500, need=8;
+
+      function reset(){
+        taps=0; first=0;
+        if(timer){ clearTimeout(timer); timer=null; }
+      }
+
+      function handler(){
+        const now=Date.now();
+        if(!first) first=now;
+        taps++;
+        if(now-first>windowMs){ reset(); taps=1; first=now; }
+
+        if(taps>=need){
+          reset();
+          sessionStorage.setItem(WANT_EXIT_BOARD,'1');
+          document.getElementById('pinModal')?.classList.add('open');
+        } else {
+          if(timer) clearTimeout(timer);
+          timer=setTimeout(reset, windowMs);
+        }
+      }
+
+      ['click','pointerup','touchend'].forEach(ev=>{
+        exitHot.addEventListener(ev,(e)=>{
+          e.preventDefault(); e.stopPropagation();
+          handler();
+        },{passive:false});
+      });
+    })();
+
+    root.cleanup = ()=>{
+      if (pollTimer) clearInterval(pollTimer);
+      app && app.classList.add('phone-shell');
+    };
+
+    return root;
+  }
+
+  /* =========================================================
+     ===================== КОНСТРУКТОР ========================
+     ========================================================= */
+  function BuilderView(){
+    const cfg = loadConfig();
+    applyTheme(cfg.theme || {});
+
+    const root = el(`
+      <div class="grid gap-4 pb-24 max-w-4xl mx-auto px-2 md:px-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">Конструктор меню</h2>
+          <div class="flex gap-2">
+            <button id="btnSave"
+              class="px-3 py-2 rounded-xl bg-black text-white">Сохранить</button>
+            <button id="btnBack"
+              class="px-3 py-2 rounded-xl border">Назад</button>
+          </div>
+        </div>
+
+        <div class="card p-4 grid gap-3">
+          <div class="font-semibold">Общие настройки</div>
+
+          <label class="text-sm">Название бренда</label>
+          <input id="brandTitleInp"
+                 class="border rounded-xl p-2"
+                 value="${escapeHtml(cfg.brandTitle||'')}"/>
+
+          <label class="text-sm">QR-картинка СБП (URL)</label>
+          <input id="sbpQrInp"
+                 class="border rounded-xl p-2"
+                 placeholder="https://storage.yandexcloud.net/.../qr.png"
+                 value="${escapeHtml(cfg.sbpQrUrl||localStorage.getItem('sbp_qr_url')||'')}" />
+
+          <label class="text-sm">Реклама на простое (URL видео/гиф)</label>
+          <input id="adUrlInp"
+                 class="border rounded-xl p-2"
+                 placeholder="https://storage.yandexcloud.net/.../ad.mp4"
+                 value="${escapeHtml(cfg.terminalAdUrl||'')}"/>
+
+          <label class="text-sm">Тип рекламы</label>
+          <select id="adTypeSel" class="border rounded-xl p-2">
+            <option value="video" ${cfg.terminalAdType==='video'?'selected':''}>video</option>
+            <option value="gif" ${cfg.terminalAdType==='gif'?'selected':''}>gif</option>
+          </select>
+        </div>
+
+        <div class="card p-4 grid gap-3">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold">Категории</div>
+            <button id="btnAddCat" class="px-3 py-1.5 rounded-xl border">+ Категория</button>
+          </div>
+          <div id="catsWrap" class="grid gap-3"></div>
+        </div>
+      </div>
+    `);
+
+    const catsWrap = root.querySelector('#catsWrap');
+
+    function renderCats(){
+      catsWrap.innerHTML = '';
+      cfg.menu.forEach((cat, cIdx)=>{
+        const catBox = el(`
+          <div class="border rounded-2xl p-3 grid gap-2 bg-white">
+            <div class="flex items-center gap-2">
+              <input class="border rounded-xl p-2 flex-1"
+                     data-k="catTitle"
+                     data-ci="${cIdx}"
+                     value="${escapeHtml(cat.title||'')}"
+                     placeholder="Название категории"/>
+              <button class="px-2 py-1 rounded-xl border text-red-600"
+                      data-act="delCat"
+                      data-ci="${cIdx}">Удалить</button>
+            </div>
+
+            <div class="grid gap-2" data-items="${cIdx}"></div>
+
+            <button class="px-3 py-1.5 rounded-xl border w-max"
+                    data-act="addItem"
+                    data-ci="${cIdx}">+ Товар</button>
+          </div>
+        `);
+
+        const itemsWrap = catBox.querySelector(`[data-items="${cIdx}"]`);
+
+        (cat.items||[]).forEach((it, iIdx)=>{
+          const row = el(`
+            <div class="grid grid-cols-12 gap-2 items-center">
+              <input class="border rounded-xl p-2 col-span-5"
+                     data-k="itemName"
+                     data-ci="${cIdx}" data-ii="${iIdx}"
+                     placeholder="Название"
+                     value="${escapeHtml(it.name||'')}"/>
+              <input class="border rounded-xl p-2 col-span-2"
+                     data-k="itemPrice"
+                     data-ci="${cIdx}" data-ii="${iIdx}"
+                     placeholder="Цена"
+                     inputmode="numeric"
+                     value="${escapeHtml(String(it.price||''))}"/>
+              <input class="border rounded-xl p-2 col-span-4"
+                     data-k="itemImg"
+                     data-ci="${cIdx}" data-ii="${iIdx}"
+                     placeholder="URL картинки"
+                     value="${escapeHtml(it.img||'')}"/>
+              <button class="border rounded-xl col-span-1 text-red-600 py-2"
+                      data-act="delItem"
+                      data-ci="${cIdx}" data-ii="${iIdx}">×</button>
+            </div>
+          `);
+          itemsWrap.appendChild(row);
+        });
+
+        catsWrap.appendChild(catBox);
+      });
+    }
+    renderCats();
+
+    // делегирование кликов
+    catsWrap.addEventListener('click',(e)=>{
+      const btn = e.target.closest('button[data-act]');
+      if(!btn) return;
+      const act = btn.dataset.act;
+      const ci = +btn.dataset.ci;
+
+      if(act==='delCat'){
+        if(!confirm('Удалить категорию?')) return;
+        cfg.menu.splice(ci,1);
+        renderCats();
+      }
+
+      if(act==='addItem'){
+        cfg.menu[ci].items = cfg.menu[ci].items || [];
+        cfg.menu[ci].items.push({name:'Новый товар', price:0, img:''});
+        renderCats();
+      }
+
+      if(act==='delItem'){
+        const ii = +btn.dataset.ii;
+        if(!confirm('Удалить товар?')) return;
+        cfg.menu[ci].items.splice(ii,1);
+        renderCats();
+      }
+    });
+
+    // сбор инпутов
+    root.addEventListener('input',(e)=>{
+      const inp = e.target;
+      const k = inp.dataset.k;
+      if(!k) return;
+
+      const ci = +inp.dataset.ci;
+      const ii = inp.dataset.ii!=null ? +inp.dataset.ii : null;
+
+      if(k==='catTitle'){
+        cfg.menu[ci].title = inp.value;
+        cfg.menu[ci].key = slug(inp.value||('cat'+ci));
+      }
+      if(k==='itemName'){
+        cfg.menu[ci].items[ii].name = inp.value;
+      }
+      if(k==='itemPrice'){
+        cfg.menu[ci].items[ii].price = Number(inp.value||0);
+      }
+      if(k==='itemImg'){
+        cfg.menu[ci].items[ii].img = inp.value;
+      }
+    });
+
+    root.querySelector('#btnAddCat').onclick = ()=>{
+      cfg.menu.push({ key:'newcat'+Date.now(), title:'Новая категория', items:[] });
+      renderCats();
+    };
+
+    root.querySelector('#btnBack').onclick = ()=>{
+      location.hash='#/dashboard';
+    };
+
+    root.querySelector('#btnSave').onclick = ()=>{
+      cfg.brandTitle = root.querySelector('#brandTitleInp').value.trim() || 'ЯмаMoto';
+      cfg.sbpQrUrl = root.querySelector('#sbpQrInp').value.trim();
+      cfg.terminalAdUrl = root.querySelector('#adUrlInp').value.trim();
+      cfg.terminalAdType = root.querySelector('#adTypeSel').value;
+
+      saveConfig(cfg);
+      applyTheme(cfg.theme||{});
+
+      if(cfg.sbpQrUrl){
+        localStorage.setItem('sbp_qr_url', cfg.sbpQrUrl);
+      }
+
+      showToast('Сохранено');
+      location.hash='#/order';
+    };
+
+    return root;
+  }
+
+  /* =========================
+     ROUTER + защита PIN
+     ========================= */
+  function realRouter(){
+    const h = location.hash.split('?')[0];
+
+    if (h==='#/order') {
+      // терминал уже смонтирован в ЧАСТИ 1
+      mount(window.__APP__ORDER_VIEW__());
+      return;
+    }
+    if (h==='#/dashboard') { mount(DashboardView()); return; }
+    if (h==='#/board')     { mount(PublicBoardView()); return; }
+    if (h==='#/builder')   { mount(BuilderView()); return; }
+
+    location.hash='#/order';
+  }
+
+  function router(){
+    const h = location.hash.split('?')[0];
+
+    // PIN защита для админ-экранов
+    const needPin = (h==='#/dashboard' || h==='#/board' || h==='#/builder');
+
+    if (needPin && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
+      sessionStorage.setItem(WANT_ADMIN_ROUTE, h);
+      document.getElementById('pinModal')?.classList.add('open');
+
+      const app=document.getElementById('app');
+      if(app) app.innerHTML='';
+      return;
+    }
+
+    realRouter();
+  }
+
+  /* =========================
+     хелперы для Builder
+     ========================= */
+  function el(html){
+    const t=document.createElement('template'); t.innerHTML=html.trim();
+    return t.content.firstChild;
+  }
+  function escapeHtml(s){
+    return String(s||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function slug(s){
+    return String(s||'cat').toLowerCase()
+      .replace(/\s+/g,'-')
+      .replace(/[^a-z0-9а-яё\-]/gi,'')
+      .slice(0,32) || ('cat'+Date.now());
+  }
+
+  /* IMPORTANT:
+     нам нужно иметь доступ к OrderView из ЧАСТИ 1.
+     Я делаю лёгкий трюк: сохраняю ссылку на него при первом монтировании.
+  */
+  if(!window.__APP__ORDER_VIEW__){
+    // берём текущий OrderView с DOM (первый child app)
+    // и сохраняем фабрику
+    const oldMount = mount;
+    window.__APP__ORDER_VIEW__ = function(){
+      // ЧАСТЬ 1 объявила OrderView внутри IIFE, поэтому
+      // мы берём его из уже смонтированного экрана:
+      // пересоздать его можем только через reload страницы.
+      // Поэтому здесь принудительно reload если надо.
+      location.reload();
+    };
+    // переопределять mount не будем — просто оставляем как есть
+  }
+
+  // биндим PIN и роутер
+  bindPinModalOnce();
+  window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
+  try{ router(); }catch(e){ console.error(e); }
+
+})();
+</script>
+
 </body>
 </html>
