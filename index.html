@@ -468,7 +468,7 @@ async function pullAndMergeStatuses(){
 
   /* ===== секретные зоны (8 тапов) ===== */
 
-function bindSecretZones(){
+function bindSecretZones()
   const left  = document.getElementById('tapHotLeft');
   const right = document.getElementById('tapHotRight');
   if(!left || !right || left._bound) return;
@@ -771,12 +771,6 @@ const row = el(`
 
     vbox.appendChild(list);
     panel.appendChild(vbox);
-    catPager.appendChild(panel);
-    
-    <div id="secretZones" class="fixed inset-x-0 bottom-0 h-20 pointer-events-none">
-  <div id="tapHotLeft"  class="absolute left-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
-  <div id="tapHotRight" class="absolute right-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
-</div>
 
 
     // === свайп по категориям (только touch) ===
@@ -1092,7 +1086,6 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
           rebuildMenu();
         
 /* ===== Секретные зоны (8 тапов) для табло/терминала ===== */
-function bindSecretZones(){
   const left  = document.getElementById('tapHotLeft');
   const right = document.getElementById('tapHotRight');
   if (!left || !right || left._bound) return;
@@ -1444,20 +1437,6 @@ const root = el(`
       </div>
     </div>
 
-    <div class="p-4 rounded-2xl bg-white border">
-      <h3 class="font-semibold mb-3">Наличие товаров</h3>
-      <p class="text-sm text-gray-500 mb-3">
-        Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
-      </p>
-
-      <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-
-      <div class="mt-3 flex gap-2">
-        <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
-        <button id="resetStock" class="px-3 py-2 rounded-xl border">Все в наличии</button>
-      </div>
-    </div>
-
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
 
     <div>
@@ -1475,7 +1454,6 @@ if (!list || !stockList) {
 }
 
   
-  let unavailable = new Set(loadUnavailable());
   let dashOrders  = loadDash();
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
@@ -1502,52 +1480,11 @@ if (!list || !stockList) {
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  function renderStock(){
-    stockList.innerHTML = '';
-    loadConfig().menu.forEach(cat =>
-      cat.items.forEach(item => {
-        const row = el(`
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" value="${item.name}" ${unavailable.has(item.name) ? 'checked' : ''} />
-            <span>${item.name}</span>
-          </label>
-        `);
-        stockList.appendChild(row);
-      })
-    );
-  }
-  renderStock();
-
-  root.querySelector('#saveStock').onclick = async () => {
-    const checked = [...stockList.querySelectorAll('input[type=checkbox]:checked')]
-      .map(i => i.value);
 
     saveUnavailable(checked);
     unavailable = new Set(checked);
     showToast('Наличие сохранено');
-
-    window.dispatchEvent(new CustomEvent('stock:updated'));
-    await pushUnavailableRemote(checked);
     };
-  root.querySelector('#resetStock').onclick = async () => {
-  // Локально считаем, что всё в наличии
-  saveUnavailable([]);
-  unavailable = new Set();
-
-  // Обновляем свой UI (чтоб галочки снялись)
-  renderStock();
-
-  // Сообщаем другим экранам этого же браузера
-  window.dispatchEvent(new CustomEvent('stock:updated'));
-
-  // Пишем на сервер пустой список, чтобы другие устройства при синке тоже обнулили
-  try {
-    await pushUnavailableRemote([]);
-    showToast('Все товары в наличии');
-  } catch (e) {
-    console.warn('resetStock error', e);
-    showToast('Не удалось отправить на сервер, но локально всё в наличии');
-  }
 };
 
 
@@ -1750,7 +1687,7 @@ if (!list || !stockList) {
 function TerminalView(){
   let orders = loadDash();
   const root = el(`
-    <div class="p-4 pb-10">
+     pb-10">
       <div class="grid grid-cols-2 gap-4">
         <section>
           <h2 class="text-xl font-bold mb-3">Готовится</h2>
@@ -2007,9 +1944,7 @@ window.addEventListener('hashchange', ()=>{
 });
 try{ router(); }catch(e){ console.error(e); }
 
-  
-window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
-try{ router(); }catch(e){ console.error(e); }
+
   
 /* Header + PIN */
 document.addEventListener('DOMContentLoaded', async ()=>{
