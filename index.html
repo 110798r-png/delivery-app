@@ -1886,19 +1886,6 @@ function BuilderView(){
 }
 
 }
-  function handler(){
-    const now = Date.now();
-    if (!first) first = now; taps++;
-    if (now - first > windowMs){ reset(); taps = 1; first = now; }
-    if (taps >= 4){
-      reset();
-      document.getElementById('payModal')?.classList.remove('open');
-      if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){ location.hash = '#/dashboard'; }
-      else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal').classList.add('open'); }
-    }else{ if (timer) clearTimeout(timer); timer = setTimeout(reset, windowMs); }
-  }
-  ['click','pointerup','touchend'].forEach(ev => hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}));
-}
 
 /* ===== Router ===== */
 function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
