@@ -49,6 +49,21 @@
       -webkit-touch-callout: none;
       user-select: none;
     }
+
+    .secret-dot{
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.25);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.08) inset;
+}
+.secret-dot:active{
+  transform: scale(0.95);
+  background: rgba(255,255,255,0.45);
+}
+
+    
     button:focus, a:focus { outline: none; box-shadow: none; }
   </style>
 </head>
@@ -69,6 +84,21 @@
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
+
+        <div class="brand-wrap">
+  <div class="sushi-icon" aria-hidden="true">...</div>
+  <div class="leading-tight">
+    <div class="brand-title" id="brandTitle">ЯмаMoto</div>
+    <div class="brand-sub">суши • роллы • фастфуд</div>
+  </div>
+</div>
+
+<!-- две точки-кнопки справа от названия -->
+<div class="flex items-center gap-2 ml-2">
+  <button id="termDot" class="secret-dot" title="Терминал"></button>
+  <button id="dashDot" class="secret-dot" title="Табло"></button>
+</div>
+
 
         <a id="profileBtn" href="#/profile"
            class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
@@ -127,20 +157,6 @@
   <audio id="orderDing" preload="auto">
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
-
-  <!-- Секретные зоны (невидимые) для входа в табло/терминал -->
-<div id="secretZones" class="fixed inset-x-0 bottom-0 h-20 pointer-events-none z-50">
-  <!-- левая зона: терминал -->
-  <div id="tapHotLeft"
-       class="absolute left-0 bottom-0 w-24 h-20 pointer-events-auto"
-       aria-label="terminal-hotzone"></div>
-
-  <!-- правая зона: табло -->
-  <div id="tapHotRight"
-       class="absolute right-0 bottom-0 w-24 h-20 pointer-events-auto"
-       aria-label="dashboard-hotzone"></div>
-</div>
-
 
   <script>
   if (!Element.prototype.matches) {
@@ -216,6 +232,37 @@ async function rpc(payload){
   }
   return res.json();
 }
+
+    function bindHeaderDots(){
+  const termDot = document.getElementById('termDot');
+  const dashDot = document.getElementById('dashDot');
+  if(!termDot || !dashDot || termDot._bound) return;
+  termDot._bound = dashDot._bound = true;
+
+  const goDash = ()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
+      location.hash = '#/dashboard';
+    } else {
+      sessionStorage.setItem(WANT_DASH,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
+  };
+
+  const goTerm = ()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
+      location.hash = '#/terminal';
+    } else {
+      sessionStorage.setItem(WANT_TERM,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
+  };
+
+  ['click','pointerup','touchend'].forEach(ev=>{
+    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTerm(); }, {passive:false});
+    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDash(); }, {passive:false});
+  });
+}
+
 
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
