@@ -1,121 +1,82 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>ЯмаMoto</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 
-  <!-- Tailwind (как у тебя было) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <!-- наши стили -->
-  <link rel="stylesheet" href="./styles.css" />
+  <title>Терминал ЯмаMoto</title>
 
-  <link rel="icon" href="data:,">
+  <!-- Tailwind -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      font-family: sans-serif;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+    .screen.active {
+      display: block;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .modal.open {
+      display: flex;
+    }
+
+    .hidden-zone {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      width: 200px;
+      height: 150px;
+      opacity: 0;
+      z-index: 9999;
+    }
+  </style>
 </head>
+<body>
 
-<body class="bg-gray-50">
+  <!-- =============================== -->
+  <!--     ЭКРАН 1 — ТЕРМИНАЛ          -->
+  <!-- =============================== -->
+  <div id="screen-order" class="screen active">
+    <div class="bg-red-600 text-white px-4 py-3 text-2xl font-extrabold">ЯмаMoto</div>
 
-  <div class="w-full">
-    <!-- Красная шапка -->
-    <div class="brand-strip">
-      <div class="phone-shell header-row flex items-center justify-between">
-        <div class="brand-wrap">
-          <div class="sushi-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" fill="#fff"/>
-              <circle cx="12" cy="12" r="7" fill="#e50000"/>
-              <circle cx="12" cy="12" r="4" fill="#000"/>
-            </svg>
-          </div>
-          <div class="leading-tight">
-            <div class="brand-title" id="brandTitle">ЯмаMoto</div>
-            <div class="brand-sub">суши • роллы • фастфуд</div>
-          </div>
-        </div>
-      </div>
+    <div class="p-4">
+      <!-- Категории -->
+      <div id="categoryBar" class="flex gap-2 overflow-x-auto mb-3 no-scrollbar"></div>
+
+      <!-- Товары -->
+      <div id="productsArea" class="grid gap-3"></div>
     </div>
-    <div class="header-ghost"></div>
 
-    <!-- сюда монтируются экраны -->
-    <main id="app" class="phone-shell"></main>
-  </div>
-
-  <!-- Плавающая кнопка входа на табло кухни -->
-  <button id="openDashBtn" title="Табло" aria-label="Табло">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="4" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
-      <rect x="3" y="14" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
-      <path d="M7 7h4M7 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  </button>
-
-  <!-- Подтверждение заказа -->
-  <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
-      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-60 overflow-auto"></div>
-
-      <div class="flex justify-end gap-2">
-        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
-        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+    <!-- ИТОГО + кнопка -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex justify-between items-center">
+      <div class="text-xl">
+        Итого: <b id="orderTotal">0 ₽</b>
       </div>
+      <button id="orderConfirmBtn" disabled class="px-5 py-2 rounded-xl bg-black text-white text-lg disabled:opacity-30">
+        Оформить
+      </button>
     </div>
+
+    <!-- скрытая зона для входа на кухню -->
+    <div id="enterKitchenZone" class="hidden-zone"></div>
   </div>
-
-  <!-- PIN модалка -->
-  <div id="pinModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
-      <h3 class="text-lg font-semibold">Введите ключ</h3>
-      <input id="pinInput" class="border rounded-2xl p-3 w-full text-center" placeholder="введите ключ" inputmode="text">
-      <div class="flex justify-end gap-2">
-        <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
-        <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Тост -->
-  <div id="toast" class="toast hidden"></div>
-
-  <!-- звук нового заказа -->
-  <audio id="orderDing" preload="auto">
-    <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
-  </audio>
-
-  <!-- Полифилы (как у тебя) -->
-  <script>
-    if (!Element.prototype.matches) {
-      Element.prototype.matches =
-        Element.prototype.msMatchesSelector ||
-        Element.prototype.webkitMatchesSelector ||
-        function (selector) {
-          const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
-          let i = matches.length;
-          while (--i >= 0 && matches.item(i) !== this) {}
-          return i > -1;
-        };
-    }
-
-    if (!Element.prototype.closest) {
-      Element.prototype.closest = function (selector) {
-        let el = this;
-        while (el && el.nodeType === 1) {
-          if (el.matches(selector)) return el;
-          el = el.parentElement || el.parentNode;
-        }
-        return null;
-      };
-    }
-
-    if (!window.CSS) window.CSS = {};
-    if (typeof window.CSS.escape !== 'function') {
-      window.CSS.escape = function (value) {
-        return String(value).replace(/"/g, '\\"');
-      };
-    }
-  </script>
-
-  <!-- наш главный файл -->
-  <script src="./app.js"></script>
-</body>
-</html>
