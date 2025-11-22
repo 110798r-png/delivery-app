@@ -1,1774 +1,973 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Терминал заказа</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <meta charset="utf-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>ЯмаMoto — Терминал</title>
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <link rel="icon" href="data:,">
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      font-family: Arial, sans-serif;
-      user-select: none;
-      overflow: hidden;
-    }
-
-    /* Основные кнопки */
-    .btn {
-      display: inline-block;
-      padding: 16px 26px;
-      font-size: 22px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      text-align: center;
-      margin: 4px;
-    }
-
-    .btn-primary {
-      background: #ff0000;
-      color: white;
-    }
-
-    .btn-secondary {
-      background: #dddddd;
-      color: #333;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* Контейнер категорий */
-    #categoriesBar {
+    html, body {
       width: 100%;
-      height: 90px;
-      overflow-x: auto;
-      white-space: nowrap;
-      border-bottom: 2px solid #eee;
-      background: #fafafa;
+      max-width: 100%;
+      overflow-x: hidden;
+      background: #f9fafb;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    img { max-width: 100%; display:block; }
+    .hidden { display:none; }
+    .phone-shell { width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
+
+    .toast{
+      position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff;
+      padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2);
+      opacity:.95; z-index:9999
     }
 
-    .category {
-      display: inline-block;
-      padding: 20px 30px;
-      font-size: 24px;
-      cursor: pointer;
+    .glass-panel{
+      background:radial-gradient(circle at 10% 20%,
+        rgba(255,255,255,.85) 0%,
+        rgba(255,255,255,.45) 45%,
+        rgba(255,255,255,.25) 100%);
+      backdrop-filter:blur(18px);
+      border:1px solid rgba(255,255,255,.4);
+      box-shadow:0 14px 40px rgba(15,23,42,.12)
+    }
+    .no-scrollbar::-webkit-scrollbar{ display:none }
+    .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
+    .sticky-top{ position:sticky; top:.5rem; z-index:30 }
+
+    .menu-card{
+      display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7;
+      border-radius:var(--card-radius, 1.25rem); padding:1rem; min-height:var(--card-min-h, 6.4rem)
+    }
+    .menu-card-img{
+      width:var(--img-w,110px); height:var(--img-h,70px);
+      border-radius:var(--img-radius,.75rem);
+      background:#eee; object-fit:cover
     }
 
-    .category.active {
-      background: #ff0000;
-      color: white;
-      border-radius: 12px;
+    .confirm-bar{
+      position:fixed; left:50%; transform:translateX(-50%);
+      bottom:0; width:min(540px, 100%);
+      background:#fff; border-top:1px solid #e5e7eb;
+      padding:.6rem .9rem; z-index:50;
+      box-shadow:0 -10px 25px rgba(15,23,42,.06)
     }
 
-    /* Товары */
-    #productsArea {
-      padding: 20px;
-      height: calc(100vh - 200px);
-      overflow-y: auto;
+    #catPager{
+      display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom;
+    }
+    .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
+    .v-scroll{
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain; touch-action: pan-y;
     }
 
-    .productCard {
-      border: 2px solid #eee;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      display: flex;
+    .modal{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.45); z-index:90
+    }
+    .modal.open{ display:flex }
+
+    .card{
+      border-radius:1.25rem; background:#fff; border:1px solid #edf2f7;
+      box-shadow:0 8px 24px rgba(15,23,42,.06);
     }
 
-    .productCard img {
-      width: 130px;
-      height: 130px;
-      border-radius: 12px;
-      margin-right: 20px;
-      object-fit: cover;
+    /* --- Красная шапка --- */
+    .brand-strip{ background:#e50000; color:#fff; }
+    .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
+    .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
+    .brand-wrap{ display:flex; align-items:center; gap:10px; }
+    .sushi-icon{
+      width:36px; height:36px; border-radius:999px;
+      display:grid; place-items:center; background:#000;
+    }
+    .sushi-icon svg{ width:24px; height:24px; }
+    .header-row{ padding:10px 12px; }
+    .header-ghost{ height:8px; }
+
+    button, a, svg, .brand-strip, .header-row{
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    button:focus, a:focus{ outline:none; box-shadow:none; }
+
+    /* 14" горизонталь / большой экран */
+    @media (min-width: 1000px) {
+      #app.phone-shell { max-width: 1000px; }
+      .confirm-bar { width:min(1000px,100%); }
     }
 
-    .productInfo {
-      flex-grow: 1;
+    /* Плавающая кнопка в табло кухни (видимая) */
+    #openKitchenBtn{
+      position:fixed; right:16px; bottom:86px; z-index:80;
+      width:56px; height:56px; border-radius:999px;
+      background:#111; color:#fff; display:grid; place-items:center;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+      opacity:.9;
     }
+    #openKitchenBtn:active{ transform:scale(.96); }
 
-    .productName {
-      font-size: 28px;
-      margin-bottom: 12px;
+    /* Скрытые зоны тапов */
+    #hotLeft, #hotRight {
+      position:fixed; bottom:0; width:220px; height:140px; z-index:9998;
+      opacity:0; pointer-events:auto;
     }
-
-    .productPrice {
-      font-size: 26px;
-      font-weight: bold;
-      margin-bottom: 16px;
-    }
-
-    /* Кнопка корзины */
-    #cartButton {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      background: #ff0000;
-      color: white;
-      font-size: 28px;
-      padding: 16px 26px;
-      border-radius: 50px;
-      cursor: pointer;
-    }
-
-    /* Скрытые кнопки PIN входа */
-    #secretRight,
-    #secretLeft {
-      position: fixed;
-      width: 50px;
-      height: 50px;
-      bottom: 0;
-      opacity: 0; /* невидимые */
-    }
-
-    #secretRight {
-      right: 0;
-    }
-
-    #secretLeft {
-      left: 0;
-    }
-
-    /* PIN окно */
-    #pinModal {
-      position: fixed;
-      left: 0; right: 0; top: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    #pinBox {
-      background: white;
-      padding: 40px;
-      border-radius: 20px;
-      width: 400px;
-      text-align: center;
-    }
-
-    #pinInput {
-      font-size: 32px;
-      padding: 12px;
-      width: 80%;
-      text-align: center;
-      margin-bottom: 20px;
-      border-radius: 12px;
-      border: 2px solid #ccc;
-    }
-
-    /* Модалка корзины */
-    #cartModal {
-      position: fixed;
-      left: 0; top: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    #cartBox {
-      background: #ffffff;
-      width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-      border-radius: 20px;
-      padding: 20px;
-    }
-
-    /* Модалка оплаты */
-    #payModal {
-      position: fixed;
-      left: 0; top: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    #payBox {
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 20px;
-      width: 500px;
-      text-align: center;
-    }
-
-    #qrImage {
-      width: 300px;
-      height: 300px;
-      margin: 20px auto;
-      object-fit: contain;
-    }
-
+    #hotLeft { left:0; }
+    #hotRight { right:0; }
   </style>
 </head>
+
 <body>
-
-  <!-- Секретные невидимые кнопки -->
-  <div id="secretLeft"></div>
-  <div id="secretRight"></div>
-
-  <!-- Категории -->
-  <div id="categoriesBar"></div>
-
-  <!-- Товары -->
-  <div id="productsArea"></div>
-
-  <!-- Корзина -->
-  <div id="cartButton">Корзина</div>
-
-  <!-- PIN окно -->
-  <div id="pinModal" class="hidden">
-    <div id="pinBox">
-      <h2>Введите PIN</h2>
-      <input id="pinInput" type="password" maxlength="6">
-      <br><br>
-      <button class="btn btn-primary" id="pinSubmit">Войти</button>
-      <br><br>
-      <button class="btn btn-secondary" id="pinClose">Отмена</button>
-    </div>
-  </div>
-
-  <!-- Корзина -->
-  <div id="cartModal" class="hidden">
-    <div id="cartBox">
-      <h2>Корзина</h2>
-      <div id="cartItems"></div>
-
-      <br>
-      <button class="btn btn-secondary" id="editCart">Изменить</button>
-      <button class="btn btn-primary" id="confirmCart">Подтвердить</button>
-
-      <br><br>
-      <button class="btn" id="closeCart">Закрыть</button>
-    </div>
-  </div>
-
-  <!-- Оплата -->
-  <div id="payModal" class="hidden">
-    <div id="payBox">
-      <h2>Оплатите заказ</h2>
-
-      <img id="qrImage" src="" alt="QR">
-
-      <p>После оплаты заказ автоматически отправится.</p>
-
-      <button class="btn btn-secondary" id="payClose">Закрыть</button>
-    </div>
-  </div>
-    <script>
-  /* =========================================================
-     НАСТРОЙКИ / КОНФИГ
-     ========================================================= */
-
-  const LS_CONFIG_KEY = "app_config_v1";
-  const LS_DASH_KEY   = "dashboard_orders_v1";
-  const PIN_CODE      = "65Vafuza";      // твой PIN
-  const PIN_OK_KEY    = "PIN_OK";
-  const WANT_ROUTE_KEY= "WANT_ROUTE";
-
-  // меню по умолчанию (если нет в localStorage)
-  const DEFAULT_CONFIG = {
-    brandTitle: "ЯмаMoto",
-    sbpPayBaseUrl: "",  // пока пусто, позже можно использовать
-    menu: [
-      {
-        key: "burgers",
-        title: "Бургеры",
-        items: [
-          { name: "Говяжий бургер", price: 280, img: "https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop" },
-          { name: "Говяжий двойной", price: 440, img: "https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop" },
-          { name: "Куриный бургер",  price: 200, img: "https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop" },
-          { name: "Куриный двойной", price: 250, img: "https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop" },
-          { name: "Чизбургер", price: 220, img: "" }
-        ]
-      },
-      {
-        key: "twisters",
-        title: "Твистеры",
-        items: [
-          { name: "Твистер обычный", price: 200, img: "" },
-          { name: "Твистер обычный с картошкой", price: 220, img: "" },
-          { name: "Твистер макс", price: 250, img: "" },
-          { name: "Твистер макс с картошкой", price: 280, img: "" }
-        ]
-      },
-      {
-        key: "drinks",
-        title: "Напитки",
-        items: [
-          { name: "Добрый кола", price: 100, img: "" },
-          { name: "Добрый апельсин", price: 100, img: "" },
-          { name: "Добрый лайм", price: 100, img: "" },
-          { name: "Флэт-уайт", price: 100, img: "" },
-          { name: "Раф банан", price: 100, img: "" },
-          { name: "Эспрессо", price: 100, img: "" }
-        ]
-      },
-      {
-        key: "sushi",
-        title: "Суши / роллы",
-        items: [
-          { name: "Калифорния", price: 350, img: "" },
-          { name: "Филадельфия", price: 390, img: "" },
-          { name: "Аляска", price: 350, img: "" }
-        ]
-      }
-    ]
-  };
-
-  function loadConfig() {
-    try {
-      const raw = localStorage.getItem(LS_CONFIG_KEY);
-      if (!raw) return DEFAULT_CONFIG;
-      const json = JSON.parse(raw);
-      if (!json || !Array.isArray(json.menu)) return DEFAULT_CONFIG;
-      return json;
-    } catch {
-      return DEFAULT_CONFIG;
-    }
-  }
-
-  function saveConfig(cfg) {
-    localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(cfg));
-  }
-
-  /* =========================================================
-     УТИЛИТЫ
-     ========================================================= */
-
-  function $(id){ return document.getElementById(id); }
-
-  function money(n){
-    return (n || 0) + " руб.";
-  }
-
-  function toast(msg){
-    const t = $("toast");
-    t.textContent = msg;
-    t.classList.remove("hidden");
-    setTimeout(() => t.classList.add("hidden"), 1500);
-  }
-
-  function loadDash(){
-    try {
-      return JSON.parse(localStorage.getItem(LS_DASH_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  }
-  function saveDash(arr){
-    localStorage.setItem(LS_DASH_KEY, JSON.stringify(arr || []));
-  }
-
-  /* =========================================================
-     ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЭКРАНА ТЕРМИНАЛА
-     ========================================================= */
-
-  const cfg = loadConfig();
-  let activeCatIndex = 0;
-
-  // корзина: { "name": { qty, price, img } }
-  let cart = {};
-
-  /* =========================================================
-     РЕНДЕР КАТЕГОРИЙ
-     ========================================================= */
-
-  function renderCategories(){
-    const bar = $("categoriesBar");
-    bar.innerHTML = "";
-
-    cfg.menu.forEach((cat, idx) => {
-      const div = document.createElement("div");
-      div.className = "category " + (idx === activeCatIndex ? "active" : "");
-      div.textContent = cat.title;
-
-      div.onclick = () => {
-        activeCatIndex = idx;
-        renderCategories();
-        renderProducts();
-      };
-
-      bar.appendChild(div);
-    });
-  }
-
-  /* =========================================================
-     РЕНДЕР ТОВАРОВ
-     ========================================================= */
-
-  function renderProducts(){
-    const area = $("productsArea");
-    area.innerHTML = "";
-
-    const cat = cfg.menu[activeCatIndex];
-    if (!cat) return;
-
-    cat.items.forEach(item => {
-      const card = document.createElement("div");
-      card.className = "productCard";
-
-      const img = document.createElement("img");
-      img.src = item.img || "https://placehold.co/160x160?text=food";
-
-      const info = document.createElement("div");
-      info.className = "productInfo";
-
-      const name = document.createElement("div");
-      name.className = "productName";
-      name.textContent = item.name;
-
-      const price = document.createElement("div");
-      price.className = "productPrice";
-      price.textContent = money(item.price);
-
-      const controls = document.createElement("div");
-
-      const dec = document.createElement("button");
-      dec.className = "btn btn-secondary";
-      dec.textContent = "−";
-      dec.onclick = () => changeQty(item, -1);
-
-      const qty = document.createElement("span");
-      qty.style.fontSize = "28px";
-      qty.style.margin = "0 18px";
-      qty.id = "qty_" + item.name;
-
-      const inc = document.createElement("button");
-      inc.className = "btn btn-primary";
-      inc.textContent = "+";
-      inc.onclick = () => changeQty(item, +1);
-
-      controls.appendChild(dec);
-      controls.appendChild(qty);
-      controls.appendChild(inc);
-
-      info.appendChild(name);
-      info.appendChild(price);
-      info.appendChild(controls);
-
-      card.appendChild(img);
-      card.appendChild(info);
-
-      area.appendChild(card);
-
-      updateQtyLabel(item.name);
-    });
-  }
-
-  function changeQty(item, delta){
-    const key = item.name;
-    if (!cart[key]) cart[key] = { qty: 0, price: item.price, img: item.img };
-    cart[key].qty = Math.max(0, cart[key].qty + delta);
-    if (cart[key].qty === 0) delete cart[key];
-
-    updateQtyLabel(key);
-    updateCartButton();
-  }
-
-  function updateQtyLabel(name){
-    const el = $("qty_" + name);
-    if (!el) return;
-    el.textContent = cart[name]?.qty || 0;
-  }
-
-  function updateCartButton(){
-    const btn = $("cartButton");
-    const totalQty = Object.values(cart).reduce((s, x) => s + x.qty, 0);
-    btn.textContent = totalQty > 0 ? ("Корзина (" + totalQty + ")") : "Корзина";
-  }
-
-  /* =========================================================
-     КОРЗИНА / МОДАЛКА
-     ========================================================= */
-
-  function openCart(){
-    const modal = $("cartModal");
-    const itemsBox = $("cartItems");
-    itemsBox.innerHTML = "";
-
-    const entries = Object.entries(cart);
-    if (!entries.length){
-      itemsBox.innerHTML = "<p>Корзина пуста</p>";
-    } else {
-      let total = 0;
-
-      entries.forEach(([name, data]) => {
-        const row = document.createElement("div");
-        row.style.fontSize = "22px";
-        row.style.display = "flex";
-        row.style.justifyContent = "space-between";
-        row.style.marginBottom = "12px";
-
-        const left = document.createElement("div");
-        left.textContent = name + " × " + data.qty;
-
-        const right = document.createElement("div");
-        const sum = data.qty * data.price;
-        total += sum;
-        right.textContent = money(sum);
-
-        row.appendChild(left);
-        row.appendChild(right);
-
-        itemsBox.appendChild(row);
-      });
-
-      const totRow = document.createElement("div");
-      totRow.style.fontSize = "26px";
-      totRow.style.fontWeight = "bold";
-      totRow.style.marginTop = "16px";
-      totRow.textContent = "Итого: " + money(total);
-      itemsBox.appendChild(totRow);
-    }
-
-    modal.classList.remove("hidden");
-  }
-
-  function closeCart(){
-    $("cartModal").classList.add("hidden");
-    // возвращаем кнопки корзины на место
-    $("confirmCart").classList.remove("hidden");
-    $("editCart").classList.remove("hidden");
-    if ($("payChoice")) $("payChoice").remove();
-  }
-
-  // шаг 2: выбор оплаты
-  function showPayChoice(){
-    const box = $("cartBox");
-
-    // скрываем старые кнопки
-    $("confirmCart").classList.add("hidden");
-    $("editCart").classList.add("hidden");
-
-    // блок выбора
-    const choice = document.createElement("div");
-    choice.id = "payChoice";
-    choice.style.marginTop = "20px";
-    choice.innerHTML = `
-      <h3 style="font-size:24px;margin-bottom:8px;">Способ оплаты</h3>
-      <button id="payByQr" class="btn btn-primary" style="width:100%;margin-bottom:10px;">QR (СБП)</button>
-      <button id="payByCard" class="btn btn-secondary" style="width:100%;">Картой</button>
-    `;
-    box.appendChild(choice);
-
-    $("payByQr").onclick = () => finalizeOrder("sbp");
-    $("payByCard").onclick = () => finalizeOrder("card");
-  }
-
-  /* =========================================================
-     ОТПРАВКА ЗАКАЗА
-     ========================================================= */
-
-  async function sendOrderToApi(orderPayload){
-    // пока API не трогаем — пробуем отправить, если не получится — не падаем
-    try {
-      const res = await fetch("/api/order", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ op:"create", ...orderPayload })
-      });
-      const json = await res.json().catch(()=>null);
-      return json;
-    } catch {
-      return null;
-    }
-  }
-
-  async function finalizeOrder(payType){
-    const entries = Object.entries(cart);
-    if (!entries.length){
-      toast("Корзина пуста");
-      return;
-    }
-
-    const items = entries.map(([name, d]) => ({
-      name,
-      qty: d.qty,
-      price: d.price
-    }));
-
-    const total = items.reduce((s,i)=> s + i.qty*i.price, 0);
-
-    // собираем заказ
-    let order = {
-      id: Date.now().toString().slice(-6),
-      createdAt: Date.now(),
-      items,
-      total,
-      pay: payType,
-      status: "готовится"  // по умолчанию
-    };
-
-    // пробуем API
-    const apiRes = await sendOrderToApi({ items, total, pay: payType });
-    if (apiRes?.order) order = apiRes.order;
-
-    // пишем в табло локально
-    const dash = loadDash();
-    dash.unshift(order);
-    saveDash(dash.slice(0,200));
-
-    // чистим корзину
-    cart = {};
-    updateCartButton();
-    renderProducts();
-
-    closeCart();
-
-    // QR оплата → открыть payModal
-    if (payType === "sbp"){
-      openQrModal();
-    } else {
-      toast("Оплатите на кассе");
-    }
-  }
-
-  /* =========================================================
-     QR МОДАЛКА
-     ========================================================= */
-
-  let qrTimer = null;
-
-  function openQrModal(){
-    const m = $("payModal");
-    const img = $("qrImage");
-
-    // берем URL картинки из localStorage
-    const qrUrl = localStorage.getItem("qr_url") || "";
-    if (qrUrl){
-      img.src = qrUrl;
-    } else {
-      img.src = "https://placehold.co/300x300?text=QR+URL+empty";
-    }
-
-    m.classList.remove("hidden");
-
-    // авто-закрытие через 20 сек
-    if (qrTimer) clearTimeout(qrTimer);
-    qrTimer = setTimeout(() => {
-      m.classList.add("hidden");
-    }, 20000);
-  }
-
-  function closeQrModal(){
-    $("payModal").classList.add("hidden");
-    if (qrTimer) clearTimeout(qrTimer);
-  }
-
-  // клик по свободному месту → закрыть
-  $("payModal").addEventListener("click", (e) => {
-    if (e.target.id === "payModal") closeQrModal();
-  });
-
-  $("payClose").onclick = closeQrModal;
-
-  /* =========================================================
-     PIN ЛОГИКА + 8 ТАПОВ В УГЛАХ
-     ========================================================= */
-
-  function openPinModal(targetRoute){
-    sessionStorage.setItem(WANT_ROUTE_KEY, targetRoute);
-    $("pinInput").value = "";
-    $("pinModal").classList.remove("hidden");
-    $("pinInput").focus();
-  }
-
-  function closePinModal(){
-    $("pinModal").classList.add("hidden");
-  }
-
-  $("pinSubmit").onclick = () => {
-    const val = $("pinInput").value.trim();
-    if (val !== PIN_CODE){
-      toast("Неверный PIN");
-      return;
-    }
-    sessionStorage.setItem(PIN_OK_KEY, "1");
-    closePinModal();
-
-    const route = sessionStorage.getItem(WANT_ROUTE_KEY) || "#/dashboard";
-    sessionStorage.removeItem(WANT_ROUTE_KEY);
-    location.hash = route;
-  };
-
-  $("pinClose").onclick = closePinModal;
-
-  function bindSecretTaps(el, route){
-    let taps = 0;
-    let firstTime = 0;
-    let timer = null;
-    const winMs = 1500;
-
-    function reset(){
-      taps = 0;
-      firstTime = 0;
-      if (timer) { clearTimeout(timer); timer = null; }
-    }
-
-    el.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const now = Date.now();
-      if (!firstTime) firstTime = now;
-      taps++;
-
-      if (now - firstTime > winMs){
-        reset();
-        taps = 1;
-        firstTime = now;
-      }
-
-      if (taps >= 8){
-        reset();
-        openPinModal(route);
-      } else {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(reset, winMs);
-      }
-    }, { passive:false });
-  }
-
-  bindSecretTaps($("secretRight"), "#/dashboard"); // правая — кухня
-  bindSecretTaps($("secretLeft"),  "#/board");     // левая — табло зала
-
-  /* =========================================================
-     КНОПКИ
-     ========================================================= */
-
-  $("cartButton").onclick = openCart;
-  $("closeCart").onclick = closeCart;
-  $("editCart").onclick = () => { closeCart(); };
-  $("confirmCart").onclick = showPayChoice;
-
-  /* =========================================================
-     СТАРТ
-     ========================================================= */
-
-  renderCategories();
-  renderProducts();
-  updateCartButton();
-
-  </script>
-    <script>
-  /* =========================================================
-     ТАБЛО КУХНИ (#/dashboard)
-     ========================================================= */
-
-  function renderDashboard() {
-    const root = document.getElementById("app");
-    root.innerHTML = "";
-
-    const dash = loadDash();
-
-    const wrap = document.createElement("div");
-    wrap.style.padding = "20px";
-
-    const title = document.createElement("h2");
-    title.textContent = "КУХНЯ — Заказы";
-    title.style.fontSize = "36px";
-    wrap.appendChild(title);
-
-    if (!dash.length){
-      const empty = document.createElement("p");
-      empty.textContent = "Пока заказов нет";
-      empty.style.fontSize = "28px";
-      wrap.appendChild(empty);
-    } else {
-      dash.forEach(order => {
-        const box = document.createElement("div");
-        box.style.padding = "12px 20px";
-        box.style.margin = "10px 0";
-        box.style.background = "#fff";
-        box.style.borderRadius = "12px";
-        box.style.boxShadow = "0 0 4px rgba(0,0,0,0.2)";
-        box.style.fontSize = "26px";
-
-        const head = document.createElement("div");
-        head.style.fontWeight = "bold";
-        head.textContent = "№ " + order.id + " — " + order.status;
-        box.appendChild(head);
-
-        order.items.forEach(i => {
-          const row = document.createElement("div");
-          row.textContent = i.name + " × " + i.qty;
-          row.style.marginLeft = "10px";
-          row.style.marginTop = "4px";
-          box.appendChild(row);
-        });
-
-        const btns = document.createElement("div");
-        btns.style.marginTop = "10px";
-
-        const btnReady = document.createElement("button");
-        btnReady.className = "btn btn-primary";
-        btnReady.style.marginRight = "12px";
-        btnReady.textContent = "ГОТОВО";
-
-        btnReady.onclick = () => setKitchenStatus(order.id, "готов");
-
-        const btnRemove = document.createElement("button");
-        btnRemove.className = "btn btn-secondary";
-        btnRemove.textContent = "УДАЛИТЬ";
-
-        btnRemove.onclick = () => {
-          const arr = loadDash().filter(o => o.id !== order.id);
-          saveDash(arr);
-          renderDashboard();
-        };
-
-        btns.appendChild(btnReady);
-        btns.appendChild(btnRemove);
-        box.appendChild(btns);
-
-        wrap.appendChild(box);
-      });
-    }
-
-    // кнопка "выйти"
-    const exitBtn = document.createElement("div");
-    exitBtn.textContent = "Выйти";
-    exitBtn.style.position = "fixed";
-    exitBtn.style.bottom = "40px";
-    exitBtn.style.right = "40px";
-    exitBtn.style.fontSize = "28px";
-    exitBtn.style.color = "#fff";
-    exitBtn.style.background = "#555";
-    exitBtn.style.padding = "12px 16px";
-    exitBtn.style.borderRadius = "10px";
-    exitBtn.style.cursor = "pointer";
-    exitBtn.onclick = () => {
-      sessionStorage.removeItem(PIN_OK_KEY);
-      location.hash = "/";
-    };
-    wrap.appendChild(exitBtn);
-
-    root.appendChild(wrap);
-  }
-
-  function setKitchenStatus(id, status){
-    const dash = loadDash();
-    const o = dash.find(x => x.id === id);
-    if (!o) return;
-
-    o.status = status;
-
-    saveDash(dash);
-    renderDashboard();
-  }
-
-
-  /* =========================================================
-     ТАБЛО ЗАЛА (#/board)
-     ========================================================= */
-
-  function renderBoard() {
-    const root = document.getElementById("app");
-    root.innerHTML = "";
-
-    const wrap = document.createElement("div");
-    wrap.style.padding = "20px";
-    wrap.style.textAlign = "center";
-
-    const title = document.createElement("h2");
-    title.style.fontSize = "46px";
-    title.style.marginBottom = "20px";
-    title.textContent = "ГОТОВИТСЯ / ГОТОВО";
-    wrap.appendChild(title);
-
-    const dash = loadDash();
-
-    const preparing = dash.filter(o => o.status !== "готов");
-    const ready = dash.filter(o => o.status === "готов");
-
-    const col = document.createElement("div");
-    col.style.fontSize = "40px";
-
-    const prepTitle = document.createElement("div");
-    prepTitle.style.fontWeight = "bold";
-    prepTitle.style.marginBottom = "10px";
-    prepTitle.textContent = "ГОТОВИТСЯ:";
-    col.appendChild(prepTitle);
-
-    if (!preparing.length){
-      const e = document.createElement("div");
-      e.style.fontSize = "28px";
-      e.textContent = "—";
-      col.appendChild(e);
-    } else {
-      preparing.forEach(o => {
-        const n = document.createElement("div");
-        n.textContent = o.id;
-        col.appendChild(n);
-      });
-    }
-
-    const readyTitle = document.createElement("div");
-    readyTitle.style.fontWeight = "bold";
-    readyTitle.style.marginTop = "30px";
-    readyTitle.style.marginBottom = "10px";
-    readyTitle.textContent = "ГОТОВО:";
-    col.appendChild(readyTitle);
-
-    if (!ready.length){
-      const e = document.createElement("div");
-      e.style.fontSize = "28px";
-      e.textContent = "—";
-      col.appendChild(e);
-    } else {
-      ready.forEach(o => {
-        const n = document.createElement("div");
-        n.style.color = "#00ff00";
-        n.textContent = o.id;
-        col.appendChild(n);
-      });
-    }
-
-    wrap.appendChild(col);
-
-    root.appendChild(wrap);
-
-    // автовозврат на терминал при клике
-    wrap.onclick = () => location.hash = "/";
-  }
-
-  /* =========================================================
-     РОУТЕР (#/, #/dashboard, #/board)
-     ========================================================= */
-
-  function router() {
-    const route = location.hash.replace("#","");
-    const pinOk = sessionStorage.getItem(PIN_OK_KEY);
-
-    if (route === "dashboard"){
-      if (!pinOk) { location.hash = "/"; return; }
-      renderDashboard();
-      return;
-    }
-
-    if (route === "board"){
-      renderBoard();
-      return;
-    }
-
-    // иначе обычный терминал
-    renderCategories();
-    renderProducts();
-    updateCartButton();
-  }
-
-  window.addEventListener("hashchange", router);
-
-  // первый вызов
-  router();
-
-  </script>
-<script>
-/* =========================================================
-   ЧАСТЬ 4 — PIN ВХОД/ВЫХОД + 2 СКРЫТЫЕ ЗОНЫ + QR-КАРТИНКА
-   ВСТАВИТЬ ПОСЛЕ ЧАСТЬ 3
-   ========================================================= */
-
-/* ===== PIN настройки ===== */
-const PIN_CODE = "65Vafuza";                // твой PIN
-const PIN_OK_KEY = "PIN_OK_KEY";           // sessionStorage
-const WANT_ROUTE_KEY = "WANT_ROUTE_KEY";   // sessionStorage
-
-/* ===== QR URL для СБП (картинка) =====
-   Ты потом просто в консоли или кодом сделаешь:
-   localStorage.setItem('sbp_qr_url_v1', 'https://....png')
-*/
-const SBP_QR_URL_KEY = "sbp_qr_url_v1";
-
-function getSbpQrUrl(){
-  const fromLs = (localStorage.getItem(SBP_QR_URL_KEY) || "").trim();
-  if (fromLs) return fromLs;
-
-  const cfg = loadConfig?.() || {};
-  return (cfg.sbpQrUrl || "").trim();
-}
-
-/* =========================================================
-   QR МОДАЛКА (КАРТИНКА)
-   ========================================================= */
-function ensureQrModal(){
-  let m = document.getElementById("qrModal");
-  if (m) return m;
-
-  m = el(`
-    <div id="qrModal" class="modal">
-      <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl text-center">
-        <h3 class="text-lg font-semibold">Оплата по СБП</h3>
-        <div class="text-sm text-gray-600">
-          Отсканируйте QR и оплатите
+  <div class="w-full">
+    <!-- Красная шапка -->
+    <div class="brand-strip">
+      <div class="phone-shell header-row flex items-center justify-between">
+        <div class="brand-wrap">
+          <div class="sushi-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="#fff"/>
+              <circle cx="12" cy="12" r="7" fill="#e50000"/>
+              <circle cx="12" cy="12" r="4" fill="#000"/>
+            </svg>
+          </div>
+          <div class="leading-tight">
+            <div class="brand-title" id="brandTitle">ЯмаMoto</div>
+            <div class="brand-sub">суши • роллы • фастфуд</div>
+          </div>
         </div>
-        <img id="qrImg" class="mx-auto rounded-xl border w-64 h-64 object-contain" alt="QR">
-        <div class="text-xs text-gray-500">
-          Окно закроется само через 20 секунд
-        </div>
-        <button id="qrOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white w-full">
-          Закрыть
+        <!-- личный кабинет убран -->
+      </div>
+    </div>
+    <div class="header-ghost"></div>
+
+    <main id="app" class="phone-shell"></main>
+  </div>
+
+  <!-- Плавающая кнопка на табло кухни -->
+  <button id="openKitchenBtn" title="Табло кухни" aria-label="Табло кухни">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
+      <rect x="3" y="14" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
+      <path d="M7 7h4M7 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <!-- Скрытые зоны 8-тапа -->
+  <div id="hotLeft" aria-label="hidden-left"></div>
+  <div id="hotRight" aria-label="hidden-right"></div>
+
+  <!-- Подтверждение заказа -->
+  <div id="payModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
+      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
+      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-60 overflow-auto"></div>
+
+      <div class="grid gap-2">
+        <button id="payByQr" type="button" class="px-3 py-2 rounded-xl bg-black text-white w-full">
+          Оплатить по QR (СБП)
+        </button>
+        <button id="payByCard" type="button" class="px-3 py-2 rounded-xl border w-full">
+          Оплата картой (POS позже)
         </button>
       </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
+      </div>
     </div>
-  `);
+  </div>
 
-  document.body.appendChild(m);
+  <!-- QR модалка -->
+  <div id="qrModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl text-center">
+      <h3 class="text-lg font-semibold">Оплата по СБП</h3>
+      <div class="text-sm text-gray-600">
+        Отсканируйте QR и оплатите заказ
+      </div>
 
-  // тап мимо — закрыть
-  m.onclick = (e) => {
-    if (e.target === m) m.classList.remove("open");
-  };
+      <img id="qrImg"
+           class="mx-auto rounded-xl border w-64 h-64 object-contain"
+           alt="QR">
 
-  m.querySelector("#qrOk").onclick = () => m.classList.remove("open");
+      <div class="text-xs text-gray-500">
+        Если QR не настроен — вставь URL картинки в localStorage ключ:
+        <b>sbp_qr_url</b>
+      </div>
 
-  return m;
-}
+      <button id="qrPaidBtn" type="button" class="px-3 py-2 rounded-xl bg-black text-white w-full">
+        Я оплатил(а)
+      </button>
 
-function openQrImage(){
-  const m = ensureQrModal();
-  const qi = m.querySelector("#qrImg");
-  const url = getSbpQrUrl();
+      <button id="qrCloseBtn" type="button" class="px-3 py-2 rounded-xl border w-full">
+        Закрыть
+      </button>
+    </div>
+  </div>
 
-  if (!url){
-    qi.src = "https://placehold.co/256x256?text=QR+URL+NOT+SET";
-  } else {
-    qi.src = url;
-  }
+  <!-- PIN модалка -->
+  <div id="pinModal" class="modal">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
+      <h3 class="text-lg font-semibold">Введите PIN</h3>
+      <input id="pinInput"
+             class="border rounded-2xl p-3 w-full text-center"
+             placeholder="PIN"
+             inputmode="text">
+      <div class="flex justify-end gap-2">
+        <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
+        <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+      </div>
+    </div>
+  </div>
 
-  m.classList.add("open");
+  <div id="toast" class="toast hidden"></div>
 
-  // авто-закрытие через 20 сек
-  setTimeout(() => {
-    m.classList.remove("open");
-  }, 20000);
-}
+  <!-- звук новых заказов -->
+  <audio id="orderDing" preload="auto">
+    <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
+  </audio>
 
-/* =========================================================
-   ПЕРЕОПРЕДЕЛЯЕМ ОК в payModal:
-   после создания заказа → показываем QR картинку
-   ========================================================= */
-(function patchPayModalOk(){
-  const okBtn = document.getElementById("payOk");
-  if (!okBtn) return;
-
-  // снимаем старый если был
-  if (okBtn._patchedHandler){
-    okBtn.removeEventListener("click", okBtn._patchedHandler);
-  }
-
-  okBtn._patchedHandler = async (e) => {
-    e?.preventDefault(); e?.stopPropagation();
-
-    const payModal = document.getElementById("payModal");
-    const closePay = () => payModal?.classList.remove("open");
-
-    // собрать товары
-    const cfg = loadConfig();
-    const counts = window.__orderCounts || {};
-    const itemsSel = [];
-    let total = 0;
-
-    cfg.menu.forEach(cat =>
-      cat.items.forEach(it => {
-        const q = counts[it.name] || 0;
-        if (q > 0){
-          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
-          total += q * (it.price || 0);
-        }
-      })
-    );
-
-    if (!itemsSel.length){
-      closePay();
-      return;
-    }
-
-    let order;
-    try{
-      const res = await rpc({
-        op: "create",
-        data: {
-          clientId: "terminal",
-          items: itemsSel,
-          total,
-          pay: "sbp",
-          status: "готовится"
-        }
-      });
-
-      order = res?.order || {
-        id: Date.now().toString().slice(-6),
-        createdAt: Date.now(),
-        items: itemsSel,
-        total,
-        pay: "sbp",
-        status: "готовится"
+  <script>
+  // ========= ПОЛИФИЛЫ =========
+  if (!Element.prototype.matches) {
+    Element.prototype.matches =
+      Element.prototype.msMatchesSelector ||
+      Element.prototype.webkitMatchesSelector ||
+      function (selector) {
+        const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
+        let i = matches.length;
+        while (--i >= 0 && matches.item(i) !== this) {}
+        return i > -1;
       };
+  }
+  if (!Element.prototype.closest) {
+    Element.prototype.closest = function (selector) {
+      let el = this;
+      while (el && el.nodeType === 1) {
+        if (el.matches(selector)) return el;
+        el = el.parentElement || el.parentNode;
+      }
+      return null;
+    };
+  }
+  if (!window.CSS) window.CSS = {};
+  if (typeof window.CSS.escape !== 'function') {
+    window.CSS.escape = function (value) {
+      return String(value).replace(/"/g, '\\"');
+    };
+  }
+  </script>
 
-      // сохраняем в локальные даши
-      const dash = loadDash();
-      dash.unshift(order);
-      saveDash(dash.slice(0, 200));
+  <script>
+  (function(){
+    /* ================== КОНСТАНТЫ ================== */
+    const API_URL = '/api/order';
 
-      // чистим корзину
-      window.__orderCounts = {};
-      document.querySelectorAll("[data-q]").forEach(n => n.textContent="0");
-      document.getElementById("totalVal").textContent = "0 руб.";
-      document.getElementById("confirmBtn").disabled = true;
+    const CONFIG_LS_KEY      = 'app_config_v1';
+    const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
+    const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
+    const SOUND_ON_KEY       = 'sound_on_v1';
 
-    }catch(err){
-      console.warn("create error", err);
-      showToast("Не удалось отправить заказ");
-      return;
+    const TABLO_PIN_OK       = 'TABLO_PIN_OK';
+    const WANT_ADMIN_ROUTE   = 'WANT_ADMIN_ROUTE';
+
+    const PIN_CODE = '65Vafuza'; // твой PIN
+
+    /* ================== УТИЛИТЫ ================== */
+    const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
+
+    const showToast = (msg)=>{
+      const t=document.getElementById('toast');
+      t.textContent=msg;
+      t.classList.remove('hidden');
+      setTimeout(()=>t.classList.add('hidden'), 1800);
+    };
+
+    const money = (x)=> `${x} руб.`;
+    const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
+
+    function safeParse(k, f){
+      try{
+        const v=JSON.parse(localStorage.getItem(k)||'null');
+        if(v==null) return f;
+        if(Array.isArray(f)) return Array.isArray(v)?v:[];
+        if(typeof f==='object') return v&&typeof v==='object'?v:{};
+        return v;
+      }catch{ return f }
     }
 
-    closePay();
-    openQrImage();
-  };
-
-  okBtn.addEventListener("click", okBtn._patchedHandler);
-})();
-
-
-/* =========================================================
-   2 СКРЫТЫЕ ЗОНЫ НА ТЕРМИНАЛЕ (8 тапов)
-    - справа снизу → #/dashboard (кухня)
-    - слева снизу  → #/board (табло зала)
-   ========================================================= */
-function ensureHotZones(){
-  // правая зона
-  let right = document.getElementById("hotZoneRight");
-  if (!right){
-    right = document.createElement("div");
-    right.id = "hotZoneRight";
-    right.style.cssText = `
-      position:fixed; right:0; bottom:0;
-      width:220px; height:160px; z-index:9998; opacity:0;
-    `;
-    document.body.appendChild(right);
-  }
-
-  // левая зона
-  let left = document.getElementById("hotZoneLeft");
-  if (!left){
-    left = document.createElement("div");
-    left.id = "hotZoneLeft";
-    left.style.cssText = `
-      position:fixed; left:0; bottom:0;
-      width:220px; height:160px; z-index:9998; opacity:0;
-    `;
-    document.body.appendChild(left);
-  }
-
-  bindMultiTap(right, 8, () => askPinThenGo("#/dashboard"));
-  bindMultiTap(left, 8, () => askPinThenGo("#/board"));
-}
-
-function bindMultiTap(node, count, onDone){
-  if (!node || node._bound) return;
-  node._bound = true;
-
-  let taps=0, first=0, timer=null;
-  const windowMs=1300;
-
-  function reset(){
-    taps=0; first=0;
-    if (timer){ clearTimeout(timer); timer=null; }
-  }
-
-  function handler(){
-    const now = Date.now();
-    if(!first) first=now;
-    taps++;
-
-    if(now-first > windowMs){
-      reset(); taps=1; first=now;
+    function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
+    function saveHistory(list){
+      const arr = Array.isArray(list) ? list : [];
+      localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(arr));
     }
 
-    if(taps>=count){
-      reset();
-      onDone();
-    } else {
-      if(timer) clearTimeout(timer);
-      timer=setTimeout(reset, windowMs);
-    }
-  }
-
-  ["click","pointerup","touchend"].forEach(ev=>{
-    node.addEventListener(ev, (e)=>{
-      e.preventDefault(); e.stopPropagation();
-      handler();
-    }, {passive:false});
-  });
-}
-
-
-/* =========================================================
-   PIN МОДАЛКА ЛОГИКА
-   ========================================================= */
-function askPinThenGo(routeHash){
-  sessionStorage.setItem(WANT_ROUTE_KEY, routeHash);
-  document.getElementById("pinInput").value = "";
-  document.getElementById("pinModal").classList.add("open");
-}
-
-(function bindPinModal(){
-  const pinM = document.getElementById("pinModal");
-  const pinOk = document.getElementById("pinOk");
-  const pinCancel = document.getElementById("pinCancel");
-  const pinInput = document.getElementById("pinInput");
-
-  if (!pinM || pinM._bound) return;
-  pinM._bound = true;
-
-  pinOk.onclick = (e)=>{
-    e?.preventDefault(); e?.stopPropagation();
-
-    const val = (pinInput.value||"").trim();
-    if (!val){
-      showToast("Введите ключ");
-      return;
-    }
-    if (val !== PIN_CODE){
-      showToast("Неверный ключ");
-      return;
+    function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
+    function saveDash(list){
+      const arr = Array.isArray(list) ? list : [];
+      localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(arr));
     }
 
-    pinM.classList.remove("open");
-    sessionStorage.setItem(PIN_OK_KEY, "1");
+    /* ================== RPC ================== */
+    async function rpc(payload){
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'content-type':'application/json' },
+        body: JSON.stringify(payload || {})
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => res.statusText);
+        throw new Error(`RPC ${res.status}: ${t}`);
+      }
+      return res.json();
+    }
 
-    const want = sessionStorage.getItem(WANT_ROUTE_KEY) || "#/dashboard";
-    sessionStorage.removeItem(WANT_ROUTE_KEY);
-    location.hash = want;
-  };
+    /* ================== КОНФИГ ================== */
+    const DEFAULT_CONFIG = {
+      brandTitle: 'ЯмаMoto',
+      terminalAdUrl: "",         // реклама URL (видео/гиф)
+      terminalAdType: "video",   // "video" | "gif"
+      sbpQrUrl: "",              // URL картинки QR (если не хочешь localStorage)
+      theme: {
+        cardRadius:20,
+        imgRadius:12,
+        imgW:110,
+        imgH:70,
+        cardMinH:104,
+        showPrice:true
+      },
+      menu: [
+        { key:'burgers', title:'Бургеры', items:[
+          { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
+          { name:'Говяжий двойной', price:440, img:'https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop' },
+          { name:'Куриный бургер',  price:200, img:'https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop' },
+          { name:'Куриный двойной', price:250, img:'https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop' }
+        ]},
+        { key:'twisters', title:'Твистеры', items:[
+          { name:'Твистер обычный', price:200 },
+          { name:'Твистер обычный с картошкой', price:220 },
+          { name:'Твистер макс', price:250 }
+        ]},
+        { key:'drinks',  title:'Напитки', items:[
+          { name:'Добрый кола', price:100 },
+          { name:'Добрый апельсин', price:100 },
+          { name:'фдэт-уайт', price:100 }
+        ]}
+      ]
+    };
 
-  pinCancel.onclick = ()=>{
-    pinM.classList.remove("open");
-    sessionStorage.removeItem(WANT_ROUTE_KEY);
-  };
+    function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
+    function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
-  pinM.onclick = (e)=>{
-    if(e.target===pinM) pinCancel.onclick();
-  };
-})();
+    function applyTheme(theme){
+      const r = document.documentElement;
+      r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
+      r.style.setProperty('--img-radius',   (theme.imgRadius||12)+'px');
+      r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
+      r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
+      r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
+      document.getElementById('brandTitle').textContent =
+        (loadConfig().brandTitle || 'ЯмаMoto');
+    }
 
+    /* ================== АНИМАЦИИ ================== */
+    function easeInOutCubic(t){
+      return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2
+    }
+    function animateScrollX(elm, to, {duration=280, onEnd}={}){
+      const from=elm.scrollLeft; const diff=to-from;
+      if(!diff){ onEnd&&onEnd(); return; }
+      const start=performance.now();
+      function step(ts){
+        const t=Math.min(1,(ts-start)/duration);
+        elm.scrollLeft=from+diff*easeInOutCubic(t);
+        if(t<1) requestAnimationFrame(step);
+        else onEnd&&onEnd();
+      }
+      requestAnimationFrame(step);
+    }
 
-/* =========================================================
-   ПЕРЕОПРЕДЕЛЯЕМ renderBoard:
-   - вход по PIN (через hotZoneLeft)
-   - выход тоже по PIN: 8 тапов снизу справа на самом табло
-   ========================================================= */
-function renderBoard() {
-  const root = document.getElementById("app");
-  root.innerHTML = "";
+    /* =========================================================
+       =================== ЭКРАН 1: ТЕРМИНАЛ ====================
+       ========================================================= */
 
-  const wrap = document.createElement("div");
-  wrap.style.padding = "20px";
-  wrap.style.textAlign = "center";
+    function OrderView(){
+      const cfg = loadConfig();
+      applyTheme(cfg.theme || {});
+      const root = el(`
+        <div class="relative">
+          <section class="sticky-top mb-2">
+            <div class="glass-panel rounded-2xl px-3 py-3">
+              <div id="categoryBar"
+                   class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+            </div>
+          </section>
 
-  const title = document.createElement("h2");
-  title.style.fontSize = "46px";
-  title.style.marginBottom = "20px";
-  title.textContent = "ТАБЛО ЗАЛА";
-  wrap.appendChild(title);
+          <section>
+            <div id="catPager" class="no-scrollbar"></div>
+          </section>
 
-  const dash = loadDash();
-  const preparing = dash.filter(o => o.status !== "готов");
-  const ready = dash.filter(o => o.status === "готов");
-
-  const cols = document.createElement("div");
-  cols.style.display = "grid";
-  cols.style.gridTemplateColumns = "1fr 1fr";
-  cols.style.gap = "20px";
-  cols.style.fontSize = "52px";
-  cols.style.fontWeight = "900";
-
-  const leftCol = document.createElement("div");
-  const rightCol = document.createElement("div");
-
-  leftCol.innerHTML = `<div style="font-size:28px;margin-bottom:8px">ГОТОВИТСЯ</div>`;
-  rightCol.innerHTML = `<div style="font-size:28px;margin-bottom:8px">ГОТОВО</div>`;
-
-  if (!preparing.length){
-    leftCol.innerHTML += `<div style="font-size:30px;color:#999">—</div>`;
-  } else {
-    preparing.forEach(o=>{
-      const n=document.createElement("div");
-      n.textContent=o.id;
-      leftCol.appendChild(n);
-    });
-  }
-
-  if (!ready.length){
-    rightCol.innerHTML += `<div style="font-size:30px;color:#999">—</div>`;
-  } else {
-    ready.forEach(o=>{
-      const n=document.createElement("div");
-      n.style.color="#00aa00";
-      n.textContent=o.id;
-      rightCol.appendChild(n);
-    });
-  }
-
-  cols.appendChild(leftCol);
-  cols.appendChild(rightCol);
-  wrap.appendChild(cols);
-  root.appendChild(wrap);
-
-  // скрытая зона выхода снизу справа (8 тапов)
-  let exitHot = document.getElementById("boardExitHot");
-  if (!exitHot){
-    exitHot = document.createElement("div");
-    exitHot.id = "boardExitHot";
-    exitHot.style.cssText = `
-      position:fixed; right:0; bottom:0;
-      width:220px; height:160px; z-index:9999; opacity:0;
-    `;
-    document.body.appendChild(exitHot);
-  }
-
-  bindMultiTap(exitHot, 8, ()=>{
-    // выход тоже через PIN
-    sessionStorage.removeItem(PIN_OK_KEY);
-    askPinThenGo("#/");
-  });
-}
-
-
-/* =========================================================
-   РОУТЕР (ПЕРЕОПРЕДЕЛЯЕМ)
-   ========================================================= */
-function router(){
-  const route = location.hash.replace("#","");
-
-  // терминал всегда доступен
-  if (route === "/" || route === "" || route === "order"){
-    renderCategories();
-    renderProducts();
-    updateCartButton();
-    ensureHotZones();
-    return;
-  }
-
-  // кухня и табло зала — только через PIN
-  const pinOk = sessionStorage.getItem(PIN_OK_KEY) === "1";
-  if (!pinOk){
-    // если кто-то руками ввёл hash — просим PIN и возвращаем на терминал
-    askPinThenGo("#/"+route);
-    location.hash = "/";
-    return;
-  }
-
-  if (route === "dashboard"){
-    renderDashboard();
-    return;
-  }
-
-  if (route === "board"){
-    renderBoard();
-    return;
-  }
-
-  // fallback
-  location.hash = "/";
-}
-
-window.addEventListener("hashchange", router);
-router();
-ensureHotZones();
-</script>
-<script>
-/* =========================================================
-   ЧАСТЬ 5 — КОНСТРУКТОР МЕНЮ / BUILDER
-   ========================================================= */
-
-/* ==== Вспомогалки ==== */
-function uuid4(){
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-
-/* ==== РЕНДЕР builder ==== */
-function renderBuilder(){
-  const app = document.getElementById("app");
-  app.innerHTML = "";
-
-  const cfg = loadConfig();
-
-  const wrap = document.createElement("div");
-  wrap.style.padding = "16px";
-  wrap.style.maxWidth = "1000px";
-  wrap.style.margin = "0 auto";
-
-  wrap.innerHTML = `
-    <h2 class="text-2xl font-bold mb-4">Конструктор меню</h2>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-
-      <div class="p-4 bg-white border rounded-xl shadow">
-        <h3 class="font-semibold mb-2">Бренд / Заголовок</h3>
-        <input id="bBrand" class="border rounded p-2 w-full" value="${cfg.brandTitle || ''}" placeholder="Название бренда...">
-      </div>
-
-      <div class="p-4 bg-white border rounded-xl shadow">
-        <h3 class="font-semibold mb-2">URL QR (СБП)</h3>
-        <input id="bQrUrl" class="border rounded p-2 w-full"
-               value="${(localStorage.getItem('sbp_qr_url_v1')||cfg.sbpQrUrl||'')}"
-               placeholder="https://storage.yandexcloud.net/...png">
-      </div>
-
-    </div>
-
-    <h3 class="text-xl font-bold mt-6 mb-4">Категории</h3>
-    <div id="bCategories" class="grid gap-6"></div>
-
-    <button id="addCat" class="px-4 py-2 rounded-xl bg-black text-white mt-4">+ Добавить категорию</button>
-
-    <div class="flex gap-3 mt-10">
-      <button id="saveBtn" class="px-4 py-2 rounded-xl bg-green-600 text-white">💾 Сохранить меню</button>
-      <button id="exportBtn" class="px-4 py-2 rounded-xl bg-blue-600 text-white">⬆ Экспорт</button>
-      <button id="importBtn" class="px-4 py-2 rounded-xl bg-blue-500 text-white">⬇ Импорт</button>
-      <button id="clearBtn" class="px-4 py-2 rounded-xl bg-red-600 text-white ml-auto">Очистить</button>
-      <a href="#/" class="px-4 py-2 rounded-xl border">Назад</a>
-    </div>
-  `;
-
-  app.appendChild(wrap);
-
-
-  /* ====== Категории и товары ====== */
-  const catBox = wrap.querySelector("#bCategories");
-
-  function drawCategories(){
-    catBox.innerHTML = "";
-    const cfg2 = loadConfig();
-
-    cfg2.menu.forEach((cat, ci) => {
-      const block = document.createElement("div");
-      block.className = "p-4 bg-white border rounded-xl shadow";
-
-      block.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-          <input class="border rounded p-2 flex-1" id="catName_${ci}" value="${cat.title}">
-          <button class="ml-3 px-3 py-2 rounded-xl bg-red-100 text-red-600" data-del-cat="${ci}">Удалить категорию</button>
-        </div>
-
-        <div id="items_${ci}" class="grid gap-3 mb-3"></div>
-
-        <button class="px-3 py-1 rounded-xl bg-black text-white" data-add-item="${ci}">+ Добавить товар</button>
-      `;
-
-      catBox.appendChild(block);
-
-      const itemsBox = block.querySelector(`#items_${ci}`);
-
-      cat.items.forEach((it, ii) => {
-        const row = document.createElement("div");
-        row.className = "border rounded-xl p-3";
-
-        row.innerHTML = `
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input class="border rounded p-2" id="itName_${ci}_${ii}" value="${it.name}" placeholder="Название">
-            <input class="border rounded p-2" id="itPrice_${ci}_${ii}" value="${it.price}" type="number" placeholder="Цена">
-            <input class="border rounded p-2" id="itImg_${ci}_${ii}" value="${it.img||""}" placeholder="URL картинки">
-            <button class="px-3 py-2 rounded-xl bg-red-100 text-red-600" data-del-item="${ci}_${ii}">Удалить</button>
+          <div id="confirmBar" class="confirm-bar">
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-base">
+                <span class="text-gray-600">Итого:</span>
+                <b id="totalVal">0 руб.</b>
+              </div>
+              <button id="confirmBtn"
+                      class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled>
+                Оформить заказ
+              </button>
+            </div>
           </div>
-        `;
+        </div>
+      `);
 
-        itemsBox.appendChild(row);
-      });
-    });
-  }
+      const categoryBar = root.querySelector('#categoryBar');
+      const catPager    = root.querySelector('#catPager');
+      const totalEl     = root.querySelector('#totalVal');
+      const confirmBtn  = root.querySelector('#confirmBtn');
 
-  drawCategories();
+      setBodyScrollLock(true);
+      confirmBtn._busy = false;
 
+      let activeIdx   = 0;
+      let isAnimating = false;
+      const scrollMemory = new Map();
 
-  /* ===== КНОПКИ УПРАВЛЕНИЯ ===== */
-
-  // + категория
-  wrap.querySelector("#addCat").onclick = ()=>{
-    const cfg3 = loadConfig();
-    cfg3.menu.push({
-      key: uuid4(),
-      title: "Новая категория",
-      items: []
-    });
-    saveConfig(cfg3);
-    drawCategories();
-    showToast("Категория добавлена");
-  };
-
-  // удалить категорию
-  wrap.addEventListener("click", (e)=>{
-    const btn = e.target.closest("[data-del-cat]");
-    if (!btn) return;
-    const id = +btn.dataset.delCat;
-    const cfg4 = loadConfig();
-    cfg4.menu.splice(id,1);
-    saveConfig(cfg4);
-    drawCategories();
-    showToast("Категория удалена");
-  });
-
-  // + товар
-  wrap.addEventListener("click", (e)=>{
-    const btn = e.target.closest("[data-add-item]");
-    if (!btn) return;
-    const ci = +btn.dataset.addItem;
-    const cfg5 = loadConfig();
-    cfg5.menu[ci].items.push({
-      name: "Товар",
-      price: 100,
-      img: ""
-    });
-    saveConfig(cfg5);
-    drawCategories();
-  });
-
-  // удалить товар
-  wrap.addEventListener("click", (e)=>{
-    const btn = e.target.closest("[data-del-item]");
-    if (!btn) return;
-    const [ci, ii] = btn.dataset.delItem.split("_").map(Number);
-    const cfg6 = loadConfig();
-    cfg6.menu[ci].items.splice(ii,1);
-    saveConfig(cfg6);
-    drawCategories();
-  });
-
-
-  // ===== Сохранить меню =====
-  wrap.querySelector("#saveBtn").onclick = ()=>{
-    const cfg7 = loadConfig();
-
-    cfg7.brandTitle = wrap.querySelector("#bBrand").value.trim();
-    const qrUrl = wrap.querySelector("#bQrUrl").value.trim();
-
-    if (qrUrl) localStorage.setItem("sbp_qr_url_v1", qrUrl);
-
-    // категории
-    cfg7.menu.forEach((cat, ci)=>{
-      cat.title = wrap.querySelector(`#catName_${ci}`)?.value || cat.title;
-
-      cat.items.forEach((it, ii)=>{
-        it.name  = wrap.querySelector(`#itName_${ci}_${ii}`)?.value || it.name;
-        it.price = +(wrap.querySelector(`#itPrice_${ci}_${ii}`)?.value || it.price);
-        it.img   = wrap.querySelector(`#itImg_${ci}_${ii}`)?.value || "";
-      });
-    });
-
-    saveConfig(cfg7);
-    showToast("Сохранено");
-  };
-
-
-  // ===== Экспорт =====
-  wrap.querySelector("#exportBtn").onclick = ()=>{
-    const cfg8 = loadConfig();
-    const blob = new Blob([JSON.stringify(cfg8, null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "menu_export.json";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  // ===== Импорт =====
-  wrap.querySelector("#importBtn").onclick = ()=>{
-    const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = "application/json";
-
-    inp.onchange = ()=>{
-      const file = inp.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = ()=>{
-        try{
-          const json = JSON.parse(reader.result);
-          saveConfig(json);
-          drawCategories();
-          showToast("Импортировано");
-        }catch(err){
-          showToast("Ошибка JSON");
-        }
+      // esc для атрибутов
+      const escAttr = (val)=>{
+        if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(val);
+        return String(val).replace(/"/g, '\\"');
       };
-      reader.readAsText(file);
-    };
 
-    inp.click();
-  };
+      const panelW = ()=> catPager.getBoundingClientRect().width || 1;
 
+      /* ---------- idle-реклама ---------- */
+      const adOverlay = el(`
+        <div id="adOverlay"
+             class="fixed inset-0 bg-black hidden z-[9999] flex items-center justify-center">
+          <video id="adVideo"
+                 class="w-full h-full object-cover hidden"
+                 muted loop playsinline></video>
+          <img id="adImg"
+               class="w-full h-full object-cover hidden"
+               alt="Реклама" />
+        </div>
+      `);
+      document.body.appendChild(adOverlay);
 
-  // ===== Очистить меню =====
-  wrap.querySelector("#clearBtn").onclick = ()=>{
-    if (!confirm("Очистить ВСЁ меню?")) return;
-    saveConfig({ brandTitle:"ЯмаMoto", menu:[] });
-    localStorage.removeItem("sbp_qr_url_v1");
-    drawCategories();
-    showToast("Очищено");
-  };
-}
-</script>
-<script>
-/* =========================================================
-   ЧАСТЬ 6 — RPC ФОЛБЭК + ЛОКАЛЬНЫЙ API-МОК
-   ========================================================= */
+      function showAd(){
+        const c = loadConfig();
+        const url = c.terminalAdUrl;
+        if (!url) return;
 
-/*
-  Когда будет готов реальный Yandex API:
-  1) поставишь USE_LOCAL_API = false
-  2) и всё продолжит работать через сеть
-*/
-const USE_LOCAL_API = true;
+        const v = adOverlay.querySelector('#adVideo');
+        const i = adOverlay.querySelector('#adImg');
 
-// ключ “облачных” заказов (локально)
-const CLOUD_ORDERS_KEY = "cloud_orders_v1";
+        adOverlay.classList.remove('hidden');
 
-// ключ “облачного” конфига
-const CLOUD_CONFIG_KEY = "cloud_config_v1";
+        if (c.terminalAdType === 'gif'){
+          v.pause(); v.classList.add('hidden');
+          i.classList.remove('hidden'); i.src = url;
+        } else {
+          i.classList.add('hidden');
+          v.classList.remove('hidden');
+          v.src = url;
+          v.play().catch(()=>{});
+        }
+      }
 
-// простая утилита
-function _lsGet(key, fallback){
-  try {
-    const v = JSON.parse(localStorage.getItem(key) || "null");
-    return v == null ? fallback : v;
-  } catch { return fallback; }
-}
-function _lsSet(key, val){
-  localStorage.setItem(key, JSON.stringify(val));
-}
+      function hideAd(){ adOverlay.classList.add('hidden'); }
 
-/* ========= локальная реализация op ========= */
-async function localRpc(payload){
-  const op = payload?.op;
-  if (!op) return { error:"no-op" };
+      let idleT=null;
+      function resetIdle(){
+        if (idleT) clearTimeout(idleT);
+        hideAd();
+        idleT = setTimeout(showAd, 15000);
+      }
 
-  // заказы в “облаке”
-  let orders = _lsGet(CLOUD_ORDERS_KEY, []);
+      ['click','pointerdown','touchstart','scroll','wheel'].forEach(ev=>{
+        root.addEventListener(ev, resetIdle, {passive:true});
+      });
+      resetIdle();
 
-  // конфиг меню в “облаке”
-  let cloudCfg = _lsGet(CLOUD_CONFIG_KEY, null);
-
-  // helper: нормализуем заказ
-  function normalizeOrder(o){
-    const id = o.id || (Date.now().toString().slice(-6));
-    return {
-      id,
-      createdAt: o.createdAt || Date.now(),
-      items: Array.isArray(o.items) ? o.items : [],
-      total: typeof o.total === "number" ? o.total : 0,
-      status: o.status || "готовится",
-      pay: o.pay || "sbp"
-    };
-  }
-
-  /* ------- ops ------- */
-  switch(op){
-
-    case "create":{
-      // ожидаем payload.data.items / payload.items
-      const data = payload.data || payload;
-      const order = normalizeOrder({
-        items: data.items || [],
-        total: data.total || 0,
-        pay: data.pay || "sbp",
-        status: data.status || "готовится"
+      /* ---------- категории (chips) ---------- */
+      cfg.menu.forEach((cat, idx) => {
+        categoryBar.appendChild(
+          el(`
+            <button type="button"
+                    class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap
+                           ${idx===0 ? 'bg-black text-white border-black' : 'bg-white/50'}"
+                    data-idx="${idx}">
+              ${cat.title}
+            </button>
+          `)
+        );
       });
 
-      orders.unshift(order);
-      orders = orders.slice(0, 500);
-      _lsSet(CLOUD_ORDERS_KEY, orders);
+      function highlightChip(idx){
+        const buttons = categoryBar.querySelectorAll('button');
+        buttons.forEach((b, i) => {
+          const on = i === idx;
+          b.classList.toggle('bg-black', on);
+          b.classList.toggle('text-white', on);
+          b.classList.toggle('border-black', on);
+          if (on) b.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+        });
+      }
 
-      return { ok:true, order };
-    }
+      function goToIndex(idx, { animate = true } = {}){
+        idx = Math.max(0, Math.min(cfg.menu.length - 1, idx));
+        const target = Math.round(panelW() * idx);
+        highlightChip(idx);
 
-    case "list":{
-      return { ok:true, orders };
-    }
+        const box = catPager.children[idx]?.querySelector('.v-scroll');
 
-    case "update":{
-      const id = String(payload.id);
-      const patch = payload.patch || {};
-      orders = orders.map(o => {
-        if (String(o.id) !== id) return o;
-        return { ...o, ...patch };
+        if (!animate){
+          const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+          if (old) scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+
+          catPager.scrollLeft = target;
+          if (box) box.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+
+          activeIdx = idx;
+          return;
+        }
+
+        isAnimating = true;
+        const prevSnap = catPager.style.scrollSnapType;
+        catPager.style.scrollSnapType = 'none';
+
+        const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+        if (old) scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+
+        animateScrollX(catPager, target, {
+          duration: 280,
+          onEnd(){
+            const box2 = catPager.children[idx]?.querySelector('.v-scroll');
+            if (box2) box2.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+
+            activeIdx = idx;
+            isAnimating = false;
+            catPager.style.scrollSnapType = prevSnap || 'x mandatory';
+          }
+        });
+      }
+
+      categoryBar.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-idx]');
+        if (!b || isAnimating) return;
+        goToIndex(+b.dataset.idx, { animate:true });
       });
-      _lsSet(CLOUD_ORDERS_KEY, orders);
-      return { ok:true };
-    }
 
-    case "delete":{
-      const id = String(payload.id);
-      orders = orders.filter(o => String(o.id) !== id);
-      _lsSet(CLOUD_ORDERS_KEY, orders);
-      return { ok:true };
-    }
+      /* ---------- меню + кнопки +/- ---------- */
+      function rebuildMenu(){
+        catPager.innerHTML = '';
 
-    case "clear":{
-      orders = [];
-      _lsSet(CLOUD_ORDERS_KEY, orders);
-      return { ok:true };
-    }
+        cfg.menu.forEach((cat) => {
+          const panel = el(`<div class="cat-panel"></div>`);
+          const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
+          const list  = el(`<div class="grid gap-3"></div>`);
 
-    case "config_get":{
-      // если в “облаке” нет конфига — отдаём локальный
-      if (!cloudCfg){
-        cloudCfg = loadConfig();
-        _lsSet(CLOUD_CONFIG_KEY, cloudCfg);
+          cat.items.forEach(it => {
+            const q = (window.__orderCounts?.[it.name] || 0);
+
+            const row = el(`
+              <div class="menu-card">
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-sm">${it.name}</div>
+                  ${
+                    cfg.theme.showPrice
+                      ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                      : ''
+                  }
+                  <div class="flex items-center gap-3 mt-3">
+                    <button type="button"
+                            class="w-8 h-8 rounded-xl border"
+                            data-name="${it.name}"
+                            data-act="dec">−</button>
+                    <div class="w-6 text-center text-sm"
+                         data-q="${it.name}">${q}</div>
+                    <button type="button"
+                            class="w-8 h-8 rounded-xl bg-black text-white"
+                            data-name="${it.name}"
+                            data-act="inc">+</button>
+                  </div>
+                </div>
+                <img src="${it.img || 'https://placehold.co/110x70?text=food'}"
+                     class="menu-card-img" alt="">
+              </div>
+            `);
+
+            list.appendChild(row);
+          });
+
+          list.appendChild(el(`<div class="h-24"></div>`));
+          vbox.appendChild(list);
+          panel.appendChild(vbox);
+          catPager.appendChild(panel);
+
+          // touch-swipe по категориям
+          let down=false, used=false, sx=0, sy=0, locked=null;
+          const PIX_LOCK=10;
+          const THRESH=()=>Math.max(40, panelW()*0.25);
+
+          function onPointerDown(e){
+            if (e.pointerType !== 'touch' || isAnimating) return;
+            down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null;
+            vbox.setPointerCapture?.(e.pointerId);
+          }
+          function onPointerMove(e){
+            if (e.pointerType !== 'touch' || !down || used || isAnimating) return;
+            const dx=e.clientX-sx, dy=e.clientY-sy;
+
+            if (locked===null){
+              if (Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>PIX_LOCK) locked='x';
+              else if (Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>PIX_LOCK) locked='y';
+            }
+
+            if (locked==='x'){
+              e.preventDefault();
+              if (Math.abs(dx) >= THRESH()){
+                used=true;
+                const next = dx<0 ? activeIdx+1 : activeIdx-1;
+                goToIndex(next, {animate:true});
+              }
+            }
+          }
+          function onPointerUp(){ down=false; used=false; locked=null; }
+
+          vbox.addEventListener('pointerdown', onPointerDown, {passive:true});
+          vbox.addEventListener('pointermove', onPointerMove, {passive:false});
+          ['pointerup','pointercancel','pointerleave'].forEach(evt =>
+            vbox.addEventListener(evt, onPointerUp)
+          );
+        });
       }
-      return { ok:true, config: cloudCfg };
-    }
 
-    case "config_set":{
-      const cfg = payload.config;
-      if (cfg && cfg.menu){
-        _lsSet(CLOUD_CONFIG_KEY, cfg);
+      catPager.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+
+        const name  = btn.dataset.name;
+        const delta = btn.dataset.act === 'inc' ? +1 : -1;
+        const selector = `[data-q="${escAttr(name)}"]`;
+
+        const cur = parseInt(catPager.querySelector(selector)?.textContent || '0', 10) || 0;
+        const next = Math.max(0, cur + delta);
+
+        catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
+
+        if (!window.__orderCounts) window.__orderCounts = {};
+        window.__orderCounts[name] = next;
+        recalcTotal();
+      });
+
+      function applyHeights(){
+        try {
+          const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
+          const chipsH   = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
+          const confirmH = root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
+          const availH   = Math.max(260, window.innerHeight - headerH - chipsH - confirmH - 8);
+
+          const first  = root.querySelector('.menu-card');
+          const cardH  = first ? Math.ceil(first.getBoundingClientRect().height) : 104;
+          const h      = Math.min(availH, cardH * 4 + 12 * 3 + 4);
+
+          root.querySelectorAll('.v-scroll').forEach(elm =>
+            elm.style.height = h + 'px'
+          );
+          goToIndex(activeIdx, { animate:false });
+        } catch {}
       }
-      return { ok:true };
+      window.addEventListener('resize', applyHeights);
+
+      catPager.addEventListener('scroll', () => {
+        if (isAnimating) return;
+        if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer);
+        catPager._scrollTimer = setTimeout(() => {
+          const idx = Math.round(catPager.scrollLeft / panelW());
+          if (idx !== activeIdx){
+            highlightChip(idx);
+            activeIdx = idx;
+          }
+        }, 80);
+      });
+
+      function recalcTotal(){
+        const counts = window.__orderCounts || {};
+        let sum = 0;
+        cfg.menu.forEach(cat =>
+          cat.items.forEach(it => {
+            sum += (counts[it.name] || 0) * (it.price || 0);
+          })
+        );
+        totalEl.textContent = money(sum);
+        confirmBtn.disabled = sum <= 0;
+        return sum;
+      }
+
+      /* ---------- payModal / qrModal ---------- */
+      const payModal  = document.getElementById('payModal');
+      const qrModal   = document.getElementById('qrModal');
+      const sumBox    = document.getElementById('paySummary');
+      const payCancel = document.getElementById('payCancel');
+      const payByQr   = document.getElementById('payByQr');
+      const payByCard = document.getElementById('payByCard');
+      const qrImg     = document.getElementById('qrImg');
+      const qrPaidBtn = document.getElementById('qrPaidBtn');
+      const qrCloseBtn= document.getElementById('qrCloseBtn');
+
+      let pendingOrder = null;
+      let qrAutoTimer  = null;
+
+      function openPayModal(){
+        const counts = window.__orderCounts || {};
+        const items  = [];
+        let total=0;
+
+        cfg.menu.forEach(cat =>
+          cat.items.forEach(it => {
+            const q = counts[it.name] || 0;
+            if (q > 0){
+              items.push({ name: it.name, qty: q, price: it.price || 0 });
+              total += q * (it.price || 0);
+            }
+          })
+        );
+        if (!items.length) return;
+
+        pendingOrder = { items, total };
+
+        sumBox.innerHTML = items.map(i => `
+          <div class="flex items-center justify-between">
+            <div class="truncate">${i.name} ×${i.qty}</div>
+            <div class="ml-2 whitespace-nowrap">${money(i.qty * i.price)}</div>
+          </div>
+        `).join('');
+
+        sumBox.insertAdjacentHTML(
+          'beforeend',
+          `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
+             <div>Итого</div><div>${money(total)}</div>
+           </div>`
+        );
+
+        payModal.classList.add('open');
+      }
+
+      confirmBtn.addEventListener('click', openPayModal);
+
+      payCancel.onclick = ()=>{
+        payModal.classList.remove('open');
+        pendingOrder = null;
+      };
+      payModal.onclick = (e)=>{ if(e.target===payModal) payCancel.onclick(); };
+
+      function openQrModal(){
+        if (!pendingOrder) return;
+
+        // URL QR: сначала из конфига, потом из localStorage sbp_qr_url
+        const c = loadConfig();
+        const url = (c.sbpQrUrl || '').trim()
+                 || (localStorage.getItem('sbp_qr_url')||'').trim();
+
+        if (url){
+          qrImg.src = url;
+        } else {
+          qrImg.src = 'https://placehold.co/256x256?text=QR+NOT+SET';
+        }
+
+        qrModal.classList.add('open');
+
+        if (qrAutoTimer) clearTimeout(qrAutoTimer);
+        qrAutoTimer = setTimeout(()=>{
+          qrModal.classList.remove('open');
+        }, 20000);
+      }
+
+      function closeQrModal(){
+        qrModal.classList.remove('open');
+        if (qrAutoTimer) clearTimeout(qrAutoTimer);
+      }
+      qrCloseBtn.onclick = closeQrModal;
+      qrModal.onclick = (e)=>{ if(e.target===qrModal) closeQrModal(); };
+
+      // Оплата картой пока заглушка
+      payByCard.onclick = ()=>{
+        showToast('POS оплата добавим позже');
+      };
+
+      // Оплата по QR → показываем QR, но заказ НЕ улетает пока не нажали "Я оплатил"
+      payByQr.onclick = ()=>{
+        payModal.classList.remove('open');
+        openQrModal();
+      };
+
+      // Нажал "Я оплатил" → УЛЕТАЕТ заказ + по умолчанию статус "готовится"
+      qrPaidBtn.onclick = async ()=>{
+        if (!pendingOrder) return;
+
+        let orderToSend = {
+          id: Date.now().toString().slice(-6),
+          createdAt: Date.now(),
+          items: pendingOrder.items,
+          total: pendingOrder.total,
+          status: 'готовится'
+        };
+
+        try{
+          const res = await rpc({
+            op:'create',
+            items: pendingOrder.items,
+            total: pendingOrder.total,
+            status:'готовится'
+          });
+          if (res && res.order) orderToSend = res.order;
+        }catch(e){
+          console.warn('create rpc error', e);
+          showToast('Сервер не ответил — заказ сохранён локально');
+        }
+
+        // в кухонное табло
+        const dash = loadDash();
+        dash.unshift(orderToSend);
+        saveDash(dash.slice(0,200));
+
+        // клиентскую историю (если захочешь)
+        const hist = loadHistory();
+        hist.unshift(orderToSend);
+        saveHistory(hist.slice(0,50));
+
+        closeQrModal();
+
+        // сброс корзины
+        resetCounts();
+        pendingOrder = null;
+
+        showToast('Заказ принят');
+      };
+
+      function resetCounts(){
+        window.__orderCounts = {};
+        catPager.querySelectorAll('[data-q]').forEach(n => n.textContent='0');
+        totalEl.textContent = money(0);
+        confirmBtn.disabled = true;
+      }
+
+      rebuildMenu();
+      requestAnimationFrame(()=>{
+        highlightChip(0);
+        goToIndex(0, {animate:false});
+        recalcTotal();
+        applyHeights();
+      });
+
+      root.cleanup = ()=>{
+        setBodyScrollLock(false);
+        window.removeEventListener('resize', applyHeights);
+        if (idleT) clearTimeout(idleT);
+        adOverlay.remove();
+      };
+
+      return root;
     }
 
-    default:
-      return { error:"unknown-op", op };
-  }
-}
+    /* ================== PIN + скрытые 8-тап зоны ================== */
+    function bindHiddenTapZones(){
+      const hotL = document.getElementById('hotLeft');
+      const hotR = document.getElementById('hotRight');
+      if (!hotL || !hotR) return;
 
+      function bind(zone){
+        if (zone._bound) return;
+        zone._bound=true;
 
-/* ========= новая rpc с фолбэком ========= */
-window.rpc = async function rpcSmart(payload){
-  // если принудительно локально
-  if (USE_LOCAL_API){
-    return localRpc(payload);
-  }
+        let taps=0, first=0, timer=null;
+        const windowMs=1500;
+        const needTaps=8;
 
-  // иначе сначала сеть
-  try{
-    const res = await fetch(API_URL, {
-      method:"POST",
-      headers:{ "content-type":"application/json" },
-      body: JSON.stringify(payload || {})
+        function reset(){
+          taps=0; first=0;
+          if(timer){ clearTimeout(timer); timer=null; }
+        }
+
+        function handler(){
+          const now=Date.now();
+          if(!first) first=now;
+          taps++;
+          if(now-first>windowMs){ reset(); taps=1; first=now; }
+
+          if(taps>=needTaps){
+            reset();
+            sessionStorage.setItem(WANT_ADMIN_ROUTE,'1');
+            document.getElementById('pinModal')?.classList.add('open');
+          } else {
+            if(timer) clearTimeout(timer);
+            timer=setTimeout(reset, windowMs);
+          }
+        }
+
+        ['click','pointerup','touchend'].forEach(ev=>{
+          zone.addEventListener(ev,(e)=>{
+            e.preventDefault(); e.stopPropagation();
+            handler();
+          },{passive:false});
+        });
+      }
+
+      bind(hotL);
+      bind(hotR);
+    }
+
+    /* ================== MOUNT helper ================== */
+    function mount(view){
+      const app=document.getElementById('app');
+      if(app.firstChild && typeof app.firstChild.cleanup==='function'){
+        try{ app.firstChild.cleanup(); }catch{}
+      }
+      app.innerHTML='';
+      app.classList.add('phone-shell');
+      app.appendChild(view);
+    }
+
+    /* старт */
+    document.addEventListener('DOMContentLoaded', ()=>{
+      bindHiddenTapZones();
+
+      // кнопка на кухню видимая
+      document.getElementById('openKitchenBtn').onclick = ()=>{
+        location.hash='#/dashboard';
+      };
+
+      // по умолчанию — терминал
+      if(!location.hash || location.hash==='#' || location.hash==='#/')
+        location.hash='#/order';
+
+      mount(OrderView());
     });
 
-    if(!res.ok){
-      throw new Error("net-fail");
-    }
+    // экспортим в global для следующей части
+    window.__APP__ = {
+      rpc, mount,
+      loadConfig, saveConfig, applyTheme,
+      loadDash, saveDash,
+      loadHistory, saveHistory,
+      showToast,
+      PIN_CODE,
+      TABLO_PIN_OK,
+      WANT_ADMIN_ROUTE,
+      SOUND_ON_KEY
+    };
 
-    return await res.json();
-
-  }catch(e){
-    console.warn("RPC network failed → fallback to local", e);
-    return localRpc(payload);
-  }
-};
-</script>
+  })();
+  </script>
+</body>
+</html>
