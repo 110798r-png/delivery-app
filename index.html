@@ -1081,7 +1081,6 @@ function bindSecretZones(){
 
     // статусы заказов
     await pullAndMergeStatuses().catch(() => {});
-    }
   }, 4000);
 
   root.cleanup = () => {
