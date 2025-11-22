@@ -150,15 +150,6 @@
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- Плавающая кнопка на табло кухни -->
-  <button id="openKitchenBtn" title="Табло кухни" aria-label="Табло кухни">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="4" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
-      <rect x="3" y="14" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
-      <path d="M7 7h4M7 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  </button>
-
   <!-- Скрытые зоны 8-тапа -->
   <div id="hotLeft" aria-label="hidden-left"></div>
   <div id="hotRight" aria-label="hidden-right"></div>
@@ -397,101 +388,6 @@
        =================== ЭКРАН 1: ТЕРМИНАЛ ====================
        ========================================================= */
 
-    function OrderView(){
-      const cfg = loadConfig();
-      applyTheme(cfg.theme || {});
-      const root = el(`
-        <div class="relative">
-          <section class="sticky-top mb-2">
-            <div class="glass-panel rounded-2xl px-3 py-3">
-              <div id="categoryBar"
-                   class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-            </div>
-          </section>
-
-          <section>
-            <div id="catPager" class="no-scrollbar"></div>
-          </section>
-
-          <div id="confirmBar" class="confirm-bar">
-            <div class="flex items-center justify-between gap-3">
-              <div class="text-base">
-                <span class="text-gray-600">Итого:</span>
-                <b id="totalVal">0 руб.</b>
-              </div>
-              <button id="confirmBtn"
-                      class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                      disabled>
-                Оформить заказ
-              </button>
-            </div>
-          </div>
-        </div>
-      `);
-
-      const categoryBar = root.querySelector('#categoryBar');
-      const catPager    = root.querySelector('#catPager');
-      const totalEl     = root.querySelector('#totalVal');
-      const confirmBtn  = root.querySelector('#confirmBtn');
-
-      setBodyScrollLock(true);
-      confirmBtn._busy = false;
-
-      let activeIdx   = 0;
-      let isAnimating = false;
-      const scrollMemory = new Map();
-
-      // esc для атрибутов
-      const escAttr = (val)=>{
-        if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(val);
-        return String(val).replace(/"/g, '\\"');
-      };
-
-      const panelW = ()=> catPager.getBoundingClientRect().width || 1;
-
-      /* ---------- idle-реклама ---------- */
-      const adOverlay = el(`
-        <div id="adOverlay"
-             class="fixed inset-0 bg-black hidden z-[9999] flex items-center justify-center">
-          <video id="adVideo"
-                 class="w-full h-full object-cover hidden"
-                 muted loop playsinline></video>
-          <img id="adImg"
-               class="w-full h-full object-cover hidden"
-               alt="Реклама" />
-        </div>
-      `);
-      document.body.appendChild(adOverlay);
-
-      function showAd(){
-        const c = loadConfig();
-        const url = c.terminalAdUrl;
-        if (!url) return;
-
-        const v = adOverlay.querySelector('#adVideo');
-        const i = adOverlay.querySelector('#adImg');
-
-        adOverlay.classList.remove('hidden');
-
-        if (c.terminalAdType === 'gif'){
-          v.pause(); v.classList.add('hidden');
-          i.classList.remove('hidden'); i.src = url;
-        } else {
-          i.classList.add('hidden');
-          v.classList.remove('hidden');
-          v.src = url;
-          v.play().catch(()=>{});
-        }
-      }
-
-      function hideAd(){ adOverlay.classList.add('hidden'); }
-
-      let idleT=null;
-      function resetIdle(){
-        if (idleT) clearTimeout(idleT);
-        hideAd();
-        idleT = setTimeout(showAd, 15000);
-      }
 
       ['click','pointerdown','touchstart','scroll','wheel'].forEach(ev=>{
         root.addEventListener(ev, resetIdle, {passive:true});
@@ -1048,6 +944,443 @@
     pinM.onclick = (e)=>{ if (e.target===pinM) pinCancel.onclick(); };
   }
 
+<script>
+/* ===== ЭКРАН 1: ТЕРМИНАЛ ВЫБОРА ТОВАРОВ (как в доставке) =====
+   - категории сверху (chips)
+   - свайп панелей
+   - confirm bar
+   - СКРЫТЫЙ вход в табло: 8 быстрых тапов внизу справа
+*/
+function OrderView(){
+  const cfg = loadConfig();
+  applyTheme(cfg.theme || {});
+  MENU_CATEGORIES = cfg.menu.slice();
+
+  const escAttr = (val) => {
+    if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(val);
+    return String(val).replace(/"/g, '\\"');
+  };
+
+  const root = el(`
+    <div class="relative">
+      <section class="sticky-top mb-2">
+        <div class="glass-panel rounded-2xl px-3 py-3">
+          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+        </div>
+      </section>
+
+      <section>
+        <div id="catPager" class="no-scrollbar"></div>
+      </section>
+
+      <div id="confirmBar" class="confirm-bar">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-base">
+            <span class="text-gray-600">Итого:</span>
+            <b id="totalVal">0 руб.</b>
+          </div>
+          <button
+            id="confirmBtn"
+            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled
+          >
+            Оформить заказ
+          </button>
+        </div>
+      </div>
+
+      <!-- СКРЫТАЯ зона входа в табло (низ справа) -->
+      <div id="tabloTapHot"
+           style="position:fixed; right:0; bottom:0; width:220px; height:140px; z-index:70; opacity:0;">
+      </div>
+
+      <!-- если тебе нужна ВТОРАЯ скрытая зона слева — раскомментируй:
+      <div id="tabloTapHotLeft"
+           style="position:fixed; left:0; bottom:0; width:220px; height:140px; z-index:70; opacity:0;">
+      </div>
+      -->
+    </div>
+  `);
+
+  const categoryBar = root.querySelector('#categoryBar');
+  const catPager    = root.querySelector('#catPager');
+  const totalEl     = root.querySelector('#totalVal');
+  const confirmBtn  = root.querySelector('#confirmBtn');
+
+  setBodyScrollLock(true);
+  confirmBtn._busy = false;
+
+  let activeIdx   = 0;
+  let isAnimating = false;
+  const scrollMemory = new Map();
+  const panelW = () => catPager.getBoundingClientRect().width || 1;
+
+  /* ---------- СКРЫТЫЙ ВХОД В ТАБЛО (8 тапов) ---------- */
+  (function bindHiddenTabloEnter(){
+    const hot = root.querySelector('#tabloTapHot');
+    if (!hot || hot._bound) return;
+    hot._bound = true;
+
+    let taps = 0, first = 0, timer = null;
+    const windowMs = 1400;
+    const needTaps = 8;
+
+    function reset(){
+      taps = 0; first = 0;
+      if (timer){ clearTimeout(timer); timer=null; }
+    }
+
+    function handler(){
+      const now = Date.now();
+      if (!first) first = now;
+      taps++;
+
+      if (now - first > windowMs){
+        reset(); taps = 1; first = now;
+      }
+
+      if (taps >= needTaps){
+        reset();
+
+        // закрыть оплату если открыта
+        document.getElementById('payModal')?.classList.remove('open');
+
+        // если уже вводили PIN — сразу в кухню
+        if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
+          location.hash = '#/dashboard';
+        } else {
+          sessionStorage.setItem(WANT_ADMIN_ROUTE, '#/dashboard');
+          document.getElementById('pinModal')?.classList.add('open');
+        }
+      } else {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(reset, windowMs);
+      }
+    }
+
+    ['click','pointerup','touchend'].forEach(ev=>{
+      hot.addEventListener(ev,(e)=>{
+        e.preventDefault(); e.stopPropagation();
+        handler();
+      },{passive:false});
+    });
+  })();
+
+  /* ---------- автоподстановка повторного заказа ---------- */
+  function applyRepeatOrder(){
+    const raw = sessionStorage.getItem('repeat_order_items');
+    if (!raw) return;
+    sessionStorage.removeItem('repeat_order_items');
+
+    let items = [];
+    try { items = JSON.parse(raw) || []; } catch {}
+    if (!Array.isArray(items) || !items.length) return;
+
+    window.__orderCounts = window.__orderCounts || {};
+
+    const cfgNow = loadConfig();
+    const namesSet = new Set(
+      cfgNow.menu.flatMap(cat => cat.items.map(it => it.name))
+    );
+
+    items.forEach(it => {
+      if (!namesSet.has(it.name)) return;
+      const q = Number(it.qty || it.count || 0);
+      if (q <= 0) return;
+      window.__orderCounts[it.name] = q;
+    });
+
+    catPager.querySelectorAll('[data-q]').forEach(node => {
+      const name = node.getAttribute('data-q');
+      const val  = window.__orderCounts[name] || 0;
+      node.textContent = String(val);
+    });
+
+    recalcTotal();
+  }
+
+  /* ---------- chips ---------- */
+  cfg.menu.forEach((cat, idx) => {
+    categoryBar.appendChild(
+      el(`
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${idx === 0 ? 'bg-black text-white border-black' : 'bg-white/50'}"
+          data-idx="${idx}"
+        >
+          ${cat.title}
+        </button>
+      `)
+    );
+  });
+
+  function highlightChip(idx){
+    const buttons = categoryBar.querySelectorAll('button');
+    buttons.forEach((b, i) => {
+      const on = i === idx;
+      b.classList.toggle('bg-black', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-black', on);
+      if (on){
+        b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  }
+
+  function goToIndex(idx, { animate = true } = {}){
+    idx = Math.max(0, Math.min(cfg.menu.length - 1, idx));
+    const target = Math.round(panelW() * idx);
+    highlightChip(idx);
+
+    const box = catPager.children[idx]?.querySelector('.v-scroll');
+
+    if (!animate){
+      const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+      if (old){
+        scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+      }
+      catPager.scrollLeft = target;
+      if (box){
+        box.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+      }
+      activeIdx = idx;
+      return;
+    }
+
+    isAnimating = true;
+    const prevSnap = catPager.style.scrollSnapType;
+    catPager.style.scrollSnapType = 'none';
+
+    const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
+    if (old){
+      scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+    }
+
+    animateScrollX(catPager, target, {
+      duration: 280,
+      onEnd(){
+        const box2 = catPager.children[idx]?.querySelector('.v-scroll');
+        if (box2){
+          box2.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+        }
+        activeIdx = idx;
+        isAnimating = false;
+        catPager.style.scrollSnapType = prevSnap || 'x mandatory';
+      }
+    });
+  }
+
+  categoryBar.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-idx]');
+    if (!b || isAnimating) return;
+    goToIndex(+b.dataset.idx, { animate: true });
+  });
+
+  /* ---------- меню +/− ---------- */
+  function rebuildMenu(){
+    catPager.innerHTML = '';
+
+    cfg.menu.forEach((cat) => {
+      const panel = el(`<div class="cat-panel"></div>`);
+      const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
+      const list  = el(`<div class="grid gap-3"></div>`);
+
+      cat.items.forEach(it => {
+        const q = (window.__orderCounts?.[it.name] || 0);
+
+        const row = el(`
+          <div class="menu-card">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm flex items-center gap-2">
+                ${it.name}
+              </div>
+              ${
+                cfg.theme.showPrice
+                  ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                  : ''
+              }
+              <div class="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl border"
+                  data-name="${it.name}"
+                  data-act="dec"
+                >−</button>
+                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl bg-black text-white"
+                  data-name="${it.name}"
+                  data-act="inc"
+                >+</button>
+              </div>
+            </div>
+            <img src="${it.img || 'https://placehold.co/110x70?text=food'}"
+                 class="menu-card-img" alt="">
+          </div>
+        `);
+        list.appendChild(row);
+      });
+
+      list.appendChild(el(`<div class="h-24"></div>`));
+      vbox.appendChild(list);
+      panel.appendChild(vbox);
+      catPager.appendChild(panel);
+
+      // свайп панелей
+      let down=false, used=false, sx=0, sy=0, locked=null;
+      const PIX_LOCK=10;
+      const THRESH=()=>Math.max(40, panelW()*0.25);
+
+      function onPointerDown(e){
+        if (e.pointerType !== 'touch') return;
+        if (isAnimating) return;
+        down=true; used=false; sx=e.clientX; sy=e.clientY; locked=null;
+        vbox.setPointerCapture?.(e.pointerId);
+      }
+      function onPointerMove(e){
+        if (e.pointerType !== 'touch') return;
+        if (!down || used || isAnimating) return;
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+
+        if (locked===null){
+          if (Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>PIX_LOCK) locked='x';
+          else if (Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>PIX_LOCK) locked='y';
+        }
+        if (locked==='x'){
+          e.preventDefault();
+          if (Math.abs(dx)>=THRESH()){
+            used=true;
+            const next = dx<0 ? activeIdx+1 : activeIdx-1;
+            goToIndex(next,{animate:true});
+          }
+        }
+      }
+      function onPointerUp(){ down=false; used=false; locked=null; }
+
+      vbox.addEventListener('pointerdown', onPointerDown, { passive:true });
+      vbox.addEventListener('pointermove', onPointerMove, { passive:false });
+      ['pointerup','pointercancel','pointerleave'].forEach(evt =>
+        vbox.addEventListener(evt, onPointerUp)
+      );
+    });
+  }
+
+  catPager.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn || btn.disabled) return;
+
+    const name  = btn.dataset.name;
+    const delta = btn.dataset.act === 'inc' ? +1 : -1;
+
+    const selector = `[data-q="${escAttr(name)}"]`;
+    const cur = parseInt(catPager.querySelector(selector)?.textContent || '0',10) || 0;
+    const next = Math.max(0, cur + delta);
+
+    catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
+
+    window.__orderCounts = window.__orderCounts || {};
+    window.__orderCounts[name] = next;
+    recalcTotal();
+  });
+
+  function applyHeights(){
+    try {
+      const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
+      const chipsH   = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
+      const confirmH = root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
+      const availH   = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+
+      const first  = root.querySelector('.menu-card');
+      const cardH  = first ? Math.ceil(first.getBoundingClientRect().height) : 104;
+      const h      = Math.min(availH, cardH * 4 + 12 * 3 + 4);
+
+      root.querySelectorAll('.v-scroll').forEach(elm => elm.style.height = h + 'px');
+      goToIndex(activeIdx, { animate: false });
+    } catch {}
+  }
+  window.addEventListener('resize', applyHeights);
+
+  catPager.addEventListener('scroll', () => {
+    if (isAnimating) return;
+    if (catPager._scrollTimer) clearTimeout(catPager._scrollTimer);
+    catPager._scrollTimer = setTimeout(() => {
+      const idx = Math.round(catPager.scrollLeft / panelW());
+      if (idx !== activeIdx){
+        highlightChip(idx);
+        activeIdx = idx;
+      }
+    }, 80);
+  });
+
+  function recalcTotal(){
+    const counts = window.__orderCounts || {};
+    let sum = 0;
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        sum += (counts[it.name] || 0) * (it.price || 0);
+      })
+    );
+    totalEl.textContent = money(sum);
+    confirmBtn.disabled = sum <= 0;
+    return sum;
+  }
+
+  /* --- Оформить заказ -> payModal (как у тебя было) --- */
+  confirmBtn.addEventListener('click', () => {
+    const counts = window.__orderCounts || {};
+    const items  = [];
+    let total = 0;
+
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        const q = (counts[it.name] || 0);
+        if (q > 0){
+          items.push({ name: it.name, qty: q, price: it.price || 0 });
+          total += q * (it.price || 0);
+        }
+      })
+    );
+    if (!items.length) return;
+
+    const sumBox = document.getElementById('paySummary');
+    sumBox.innerHTML = items.map(i => `
+      <div class="flex items-center justify-between">
+        <div class="truncate">${i.name} ×${i.qty}</div>
+        <div class="ml-2 whitespace-nowrap">${money(i.qty * (i.price || 0))}</div>
+      </div>
+    `).join('');
+
+    sumBox.insertAdjacentHTML(
+      'beforeend',
+      `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
+         <div>Итого</div><div>${money(total)}</div>
+       </div>`
+    );
+
+    document.getElementById('payModal')?.classList.add('open');
+  });
+
+  rebuildMenu();
+
+  requestAnimationFrame(() => {
+    highlightChip(0);
+    goToIndex(0, { animate:false });
+    recalcTotal();
+    applyRepeatOrder();
+    applyHeights();
+  });
+
+  // cleanup
+  root.cleanup = () => {
+    setBodyScrollLock(false);
+    window.removeEventListener('resize', applyHeights);
+  };
+
+  return root;
+}
+</script>
+  
   /* =========================================================
      ===================== ЭКРАН 2: КУХНЯ =====================
      ========================================================= */
