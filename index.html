@@ -1888,7 +1888,15 @@ function BuilderView(){
 }
 
 /* ===== Router ===== */
-function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
+function mount(view){
+  const app = document.getElementById('app');
+  if (!app) return;
+  if (app.firstChild && app.firstChild.cleanup) app.firstChild.cleanup();
+  app.innerHTML = '';
+  app.classList.add('phone-shell');
+  app.appendChild(view);
+}
+
 function realRouter(){
   const h = location.hash.split('?')[0];
   if (h === '#/dashboard') mount(DashboardView());
@@ -1896,19 +1904,12 @@ function realRouter(){
   else if (h === '#/builder') mount(BuilderView());
   else mount(OrderView());
 }
-else if(h==='#/profile-edit') mount(ProfileEditView());
-  else if(h==='#/history') mount(HistoryView());
-  else if(h==='#/contact') mount(ContactView());
-  else if(h==='#/dashboard') mount(DashboardView());
-  else if(h==='#/builder') mount(BuilderView());
-  else mount(OrderView());
-}
+
 function router(){
   const h = location.hash.split('?')[0];
   const profileBtn = document.getElementById('profileBtn');
-  const backBtn    = document.getElementById('backBtn');
+  const backBtn = document.getElementById('backBtn');
 
-  // профиля больше нет
   if (profileBtn) profileBtn.classList.add('hidden');
 
   const showBack = (h === '#/dashboard' || h === '#/builder' || h === '#/terminal');
@@ -1922,12 +1923,20 @@ function router(){
     if (h === '#/dashboard') sessionStorage.setItem(WANT_DASH, '1');
     if (h === '#/terminal') sessionStorage.setItem(WANT_TERM, '1');
     document.getElementById('pinModal')?.classList.add('open');
-    const app = document.getElementById('app'); if (app) app.innerHTML = '';
+    const app = document.getElementById('app'); 
+    if (app) app.innerHTML = '';
     return;
   }
 
   realRouter();
 }
+
+window.addEventListener('hashchange', ()=>{ 
+  try{ router(); }catch(e){ console.error(e); }
+});
+try{ router(); }catch(e){ console.error(e); }
+
+  
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
   
