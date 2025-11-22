@@ -466,6 +466,74 @@ async function pullAndMergeStatuses(){
   }
 }
 
+  /* ===== секретные зоны (8 тапов) ===== */
+const WANT_TERM = 'WANT_TERM'; // если ещё нет рядом с WANT_DASH
+
+function bindSecretZones(){
+  const left  = document.getElementById('tapHotLeft');
+  const right = document.getElementById('tapHotRight');
+  if(!left || !right || left._bound) return;
+  left._bound = right._bound = true;
+
+  function makeTapHandler(onDone){
+    let taps=0, first=0, timer=null;
+    const windowMs=1500;
+
+    const reset=()=>{
+      taps=0; first=0;
+      if(timer){ clearTimeout(timer); timer=null; }
+    };
+
+    return function(){
+      const now=Date.now();
+      if(!first) first=now;
+      taps++;
+
+      if(now-first>windowMs){
+        reset();
+        taps=1;
+        first=now;
+      }
+
+      if(taps>=8){
+        reset();
+        onDone();
+      }else{
+        if(timer) clearTimeout(timer);
+        timer=setTimeout(reset, windowMs);
+      }
+    };
+  }
+
+  const goDash = makeTapHandler(()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
+      location.hash='#/dashboard';
+    } else {
+      sessionStorage.setItem(WANT_DASH,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
+  });
+
+  const goTerm = makeTapHandler(()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
+      location.hash='#/terminal';
+    } else {
+      sessionStorage.setItem(WANT_TERM,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
+  });
+
+  ['click','pointerup','touchend'].forEach(ev=>{
+    left.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); goTerm();
+    }, {passive:false});
+
+    right.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation(); goDash();
+    }, {passive:false});
+  });
+}
+  
 /* ===== Order ===== */
 function OrderView(){
   const cfg = loadConfig();
@@ -705,6 +773,12 @@ const row = el(`
     vbox.appendChild(list);
     panel.appendChild(vbox);
     catPager.appendChild(panel);
+    
+    <div id="secretZones" class="fixed inset-x-0 bottom-0 h-20 pointer-events-none">
+  <div id="tapHotLeft"  class="absolute left-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
+  <div id="tapHotRight" class="absolute right-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
+</div>
+
 
     // === свайп по категориям (только touch) ===
 let down = false;
