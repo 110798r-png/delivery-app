@@ -128,6 +128,20 @@
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
 
+  <!-- Секретные зоны (невидимые) для входа в табло/терминал -->
+<div id="secretZones" class="fixed inset-x-0 bottom-0 h-20 pointer-events-none z-50">
+  <!-- левая зона: терминал -->
+  <div id="tapHotLeft"
+       class="absolute left-0 bottom-0 w-24 h-20 pointer-events-auto"
+       aria-label="terminal-hotzone"></div>
+
+  <!-- правая зона: табло -->
+  <div id="tapHotRight"
+       class="absolute right-0 bottom-0 w-24 h-20 pointer-events-auto"
+       aria-label="dashboard-hotzone"></div>
+</div>
+
+
   <script>
   if (!Element.prototype.matches) {
     Element.prototype.matches =
@@ -435,12 +449,6 @@ function OrderView(){
           </button>
         </div>
       </div>
-
-      <div id="secretZones" class="fixed inset-x-0 bottom-0 h-20 pointer-events-none">
-        <div id="tapHotLeft" class="absolute left-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
-        <div id="tapHotRight" class="absolute right-0 bottom-0 w-24 h-20 pointer-events-auto"></div>
-      </div>
-    </div>
   `);
 
   const categoryBar = root.querySelector('#categoryBar');
@@ -1273,6 +1281,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       initPushSubscription().catch(()=>{});
     }
   }
+  window.addEventListener('hashchange', bindSecretZones);
 });
   </script>
 </body>
