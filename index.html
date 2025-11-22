@@ -2,81 +2,1775 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-
-  <title>Терминал ЯмаMoto</title>
-
-  <!-- Tailwind -->
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Терминал заказа</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
-      background: #f3f4f6;
       margin: 0;
       padding: 0;
-      overflow-x: hidden;
-      font-family: sans-serif;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      user-select: none;
+      overflow: hidden;
     }
 
-    .screen {
-      display: none;
+    /* Основные кнопки */
+    .btn {
+      display: inline-block;
+      padding: 16px 26px;
+      font-size: 22px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      margin: 4px;
+    }
+
+    .btn-primary {
+      background: #ff0000;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #dddddd;
+      color: #333;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Контейнер категорий */
+    #categoriesBar {
       width: 100%;
-      height: 100%;
-    }
-    .screen.active {
-      display: block;
+      height: 90px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border-bottom: 2px solid #eee;
+      background: #fafafa;
     }
 
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
+    .category {
+      display: inline-block;
+      padding: 20px 30px;
+      font-size: 24px;
+      cursor: pointer;
     }
-    .modal.open {
+
+    .category.active {
+      background: #ff0000;
+      color: white;
+      border-radius: 12px;
+    }
+
+    /* Товары */
+    #productsArea {
+      padding: 20px;
+      height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .productCard {
+      border: 2px solid #eee;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
       display: flex;
     }
 
-    .hidden-zone {
-      position: fixed;
-      right: 0;
-      bottom: 0;
-      width: 200px;
-      height: 150px;
-      opacity: 0;
-      z-index: 9999;
+    .productCard img {
+      width: 130px;
+      height: 130px;
+      border-radius: 12px;
+      margin-right: 20px;
+      object-fit: cover;
     }
+
+    .productInfo {
+      flex-grow: 1;
+    }
+
+    .productName {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .productPrice {
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+
+    /* Кнопка корзины */
+    #cartButton {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #ff0000;
+      color: white;
+      font-size: 28px;
+      padding: 16px 26px;
+      border-radius: 50px;
+      cursor: pointer;
+    }
+
+    /* Скрытые кнопки PIN входа */
+    #secretRight,
+    #secretLeft {
+      position: fixed;
+      width: 50px;
+      height: 50px;
+      bottom: 0;
+      opacity: 0; /* невидимые */
+    }
+
+    #secretRight {
+      right: 0;
+    }
+
+    #secretLeft {
+      left: 0;
+    }
+
+    /* PIN окно */
+    #pinModal {
+      position: fixed;
+      left: 0; right: 0; top: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #pinBox {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      width: 400px;
+      text-align: center;
+    }
+
+    #pinInput {
+      font-size: 32px;
+      padding: 12px;
+      width: 80%;
+      text-align: center;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      border: 2px solid #ccc;
+    }
+
+    /* Модалка корзины */
+    #cartModal {
+      position: fixed;
+      left: 0; top: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #cartBox {
+      background: #ffffff;
+      width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border-radius: 20px;
+      padding: 20px;
+    }
+
+    /* Модалка оплаты */
+    #payModal {
+      position: fixed;
+      left: 0; top: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #payBox {
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 20px;
+      width: 500px;
+      text-align: center;
+    }
+
+    #qrImage {
+      width: 300px;
+      height: 300px;
+      margin: 20px auto;
+      object-fit: contain;
+    }
+
   </style>
 </head>
 <body>
 
-  <!-- =============================== -->
-  <!--     ЭКРАН 1 — ТЕРМИНАЛ          -->
-  <!-- =============================== -->
-  <div id="screen-order" class="screen active">
-    <div class="bg-red-600 text-white px-4 py-3 text-2xl font-extrabold">ЯмаMoto</div>
+  <!-- Секретные невидимые кнопки -->
+  <div id="secretLeft"></div>
+  <div id="secretRight"></div>
 
-    <div class="p-4">
-      <!-- Категории -->
-      <div id="categoryBar" class="flex gap-2 overflow-x-auto mb-3 no-scrollbar"></div>
+  <!-- Категории -->
+  <div id="categoriesBar"></div>
 
-      <!-- Товары -->
-      <div id="productsArea" class="grid gap-3"></div>
+  <!-- Товары -->
+  <div id="productsArea"></div>
+
+  <!-- Корзина -->
+  <div id="cartButton">Корзина</div>
+
+  <!-- PIN окно -->
+  <div id="pinModal" class="hidden">
+    <div id="pinBox">
+      <h2>Введите PIN</h2>
+      <input id="pinInput" type="password" maxlength="6">
+      <br><br>
+      <button class="btn btn-primary" id="pinSubmit">Войти</button>
+      <br><br>
+      <button class="btn btn-secondary" id="pinClose">Отмена</button>
     </div>
-
-    <!-- ИТОГО + кнопка -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3 flex justify-between items-center">
-      <div class="text-xl">
-        Итого: <b id="orderTotal">0 ₽</b>
-      </div>
-      <button id="orderConfirmBtn" disabled class="px-5 py-2 rounded-xl bg-black text-white text-lg disabled:opacity-30">
-        Оформить
-      </button>
-    </div>
-
-    <!-- скрытая зона для входа на кухню -->
-    <div id="enterKitchenZone" class="hidden-zone"></div>
   </div>
+
+  <!-- Корзина -->
+  <div id="cartModal" class="hidden">
+    <div id="cartBox">
+      <h2>Корзина</h2>
+      <div id="cartItems"></div>
+
+      <br>
+      <button class="btn btn-secondary" id="editCart">Изменить</button>
+      <button class="btn btn-primary" id="confirmCart">Подтвердить</button>
+
+      <br><br>
+      <button class="btn" id="closeCart">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- Оплата -->
+  <div id="payModal" class="hidden">
+    <div id="payBox">
+      <h2>Оплатите заказ</h2>
+
+      <img id="qrImage" src="" alt="QR">
+
+      <p>После оплаты заказ автоматически отправится.</p>
+
+      <button class="btn btn-secondary" id="payClose">Закрыть</button>
+    </div>
+  </div>
+//далеее//
+    <script>
+  /* =========================================================
+     НАСТРОЙКИ / КОНФИГ
+     ========================================================= */
+
+  const LS_CONFIG_KEY = "app_config_v1";
+  const LS_DASH_KEY   = "dashboard_orders_v1";
+  const PIN_CODE      = "65Vafuza";      // твой PIN
+  const PIN_OK_KEY    = "PIN_OK";
+  const WANT_ROUTE_KEY= "WANT_ROUTE";
+
+  // меню по умолчанию (если нет в localStorage)
+  const DEFAULT_CONFIG = {
+    brandTitle: "ЯмаMoto",
+    sbpPayBaseUrl: "",  // пока пусто, позже можно использовать
+    menu: [
+      {
+        key: "burgers",
+        title: "Бургеры",
+        items: [
+          { name: "Говяжий бургер", price: 280, img: "https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop" },
+          { name: "Говяжий двойной", price: 440, img: "https://images.unsplash.com/photo-1516684541-b4de0a07a2e1?w=400&auto=format&fit=crop" },
+          { name: "Куриный бургер",  price: 200, img: "https://images.unsplash.com/photo-1604908176997-1251882fde0b?w=400&auto=format&fit=crop" },
+          { name: "Куриный двойной", price: 250, img: "https://images.unsplash.com/photo-1603366615917-1fa6dad5c4fa?w=400&auto=format&fit=crop" },
+          { name: "Чизбургер", price: 220, img: "" }
+        ]
+      },
+      {
+        key: "twisters",
+        title: "Твистеры",
+        items: [
+          { name: "Твистер обычный", price: 200, img: "" },
+          { name: "Твистер обычный с картошкой", price: 220, img: "" },
+          { name: "Твистер макс", price: 250, img: "" },
+          { name: "Твистер макс с картошкой", price: 280, img: "" }
+        ]
+      },
+      {
+        key: "drinks",
+        title: "Напитки",
+        items: [
+          { name: "Добрый кола", price: 100, img: "" },
+          { name: "Добрый апельсин", price: 100, img: "" },
+          { name: "Добрый лайм", price: 100, img: "" },
+          { name: "Флэт-уайт", price: 100, img: "" },
+          { name: "Раф банан", price: 100, img: "" },
+          { name: "Эспрессо", price: 100, img: "" }
+        ]
+      },
+      {
+        key: "sushi",
+        title: "Суши / роллы",
+        items: [
+          { name: "Калифорния", price: 350, img: "" },
+          { name: "Филадельфия", price: 390, img: "" },
+          { name: "Аляска", price: 350, img: "" }
+        ]
+      }
+    ]
+  };
+
+  function loadConfig() {
+    try {
+      const raw = localStorage.getItem(LS_CONFIG_KEY);
+      if (!raw) return DEFAULT_CONFIG;
+      const json = JSON.parse(raw);
+      if (!json || !Array.isArray(json.menu)) return DEFAULT_CONFIG;
+      return json;
+    } catch {
+      return DEFAULT_CONFIG;
+    }
+  }
+
+  function saveConfig(cfg) {
+    localStorage.setItem(LS_CONFIG_KEY, JSON.stringify(cfg));
+  }
+
+  /* =========================================================
+     УТИЛИТЫ
+     ========================================================= */
+
+  function $(id){ return document.getElementById(id); }
+
+  function money(n){
+    return (n || 0) + " руб.";
+  }
+
+  function toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.remove("hidden");
+    setTimeout(() => t.classList.add("hidden"), 1500);
+  }
+
+  function loadDash(){
+    try {
+      return JSON.parse(localStorage.getItem(LS_DASH_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function saveDash(arr){
+    localStorage.setItem(LS_DASH_KEY, JSON.stringify(arr || []));
+  }
+
+  /* =========================================================
+     ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЭКРАНА ТЕРМИНАЛА
+     ========================================================= */
+
+  const cfg = loadConfig();
+  let activeCatIndex = 0;
+
+  // корзина: { "name": { qty, price, img } }
+  let cart = {};
+
+  /* =========================================================
+     РЕНДЕР КАТЕГОРИЙ
+     ========================================================= */
+
+  function renderCategories(){
+    const bar = $("categoriesBar");
+    bar.innerHTML = "";
+
+    cfg.menu.forEach((cat, idx) => {
+      const div = document.createElement("div");
+      div.className = "category " + (idx === activeCatIndex ? "active" : "");
+      div.textContent = cat.title;
+
+      div.onclick = () => {
+        activeCatIndex = idx;
+        renderCategories();
+        renderProducts();
+      };
+
+      bar.appendChild(div);
+    });
+  }
+
+  /* =========================================================
+     РЕНДЕР ТОВАРОВ
+     ========================================================= */
+
+  function renderProducts(){
+    const area = $("productsArea");
+    area.innerHTML = "";
+
+    const cat = cfg.menu[activeCatIndex];
+    if (!cat) return;
+
+    cat.items.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "productCard";
+
+      const img = document.createElement("img");
+      img.src = item.img || "https://placehold.co/160x160?text=food";
+
+      const info = document.createElement("div");
+      info.className = "productInfo";
+
+      const name = document.createElement("div");
+      name.className = "productName";
+      name.textContent = item.name;
+
+      const price = document.createElement("div");
+      price.className = "productPrice";
+      price.textContent = money(item.price);
+
+      const controls = document.createElement("div");
+
+      const dec = document.createElement("button");
+      dec.className = "btn btn-secondary";
+      dec.textContent = "−";
+      dec.onclick = () => changeQty(item, -1);
+
+      const qty = document.createElement("span");
+      qty.style.fontSize = "28px";
+      qty.style.margin = "0 18px";
+      qty.id = "qty_" + item.name;
+
+      const inc = document.createElement("button");
+      inc.className = "btn btn-primary";
+      inc.textContent = "+";
+      inc.onclick = () => changeQty(item, +1);
+
+      controls.appendChild(dec);
+      controls.appendChild(qty);
+      controls.appendChild(inc);
+
+      info.appendChild(name);
+      info.appendChild(price);
+      info.appendChild(controls);
+
+      card.appendChild(img);
+      card.appendChild(info);
+
+      area.appendChild(card);
+
+      updateQtyLabel(item.name);
+    });
+  }
+
+  function changeQty(item, delta){
+    const key = item.name;
+    if (!cart[key]) cart[key] = { qty: 0, price: item.price, img: item.img };
+    cart[key].qty = Math.max(0, cart[key].qty + delta);
+    if (cart[key].qty === 0) delete cart[key];
+
+    updateQtyLabel(key);
+    updateCartButton();
+  }
+
+  function updateQtyLabel(name){
+    const el = $("qty_" + name);
+    if (!el) return;
+    el.textContent = cart[name]?.qty || 0;
+  }
+
+  function updateCartButton(){
+    const btn = $("cartButton");
+    const totalQty = Object.values(cart).reduce((s, x) => s + x.qty, 0);
+    btn.textContent = totalQty > 0 ? ("Корзина (" + totalQty + ")") : "Корзина";
+  }
+
+  /* =========================================================
+     КОРЗИНА / МОДАЛКА
+     ========================================================= */
+
+  function openCart(){
+    const modal = $("cartModal");
+    const itemsBox = $("cartItems");
+    itemsBox.innerHTML = "";
+
+    const entries = Object.entries(cart);
+    if (!entries.length){
+      itemsBox.innerHTML = "<p>Корзина пуста</p>";
+    } else {
+      let total = 0;
+
+      entries.forEach(([name, data]) => {
+        const row = document.createElement("div");
+        row.style.fontSize = "22px";
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.marginBottom = "12px";
+
+        const left = document.createElement("div");
+        left.textContent = name + " × " + data.qty;
+
+        const right = document.createElement("div");
+        const sum = data.qty * data.price;
+        total += sum;
+        right.textContent = money(sum);
+
+        row.appendChild(left);
+        row.appendChild(right);
+
+        itemsBox.appendChild(row);
+      });
+
+      const totRow = document.createElement("div");
+      totRow.style.fontSize = "26px";
+      totRow.style.fontWeight = "bold";
+      totRow.style.marginTop = "16px";
+      totRow.textContent = "Итого: " + money(total);
+      itemsBox.appendChild(totRow);
+    }
+
+    modal.classList.remove("hidden");
+  }
+
+  function closeCart(){
+    $("cartModal").classList.add("hidden");
+    // возвращаем кнопки корзины на место
+    $("confirmCart").classList.remove("hidden");
+    $("editCart").classList.remove("hidden");
+    if ($("payChoice")) $("payChoice").remove();
+  }
+
+  // шаг 2: выбор оплаты
+  function showPayChoice(){
+    const box = $("cartBox");
+
+    // скрываем старые кнопки
+    $("confirmCart").classList.add("hidden");
+    $("editCart").classList.add("hidden");
+
+    // блок выбора
+    const choice = document.createElement("div");
+    choice.id = "payChoice";
+    choice.style.marginTop = "20px";
+    choice.innerHTML = `
+      <h3 style="font-size:24px;margin-bottom:8px;">Способ оплаты</h3>
+      <button id="payByQr" class="btn btn-primary" style="width:100%;margin-bottom:10px;">QR (СБП)</button>
+      <button id="payByCard" class="btn btn-secondary" style="width:100%;">Картой</button>
+    `;
+    box.appendChild(choice);
+
+    $("payByQr").onclick = () => finalizeOrder("sbp");
+    $("payByCard").onclick = () => finalizeOrder("card");
+  }
+
+  /* =========================================================
+     ОТПРАВКА ЗАКАЗА
+     ========================================================= */
+
+  async function sendOrderToApi(orderPayload){
+    // пока API не трогаем — пробуем отправить, если не получится — не падаем
+    try {
+      const res = await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ op:"create", ...orderPayload })
+      });
+      const json = await res.json().catch(()=>null);
+      return json;
+    } catch {
+      return null;
+    }
+  }
+
+  async function finalizeOrder(payType){
+    const entries = Object.entries(cart);
+    if (!entries.length){
+      toast("Корзина пуста");
+      return;
+    }
+
+    const items = entries.map(([name, d]) => ({
+      name,
+      qty: d.qty,
+      price: d.price
+    }));
+
+    const total = items.reduce((s,i)=> s + i.qty*i.price, 0);
+
+    // собираем заказ
+    let order = {
+      id: Date.now().toString().slice(-6),
+      createdAt: Date.now(),
+      items,
+      total,
+      pay: payType,
+      status: "готовится"  // по умолчанию
+    };
+
+    // пробуем API
+    const apiRes = await sendOrderToApi({ items, total, pay: payType });
+    if (apiRes?.order) order = apiRes.order;
+
+    // пишем в табло локально
+    const dash = loadDash();
+    dash.unshift(order);
+    saveDash(dash.slice(0,200));
+
+    // чистим корзину
+    cart = {};
+    updateCartButton();
+    renderProducts();
+
+    closeCart();
+
+    // QR оплата → открыть payModal
+    if (payType === "sbp"){
+      openQrModal();
+    } else {
+      toast("Оплатите на кассе");
+    }
+  }
+
+  /* =========================================================
+     QR МОДАЛКА
+     ========================================================= */
+
+  let qrTimer = null;
+
+  function openQrModal(){
+    const m = $("payModal");
+    const img = $("qrImage");
+
+    // берем URL картинки из localStorage
+    const qrUrl = localStorage.getItem("qr_url") || "";
+    if (qrUrl){
+      img.src = qrUrl;
+    } else {
+      img.src = "https://placehold.co/300x300?text=QR+URL+empty";
+    }
+
+    m.classList.remove("hidden");
+
+    // авто-закрытие через 20 сек
+    if (qrTimer) clearTimeout(qrTimer);
+    qrTimer = setTimeout(() => {
+      m.classList.add("hidden");
+    }, 20000);
+  }
+
+  function closeQrModal(){
+    $("payModal").classList.add("hidden");
+    if (qrTimer) clearTimeout(qrTimer);
+  }
+
+  // клик по свободному месту → закрыть
+  $("payModal").addEventListener("click", (e) => {
+    if (e.target.id === "payModal") closeQrModal();
+  });
+
+  $("payClose").onclick = closeQrModal;
+
+  /* =========================================================
+     PIN ЛОГИКА + 8 ТАПОВ В УГЛАХ
+     ========================================================= */
+
+  function openPinModal(targetRoute){
+    sessionStorage.setItem(WANT_ROUTE_KEY, targetRoute);
+    $("pinInput").value = "";
+    $("pinModal").classList.remove("hidden");
+    $("pinInput").focus();
+  }
+
+  function closePinModal(){
+    $("pinModal").classList.add("hidden");
+  }
+
+  $("pinSubmit").onclick = () => {
+    const val = $("pinInput").value.trim();
+    if (val !== PIN_CODE){
+      toast("Неверный PIN");
+      return;
+    }
+    sessionStorage.setItem(PIN_OK_KEY, "1");
+    closePinModal();
+
+    const route = sessionStorage.getItem(WANT_ROUTE_KEY) || "#/dashboard";
+    sessionStorage.removeItem(WANT_ROUTE_KEY);
+    location.hash = route;
+  };
+
+  $("pinClose").onclick = closePinModal;
+
+  function bindSecretTaps(el, route){
+    let taps = 0;
+    let firstTime = 0;
+    let timer = null;
+    const winMs = 1500;
+
+    function reset(){
+      taps = 0;
+      firstTime = 0;
+      if (timer) { clearTimeout(timer); timer = null; }
+    }
+
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const now = Date.now();
+      if (!firstTime) firstTime = now;
+      taps++;
+
+      if (now - firstTime > winMs){
+        reset();
+        taps = 1;
+        firstTime = now;
+      }
+
+      if (taps >= 8){
+        reset();
+        openPinModal(route);
+      } else {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(reset, winMs);
+      }
+    }, { passive:false });
+  }
+
+  bindSecretTaps($("secretRight"), "#/dashboard"); // правая — кухня
+  bindSecretTaps($("secretLeft"),  "#/board");     // левая — табло зала
+
+  /* =========================================================
+     КНОПКИ
+     ========================================================= */
+
+  $("cartButton").onclick = openCart;
+  $("closeCart").onclick = closeCart;
+  $("editCart").onclick = () => { closeCart(); };
+  $("confirmCart").onclick = showPayChoice;
+
+  /* =========================================================
+     СТАРТ
+     ========================================================= */
+
+  renderCategories();
+  renderProducts();
+  updateCartButton();
+
+  </script>
+//далее//
+    <script>
+  /* =========================================================
+     ТАБЛО КУХНИ (#/dashboard)
+     ========================================================= */
+
+  function renderDashboard() {
+    const root = document.getElementById("app");
+    root.innerHTML = "";
+
+    const dash = loadDash();
+
+    const wrap = document.createElement("div");
+    wrap.style.padding = "20px";
+
+    const title = document.createElement("h2");
+    title.textContent = "КУХНЯ — Заказы";
+    title.style.fontSize = "36px";
+    wrap.appendChild(title);
+
+    if (!dash.length){
+      const empty = document.createElement("p");
+      empty.textContent = "Пока заказов нет";
+      empty.style.fontSize = "28px";
+      wrap.appendChild(empty);
+    } else {
+      dash.forEach(order => {
+        const box = document.createElement("div");
+        box.style.padding = "12px 20px";
+        box.style.margin = "10px 0";
+        box.style.background = "#fff";
+        box.style.borderRadius = "12px";
+        box.style.boxShadow = "0 0 4px rgba(0,0,0,0.2)";
+        box.style.fontSize = "26px";
+
+        const head = document.createElement("div");
+        head.style.fontWeight = "bold";
+        head.textContent = "№ " + order.id + " — " + order.status;
+        box.appendChild(head);
+
+        order.items.forEach(i => {
+          const row = document.createElement("div");
+          row.textContent = i.name + " × " + i.qty;
+          row.style.marginLeft = "10px";
+          row.style.marginTop = "4px";
+          box.appendChild(row);
+        });
+
+        const btns = document.createElement("div");
+        btns.style.marginTop = "10px";
+
+        const btnReady = document.createElement("button");
+        btnReady.className = "btn btn-primary";
+        btnReady.style.marginRight = "12px";
+        btnReady.textContent = "ГОТОВО";
+
+        btnReady.onclick = () => setKitchenStatus(order.id, "готов");
+
+        const btnRemove = document.createElement("button");
+        btnRemove.className = "btn btn-secondary";
+        btnRemove.textContent = "УДАЛИТЬ";
+
+        btnRemove.onclick = () => {
+          const arr = loadDash().filter(o => o.id !== order.id);
+          saveDash(arr);
+          renderDashboard();
+        };
+
+        btns.appendChild(btnReady);
+        btns.appendChild(btnRemove);
+        box.appendChild(btns);
+
+        wrap.appendChild(box);
+      });
+    }
+
+    // кнопка "выйти"
+    const exitBtn = document.createElement("div");
+    exitBtn.textContent = "Выйти";
+    exitBtn.style.position = "fixed";
+    exitBtn.style.bottom = "40px";
+    exitBtn.style.right = "40px";
+    exitBtn.style.fontSize = "28px";
+    exitBtn.style.color = "#fff";
+    exitBtn.style.background = "#555";
+    exitBtn.style.padding = "12px 16px";
+    exitBtn.style.borderRadius = "10px";
+    exitBtn.style.cursor = "pointer";
+    exitBtn.onclick = () => {
+      sessionStorage.removeItem(PIN_OK_KEY);
+      location.hash = "/";
+    };
+    wrap.appendChild(exitBtn);
+
+    root.appendChild(wrap);
+  }
+
+  function setKitchenStatus(id, status){
+    const dash = loadDash();
+    const o = dash.find(x => x.id === id);
+    if (!o) return;
+
+    o.status = status;
+
+    saveDash(dash);
+    renderDashboard();
+  }
+
+
+  /* =========================================================
+     ТАБЛО ЗАЛА (#/board)
+     ========================================================= */
+
+  function renderBoard() {
+    const root = document.getElementById("app");
+    root.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.style.padding = "20px";
+    wrap.style.textAlign = "center";
+
+    const title = document.createElement("h2");
+    title.style.fontSize = "46px";
+    title.style.marginBottom = "20px";
+    title.textContent = "ГОТОВИТСЯ / ГОТОВО";
+    wrap.appendChild(title);
+
+    const dash = loadDash();
+
+    const preparing = dash.filter(o => o.status !== "готов");
+    const ready = dash.filter(o => o.status === "готов");
+
+    const col = document.createElement("div");
+    col.style.fontSize = "40px";
+
+    const prepTitle = document.createElement("div");
+    prepTitle.style.fontWeight = "bold";
+    prepTitle.style.marginBottom = "10px";
+    prepTitle.textContent = "ГОТОВИТСЯ:";
+    col.appendChild(prepTitle);
+
+    if (!preparing.length){
+      const e = document.createElement("div");
+      e.style.fontSize = "28px";
+      e.textContent = "—";
+      col.appendChild(e);
+    } else {
+      preparing.forEach(o => {
+        const n = document.createElement("div");
+        n.textContent = o.id;
+        col.appendChild(n);
+      });
+    }
+
+    const readyTitle = document.createElement("div");
+    readyTitle.style.fontWeight = "bold";
+    readyTitle.style.marginTop = "30px";
+    readyTitle.style.marginBottom = "10px";
+    readyTitle.textContent = "ГОТОВО:";
+    col.appendChild(readyTitle);
+
+    if (!ready.length){
+      const e = document.createElement("div");
+      e.style.fontSize = "28px";
+      e.textContent = "—";
+      col.appendChild(e);
+    } else {
+      ready.forEach(o => {
+        const n = document.createElement("div");
+        n.style.color = "#00ff00";
+        n.textContent = o.id;
+        col.appendChild(n);
+      });
+    }
+
+    wrap.appendChild(col);
+
+    root.appendChild(wrap);
+
+    // автовозврат на терминал при клике
+    wrap.onclick = () => location.hash = "/";
+  }
+
+  /* =========================================================
+     РОУТЕР (#/, #/dashboard, #/board)
+     ========================================================= */
+
+  function router() {
+    const route = location.hash.replace("#","");
+    const pinOk = sessionStorage.getItem(PIN_OK_KEY);
+
+    if (route === "dashboard"){
+      if (!pinOk) { location.hash = "/"; return; }
+      renderDashboard();
+      return;
+    }
+
+    if (route === "board"){
+      renderBoard();
+      return;
+    }
+
+    // иначе обычный терминал
+    renderCategories();
+    renderProducts();
+    updateCartButton();
+  }
+
+  window.addEventListener("hashchange", router);
+
+  // первый вызов
+  router();
+
+  </script>
+<script>
+/* =========================================================
+   ЧАСТЬ 4 — PIN ВХОД/ВЫХОД + 2 СКРЫТЫЕ ЗОНЫ + QR-КАРТИНКА
+   ВСТАВИТЬ ПОСЛЕ ЧАСТЬ 3
+   ========================================================= */
+
+/* ===== PIN настройки ===== */
+const PIN_CODE = "65Vafuza";                // твой PIN
+const PIN_OK_KEY = "PIN_OK_KEY";           // sessionStorage
+const WANT_ROUTE_KEY = "WANT_ROUTE_KEY";   // sessionStorage
+
+/* ===== QR URL для СБП (картинка) =====
+   Ты потом просто в консоли или кодом сделаешь:
+   localStorage.setItem('sbp_qr_url_v1', 'https://....png')
+*/
+const SBP_QR_URL_KEY = "sbp_qr_url_v1";
+
+function getSbpQrUrl(){
+  const fromLs = (localStorage.getItem(SBP_QR_URL_KEY) || "").trim();
+  if (fromLs) return fromLs;
+
+  const cfg = loadConfig?.() || {};
+  return (cfg.sbpQrUrl || "").trim();
+}
+
+/* =========================================================
+   QR МОДАЛКА (КАРТИНКА)
+   ========================================================= */
+function ensureQrModal(){
+  let m = document.getElementById("qrModal");
+  if (m) return m;
+
+  m = el(`
+    <div id="qrModal" class="modal">
+      <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl text-center">
+        <h3 class="text-lg font-semibold">Оплата по СБП</h3>
+        <div class="text-sm text-gray-600">
+          Отсканируйте QR и оплатите
+        </div>
+        <img id="qrImg" class="mx-auto rounded-xl border w-64 h-64 object-contain" alt="QR">
+        <div class="text-xs text-gray-500">
+          Окно закроется само через 20 секунд
+        </div>
+        <button id="qrOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white w-full">
+          Закрыть
+        </button>
+      </div>
+    </div>
+  `);
+
+  document.body.appendChild(m);
+
+  // тап мимо — закрыть
+  m.onclick = (e) => {
+    if (e.target === m) m.classList.remove("open");
+  };
+
+  m.querySelector("#qrOk").onclick = () => m.classList.remove("open");
+
+  return m;
+}
+
+function openQrImage(){
+  const m = ensureQrModal();
+  const qi = m.querySelector("#qrImg");
+  const url = getSbpQrUrl();
+
+  if (!url){
+    qi.src = "https://placehold.co/256x256?text=QR+URL+NOT+SET";
+  } else {
+    qi.src = url;
+  }
+
+  m.classList.add("open");
+
+  // авто-закрытие через 20 сек
+  setTimeout(() => {
+    m.classList.remove("open");
+  }, 20000);
+}
+
+/* =========================================================
+   ПЕРЕОПРЕДЕЛЯЕМ ОК в payModal:
+   после создания заказа → показываем QR картинку
+   ========================================================= */
+(function patchPayModalOk(){
+  const okBtn = document.getElementById("payOk");
+  if (!okBtn) return;
+
+  // снимаем старый если был
+  if (okBtn._patchedHandler){
+    okBtn.removeEventListener("click", okBtn._patchedHandler);
+  }
+
+  okBtn._patchedHandler = async (e) => {
+    e?.preventDefault(); e?.stopPropagation();
+
+    const payModal = document.getElementById("payModal");
+    const closePay = () => payModal?.classList.remove("open");
+
+    // собрать товары
+    const cfg = loadConfig();
+    const counts = window.__orderCounts || {};
+    const itemsSel = [];
+    let total = 0;
+
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        const q = counts[it.name] || 0;
+        if (q > 0){
+          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
+          total += q * (it.price || 0);
+        }
+      })
+    );
+
+    if (!itemsSel.length){
+      closePay();
+      return;
+    }
+
+    let order;
+    try{
+      const res = await rpc({
+        op: "create",
+        data: {
+          clientId: "terminal",
+          items: itemsSel,
+          total,
+          pay: "sbp",
+          status: "готовится"
+        }
+      });
+
+      order = res?.order || {
+        id: Date.now().toString().slice(-6),
+        createdAt: Date.now(),
+        items: itemsSel,
+        total,
+        pay: "sbp",
+        status: "готовится"
+      };
+
+      // сохраняем в локальные даши
+      const dash = loadDash();
+      dash.unshift(order);
+      saveDash(dash.slice(0, 200));
+
+      // чистим корзину
+      window.__orderCounts = {};
+      document.querySelectorAll("[data-q]").forEach(n => n.textContent="0");
+      document.getElementById("totalVal").textContent = "0 руб.";
+      document.getElementById("confirmBtn").disabled = true;
+
+    }catch(err){
+      console.warn("create error", err);
+      showToast("Не удалось отправить заказ");
+      return;
+    }
+
+    closePay();
+    openQrImage();
+  };
+
+  okBtn.addEventListener("click", okBtn._patchedHandler);
+})();
+
+
+/* =========================================================
+   2 СКРЫТЫЕ ЗОНЫ НА ТЕРМИНАЛЕ (8 тапов)
+    - справа снизу → #/dashboard (кухня)
+    - слева снизу  → #/board (табло зала)
+   ========================================================= */
+function ensureHotZones(){
+  // правая зона
+  let right = document.getElementById("hotZoneRight");
+  if (!right){
+    right = document.createElement("div");
+    right.id = "hotZoneRight";
+    right.style.cssText = `
+      position:fixed; right:0; bottom:0;
+      width:220px; height:160px; z-index:9998; opacity:0;
+    `;
+    document.body.appendChild(right);
+  }
+
+  // левая зона
+  let left = document.getElementById("hotZoneLeft");
+  if (!left){
+    left = document.createElement("div");
+    left.id = "hotZoneLeft";
+    left.style.cssText = `
+      position:fixed; left:0; bottom:0;
+      width:220px; height:160px; z-index:9998; opacity:0;
+    `;
+    document.body.appendChild(left);
+  }
+
+  bindMultiTap(right, 8, () => askPinThenGo("#/dashboard"));
+  bindMultiTap(left, 8, () => askPinThenGo("#/board"));
+}
+
+function bindMultiTap(node, count, onDone){
+  if (!node || node._bound) return;
+  node._bound = true;
+
+  let taps=0, first=0, timer=null;
+  const windowMs=1300;
+
+  function reset(){
+    taps=0; first=0;
+    if (timer){ clearTimeout(timer); timer=null; }
+  }
+
+  function handler(){
+    const now = Date.now();
+    if(!first) first=now;
+    taps++;
+
+    if(now-first > windowMs){
+      reset(); taps=1; first=now;
+    }
+
+    if(taps>=count){
+      reset();
+      onDone();
+    } else {
+      if(timer) clearTimeout(timer);
+      timer=setTimeout(reset, windowMs);
+    }
+  }
+
+  ["click","pointerup","touchend"].forEach(ev=>{
+    node.addEventListener(ev, (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      handler();
+    }, {passive:false});
+  });
+}
+
+
+/* =========================================================
+   PIN МОДАЛКА ЛОГИКА
+   ========================================================= */
+function askPinThenGo(routeHash){
+  sessionStorage.setItem(WANT_ROUTE_KEY, routeHash);
+  document.getElementById("pinInput").value = "";
+  document.getElementById("pinModal").classList.add("open");
+}
+
+(function bindPinModal(){
+  const pinM = document.getElementById("pinModal");
+  const pinOk = document.getElementById("pinOk");
+  const pinCancel = document.getElementById("pinCancel");
+  const pinInput = document.getElementById("pinInput");
+
+  if (!pinM || pinM._bound) return;
+  pinM._bound = true;
+
+  pinOk.onclick = (e)=>{
+    e?.preventDefault(); e?.stopPropagation();
+
+    const val = (pinInput.value||"").trim();
+    if (!val){
+      showToast("Введите ключ");
+      return;
+    }
+    if (val !== PIN_CODE){
+      showToast("Неверный ключ");
+      return;
+    }
+
+    pinM.classList.remove("open");
+    sessionStorage.setItem(PIN_OK_KEY, "1");
+
+    const want = sessionStorage.getItem(WANT_ROUTE_KEY) || "#/dashboard";
+    sessionStorage.removeItem(WANT_ROUTE_KEY);
+    location.hash = want;
+  };
+
+  pinCancel.onclick = ()=>{
+    pinM.classList.remove("open");
+    sessionStorage.removeItem(WANT_ROUTE_KEY);
+  };
+
+  pinM.onclick = (e)=>{
+    if(e.target===pinM) pinCancel.onclick();
+  };
+})();
+
+
+/* =========================================================
+   ПЕРЕОПРЕДЕЛЯЕМ renderBoard:
+   - вход по PIN (через hotZoneLeft)
+   - выход тоже по PIN: 8 тапов снизу справа на самом табло
+   ========================================================= */
+function renderBoard() {
+  const root = document.getElementById("app");
+  root.innerHTML = "";
+
+  const wrap = document.createElement("div");
+  wrap.style.padding = "20px";
+  wrap.style.textAlign = "center";
+
+  const title = document.createElement("h2");
+  title.style.fontSize = "46px";
+  title.style.marginBottom = "20px";
+  title.textContent = "ТАБЛО ЗАЛА";
+  wrap.appendChild(title);
+
+  const dash = loadDash();
+  const preparing = dash.filter(o => o.status !== "готов");
+  const ready = dash.filter(o => o.status === "готов");
+
+  const cols = document.createElement("div");
+  cols.style.display = "grid";
+  cols.style.gridTemplateColumns = "1fr 1fr";
+  cols.style.gap = "20px";
+  cols.style.fontSize = "52px";
+  cols.style.fontWeight = "900";
+
+  const leftCol = document.createElement("div");
+  const rightCol = document.createElement("div");
+
+  leftCol.innerHTML = `<div style="font-size:28px;margin-bottom:8px">ГОТОВИТСЯ</div>`;
+  rightCol.innerHTML = `<div style="font-size:28px;margin-bottom:8px">ГОТОВО</div>`;
+
+  if (!preparing.length){
+    leftCol.innerHTML += `<div style="font-size:30px;color:#999">—</div>`;
+  } else {
+    preparing.forEach(o=>{
+      const n=document.createElement("div");
+      n.textContent=o.id;
+      leftCol.appendChild(n);
+    });
+  }
+
+  if (!ready.length){
+    rightCol.innerHTML += `<div style="font-size:30px;color:#999">—</div>`;
+  } else {
+    ready.forEach(o=>{
+      const n=document.createElement("div");
+      n.style.color="#00aa00";
+      n.textContent=o.id;
+      rightCol.appendChild(n);
+    });
+  }
+
+  cols.appendChild(leftCol);
+  cols.appendChild(rightCol);
+  wrap.appendChild(cols);
+  root.appendChild(wrap);
+
+  // скрытая зона выхода снизу справа (8 тапов)
+  let exitHot = document.getElementById("boardExitHot");
+  if (!exitHot){
+    exitHot = document.createElement("div");
+    exitHot.id = "boardExitHot";
+    exitHot.style.cssText = `
+      position:fixed; right:0; bottom:0;
+      width:220px; height:160px; z-index:9999; opacity:0;
+    `;
+    document.body.appendChild(exitHot);
+  }
+
+  bindMultiTap(exitHot, 8, ()=>{
+    // выход тоже через PIN
+    sessionStorage.removeItem(PIN_OK_KEY);
+    askPinThenGo("#/");
+  });
+}
+
+
+/* =========================================================
+   РОУТЕР (ПЕРЕОПРЕДЕЛЯЕМ)
+   ========================================================= */
+function router(){
+  const route = location.hash.replace("#","");
+
+  // терминал всегда доступен
+  if (route === "/" || route === "" || route === "order"){
+    renderCategories();
+    renderProducts();
+    updateCartButton();
+    ensureHotZones();
+    return;
+  }
+
+  // кухня и табло зала — только через PIN
+  const pinOk = sessionStorage.getItem(PIN_OK_KEY) === "1";
+  if (!pinOk){
+    // если кто-то руками ввёл hash — просим PIN и возвращаем на терминал
+    askPinThenGo("#/"+route);
+    location.hash = "/";
+    return;
+  }
+
+  if (route === "dashboard"){
+    renderDashboard();
+    return;
+  }
+
+  if (route === "board"){
+    renderBoard();
+    return;
+  }
+
+  // fallback
+  location.hash = "/";
+}
+
+window.addEventListener("hashchange", router);
+router();
+ensureHotZones();
+</script>
+<script>
+/* =========================================================
+   ЧАСТЬ 5 — КОНСТРУКТОР МЕНЮ / BUILDER
+   ========================================================= */
+
+/* ==== Вспомогалки ==== */
+function uuid4(){
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+/* ==== РЕНДЕР builder ==== */
+function renderBuilder(){
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+
+  const cfg = loadConfig();
+
+  const wrap = document.createElement("div");
+  wrap.style.padding = "16px";
+  wrap.style.maxWidth = "1000px";
+  wrap.style.margin = "0 auto";
+
+  wrap.innerHTML = `
+    <h2 class="text-2xl font-bold mb-4">Конструктор меню</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+      <div class="p-4 bg-white border rounded-xl shadow">
+        <h3 class="font-semibold mb-2">Бренд / Заголовок</h3>
+        <input id="bBrand" class="border rounded p-2 w-full" value="${cfg.brandTitle || ''}" placeholder="Название бренда...">
+      </div>
+
+      <div class="p-4 bg-white border rounded-xl shadow">
+        <h3 class="font-semibold mb-2">URL QR (СБП)</h3>
+        <input id="bQrUrl" class="border rounded p-2 w-full"
+               value="${(localStorage.getItem('sbp_qr_url_v1')||cfg.sbpQrUrl||'')}"
+               placeholder="https://storage.yandexcloud.net/...png">
+      </div>
+
+    </div>
+
+    <h3 class="text-xl font-bold mt-6 mb-4">Категории</h3>
+    <div id="bCategories" class="grid gap-6"></div>
+
+    <button id="addCat" class="px-4 py-2 rounded-xl bg-black text-white mt-4">+ Добавить категорию</button>
+
+    <div class="flex gap-3 mt-10">
+      <button id="saveBtn" class="px-4 py-2 rounded-xl bg-green-600 text-white">💾 Сохранить меню</button>
+      <button id="exportBtn" class="px-4 py-2 rounded-xl bg-blue-600 text-white">⬆ Экспорт</button>
+      <button id="importBtn" class="px-4 py-2 rounded-xl bg-blue-500 text-white">⬇ Импорт</button>
+      <button id="clearBtn" class="px-4 py-2 rounded-xl bg-red-600 text-white ml-auto">Очистить</button>
+      <a href="#/" class="px-4 py-2 rounded-xl border">Назад</a>
+    </div>
+  `;
+
+  app.appendChild(wrap);
+
+
+  /* ====== Категории и товары ====== */
+  const catBox = wrap.querySelector("#bCategories");
+
+  function drawCategories(){
+    catBox.innerHTML = "";
+    const cfg2 = loadConfig();
+
+    cfg2.menu.forEach((cat, ci) => {
+      const block = document.createElement("div");
+      block.className = "p-4 bg-white border rounded-xl shadow";
+
+      block.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <input class="border rounded p-2 flex-1" id="catName_${ci}" value="${cat.title}">
+          <button class="ml-3 px-3 py-2 rounded-xl bg-red-100 text-red-600" data-del-cat="${ci}">Удалить категорию</button>
+        </div>
+
+        <div id="items_${ci}" class="grid gap-3 mb-3"></div>
+
+        <button class="px-3 py-1 rounded-xl bg-black text-white" data-add-item="${ci}">+ Добавить товар</button>
+      `;
+
+      catBox.appendChild(block);
+
+      const itemsBox = block.querySelector(`#items_${ci}`);
+
+      cat.items.forEach((it, ii) => {
+        const row = document.createElement("div");
+        row.className = "border rounded-xl p-3";
+
+        row.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input class="border rounded p-2" id="itName_${ci}_${ii}" value="${it.name}" placeholder="Название">
+            <input class="border rounded p-2" id="itPrice_${ci}_${ii}" value="${it.price}" type="number" placeholder="Цена">
+            <input class="border rounded p-2" id="itImg_${ci}_${ii}" value="${it.img||""}" placeholder="URL картинки">
+            <button class="px-3 py-2 rounded-xl bg-red-100 text-red-600" data-del-item="${ci}_${ii}">Удалить</button>
+          </div>
+        `;
+
+        itemsBox.appendChild(row);
+      });
+    });
+  }
+
+  drawCategories();
+
+
+  /* ===== КНОПКИ УПРАВЛЕНИЯ ===== */
+
+  // + категория
+  wrap.querySelector("#addCat").onclick = ()=>{
+    const cfg3 = loadConfig();
+    cfg3.menu.push({
+      key: uuid4(),
+      title: "Новая категория",
+      items: []
+    });
+    saveConfig(cfg3);
+    drawCategories();
+    showToast("Категория добавлена");
+  };
+
+  // удалить категорию
+  wrap.addEventListener("click", (e)=>{
+    const btn = e.target.closest("[data-del-cat]");
+    if (!btn) return;
+    const id = +btn.dataset.delCat;
+    const cfg4 = loadConfig();
+    cfg4.menu.splice(id,1);
+    saveConfig(cfg4);
+    drawCategories();
+    showToast("Категория удалена");
+  });
+
+  // + товар
+  wrap.addEventListener("click", (e)=>{
+    const btn = e.target.closest("[data-add-item]");
+    if (!btn) return;
+    const ci = +btn.dataset.addItem;
+    const cfg5 = loadConfig();
+    cfg5.menu[ci].items.push({
+      name: "Товар",
+      price: 100,
+      img: ""
+    });
+    saveConfig(cfg5);
+    drawCategories();
+  });
+
+  // удалить товар
+  wrap.addEventListener("click", (e)=>{
+    const btn = e.target.closest("[data-del-item]");
+    if (!btn) return;
+    const [ci, ii] = btn.dataset.delItem.split("_").map(Number);
+    const cfg6 = loadConfig();
+    cfg6.menu[ci].items.splice(ii,1);
+    saveConfig(cfg6);
+    drawCategories();
+  });
+
+
+  // ===== Сохранить меню =====
+  wrap.querySelector("#saveBtn").onclick = ()=>{
+    const cfg7 = loadConfig();
+
+    cfg7.brandTitle = wrap.querySelector("#bBrand").value.trim();
+    const qrUrl = wrap.querySelector("#bQrUrl").value.trim();
+
+    if (qrUrl) localStorage.setItem("sbp_qr_url_v1", qrUrl);
+
+    // категории
+    cfg7.menu.forEach((cat, ci)=>{
+      cat.title = wrap.querySelector(`#catName_${ci}`)?.value || cat.title;
+
+      cat.items.forEach((it, ii)=>{
+        it.name  = wrap.querySelector(`#itName_${ci}_${ii}`)?.value || it.name;
+        it.price = +(wrap.querySelector(`#itPrice_${ci}_${ii}`)?.value || it.price);
+        it.img   = wrap.querySelector(`#itImg_${ci}_${ii}`)?.value || "";
+      });
+    });
+
+    saveConfig(cfg7);
+    showToast("Сохранено");
+  };
+
+
+  // ===== Экспорт =====
+  wrap.querySelector("#exportBtn").onclick = ()=>{
+    const cfg8 = loadConfig();
+    const blob = new Blob([JSON.stringify(cfg8, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "menu_export.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  // ===== Импорт =====
+  wrap.querySelector("#importBtn").onclick = ()=>{
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "application/json";
+
+    inp.onchange = ()=>{
+      const file = inp.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const json = JSON.parse(reader.result);
+          saveConfig(json);
+          drawCategories();
+          showToast("Импортировано");
+        }catch(err){
+          showToast("Ошибка JSON");
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    inp.click();
+  };
+
+
+  // ===== Очистить меню =====
+  wrap.querySelector("#clearBtn").onclick = ()=>{
+    if (!confirm("Очистить ВСЁ меню?")) return;
+    saveConfig({ brandTitle:"ЯмаMoto", menu:[] });
+    localStorage.removeItem("sbp_qr_url_v1");
+    drawCategories();
+    showToast("Очищено");
+  };
+}
+</script>
+<script>
+/* =========================================================
+   ЧАСТЬ 6 — RPC ФОЛБЭК + ЛОКАЛЬНЫЙ API-МОК
+   ========================================================= */
+
+/*
+  Когда будет готов реальный Yandex API:
+  1) поставишь USE_LOCAL_API = false
+  2) и всё продолжит работать через сеть
+*/
+const USE_LOCAL_API = true;
+
+// ключ “облачных” заказов (локально)
+const CLOUD_ORDERS_KEY = "cloud_orders_v1";
+
+// ключ “облачного” конфига
+const CLOUD_CONFIG_KEY = "cloud_config_v1";
+
+// простая утилита
+function _lsGet(key, fallback){
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || "null");
+    return v == null ? fallback : v;
+  } catch { return fallback; }
+}
+function _lsSet(key, val){
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+/* ========= локальная реализация op ========= */
+async function localRpc(payload){
+  const op = payload?.op;
+  if (!op) return { error:"no-op" };
+
+  // заказы в “облаке”
+  let orders = _lsGet(CLOUD_ORDERS_KEY, []);
+
+  // конфиг меню в “облаке”
+  let cloudCfg = _lsGet(CLOUD_CONFIG_KEY, null);
+
+  // helper: нормализуем заказ
+  function normalizeOrder(o){
+    const id = o.id || (Date.now().toString().slice(-6));
+    return {
+      id,
+      createdAt: o.createdAt || Date.now(),
+      items: Array.isArray(o.items) ? o.items : [],
+      total: typeof o.total === "number" ? o.total : 0,
+      status: o.status || "готовится",
+      pay: o.pay || "sbp"
+    };
+  }
+
+  /* ------- ops ------- */
+  switch(op){
+
+    case "create":{
+      // ожидаем payload.data.items / payload.items
+      const data = payload.data || payload;
+      const order = normalizeOrder({
+        items: data.items || [],
+        total: data.total || 0,
+        pay: data.pay || "sbp",
+        status: data.status || "готовится"
+      });
+
+      orders.unshift(order);
+      orders = orders.slice(0, 500);
+      _lsSet(CLOUD_ORDERS_KEY, orders);
+
+      return { ok:true, order };
+    }
+
+    case "list":{
+      return { ok:true, orders };
+    }
+
+    case "update":{
+      const id = String(payload.id);
+      const patch = payload.patch || {};
+      orders = orders.map(o => {
+        if (String(o.id) !== id) return o;
+        return { ...o, ...patch };
+      });
+      _lsSet(CLOUD_ORDERS_KEY, orders);
+      return { ok:true };
+    }
+
+    case "delete":{
+      const id = String(payload.id);
+      orders = orders.filter(o => String(o.id) !== id);
+      _lsSet(CLOUD_ORDERS_KEY, orders);
+      return { ok:true };
+    }
+
+    case "clear":{
+      orders = [];
+      _lsSet(CLOUD_ORDERS_KEY, orders);
+      return { ok:true };
+    }
+
+    case "config_get":{
+      // если в “облаке” нет конфига — отдаём локальный
+      if (!cloudCfg){
+        cloudCfg = loadConfig();
+        _lsSet(CLOUD_CONFIG_KEY, cloudCfg);
+      }
+      return { ok:true, config: cloudCfg };
+    }
+
+    case "config_set":{
+      const cfg = payload.config;
+      if (cfg && cfg.menu){
+        _lsSet(CLOUD_CONFIG_KEY, cfg);
+      }
+      return { ok:true };
+    }
+
+    default:
+      return { error:"unknown-op", op };
+  }
+}
+
+
+/* ========= новая rpc с фолбэком ========= */
+window.rpc = async function rpcSmart(payload){
+  // если принудительно локально
+  if (USE_LOCAL_API){
+    return localRpc(payload);
+  }
+
+  // иначе сначала сеть
+  try{
+    const res = await fetch(API_URL, {
+      method:"POST",
+      headers:{ "content-type":"application/json" },
+      body: JSON.stringify(payload || {})
+    });
+
+    if(!res.ok){
+      throw new Error("net-fail");
+    }
+
+    return await res.json();
+
+  }catch(e){
+    console.warn("RPC network failed → fallback to local", e);
+    return localRpc(payload);
+  }
+};
+</script>
