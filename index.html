@@ -5,17 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ЯмаMoto — терминал</title>
 
-  <!-- Tailwind CDN -->
+  <!-- Tailwind (можно оставить, удобно для верстки) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <link rel="stylesheet" href="/styles.css">
+
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 
-<body>
+<body class="bg-gray-50">
+
   <div class="w-full">
     <!-- Красная шапка -->
     <div class="brand-strip">
-      <div class="phone-shell header-row flex items-center justify-between">
+      <div class="shell header-row flex items-center justify-between">
         <div class="brand-wrap">
           <div class="sushi-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
@@ -29,16 +31,18 @@
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
-        <!-- личного кабинета НЕТ -->
+
+        <!-- личного кабинета нет -->
       </div>
     </div>
     <div class="header-ghost"></div>
 
-    <main id="app" class="phone-shell"></main>
+    <!-- сюда рендерятся экраны -->
+    <main id="app" class="shell"></main>
   </div>
 
-  <!-- Плавающая кнопка входа в табло кухни -->
-  <button id="openDashBtn" title="Табло кухни" aria-label="Табло кухни">
+  <!-- Плавающая кнопка входа на кухню/табло (PIN внутри) -->
+  <button id="openDashBtn" title="Табло" aria-label="Табло">
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <rect x="3" y="4" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
       <rect x="3" y="14" width="18" height="6" rx="2" stroke="currentColor" stroke-width="2"/>
@@ -46,46 +50,43 @@
     </svg>
   </button>
 
-  <!-- Подтверждение заказа -->
+  <!-- Модалка подтверждения заказа -->
   <div id="payModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
-      <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-60 overflow-auto"></div>
-      <div class="flex justify-end gap-2">
-        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
-        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <h3 class="modal-title">Подтверждение заказа</h3>
+      <div id="paySummary" class="modal-summary"></div>
+      <div class="modal-actions">
+        <button id="payCancel" type="button" class="btn btn-ghost">Изменить</button>
+        <button id="payOk" type="button" class="btn btn-primary">ОК</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN модалка (вход/выход в админ-экраны) -->
+  <div id="pinModal" class="modal">
+    <div class="modal-card max-w-xs text-center">
+      <h3 class="modal-title">Введите ключ</h3>
+      <input id="pinInput" class="pin-input" placeholder="введите ключ" inputmode="text">
+      <div class="modal-actions">
+        <button id="pinCancel" class="btn btn-ghost">Отмена</button>
+        <button id="pinOk" class="btn btn-primary">ОК</button>
       </div>
     </div>
   </div>
 
   <!-- QR модалка СБП -->
   <div id="qrModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl text-center">
-      <h3 class="text-lg font-semibold">Оплата по СБП</h3>
+    <div class="modal-card text-center">
+      <h3 class="modal-title">Оплата по СБП</h3>
       <div class="text-sm text-gray-600">Отсканируйте QR и оплатите заказ</div>
-      <img id="qrImg" class="mx-auto rounded-xl border w-64 h-64 object-contain" alt="QR">
-      <a id="qrLink" class="block text-blue-600 underline text-sm" href="#" target="_blank" rel="noopener">
-        Открыть ссылку оплаты
-      </a>
-      <div class="text-xs text-gray-500 mt-2">
-        Оплата картой — у кассира/терминала POS
-      </div>
-      <button id="qrOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white w-full">Готово</button>
+      <img id="qrImg" class="qr-img" alt="QR">
+      <a id="qrLink" class="qr-link" href="#" target="_blank" rel="noopener">Открыть ссылку оплаты</a>
+      <div class="text-xs text-gray-500 mt-2">Оплата картой — у кассира/терминала POS</div>
+      <button id="qrOk" type="button" class="btn btn-primary w-full mt-3">Готово</button>
     </div>
   </div>
 
-  <!-- PIN модалка -->
-  <div id="pinModal" class="modal">
-    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
-      <h3 class="text-lg font-semibold">Введите ключ</h3>
-      <input id="pinInput" class="border rounded-2xl p-3 w-full text-center" placeholder="введите ключ" inputmode="text">
-      <div class="flex justify-end gap-2">
-        <button id="pinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
-        <button id="pinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- тост -->
   <div id="toast" class="toast hidden"></div>
 
   <!-- звук новых заказов -->
@@ -93,6 +94,42 @@
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
 
-  <script type="module" src="/app.js"></script>
+  <!-- полифилы для старых браузеров -->
+  <script>
+    if (!Element.prototype.matches) {
+      Element.prototype.matches =
+        Element.prototype.msMatchesSelector ||
+        Element.prototype.webkitMatchesSelector ||
+        function (selector) {
+          const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
+          let i = matches.length;
+          while (--i >= 0 && matches.item(i) !== this) {}
+          return i > -1;
+        };
+    }
+    if (!Element.prototype.closest) {
+      Element.prototype.closest = function (selector) {
+        let el = this;
+        while (el && el.nodeType === 1) {
+          if (el.matches(selector)) return el;
+          el = el.parentElement || el.parentNode;
+        }
+        return null;
+      };
+    }
+    if (!window.CSS) window.CSS = {};
+    if (typeof window.CSS.escape !== 'function') {
+      window.CSS.escape = function (value) {
+        return String(value).replace(/"/g, '\\"');
+      };
+    }
+  </script>
+
+  <!-- подключаем приложение -->
+  <script src="./app.js" defer></script>
+  <script src="./order-view.js" defer></script>
+  <script src="./dashboard-view.js" defer></script>
+  <script src="./public-board-view.js" defer></script>
+  <script src="./builder-view.js" defer></script>
 </body>
 </html>
