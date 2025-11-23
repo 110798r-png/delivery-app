@@ -85,15 +85,6 @@
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
-      <!-- Thanks modal -->
-  <div id="thanksModal" class="modal" aria-hidden="true">
-    <div class="bg-white rounded-3xl p-8 w-[min(520px,92vw)] text-center shadow-2xl">
-      <div class="text-3xl font-extrabold mb-3">Спасибо!</div>
-      <div class="text-lg text-gray-700">Ваш заказ скоро будет готов</div>
-      <div class="text-sm text-gray-500 mt-3">Коснитесь экрана, чтобы продолжить</div>
-    </div>
-  </div>
-
     
     /* ===== Роут-правила для шапки/стрелок ===== */
 
@@ -225,6 +216,15 @@ body.route-terminal .header-ghost{
   <video id="promoVideo" playsinline loop></video>
 </div>
 
+    <!-- Thanks modal -->
+  <div id="thanksModal" class="modal" aria-hidden="true">
+    <div class="bg-white rounded-3xl p-8 w-[min(520px,92vw)] text-center shadow-2xl">
+      <div class="text-3xl font-extrabold mb-3">Спасибо!</div>
+      <div class="text-lg text-gray-700">Ваш заказ скоро будет готов</div>
+      <div class="text-sm text-gray-500 mt-3">Коснитесь экрана, чтобы продолжить</div>
+    </div>
+  </div>
+  
   <div id="toast" class="toast hidden"></div>
 
   <!-- звук уведомления -->
@@ -410,32 +410,6 @@ async function initPushSubscription() {
     await rpc({ op: 'push_subscribe', clientId: getClientId(), subscription: sub });
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
-
-/* ===== Thanks helpers ===== */
-let thanksTimer = null;
-function openThanksModal(){
-  const m = document.getElementById('thanksModal');
-  if(!m) return;
-  m.classList.add('open');
-  setBodyScrollLock(true);
-
-  if(thanksTimer) clearTimeout(thanksTimer);
-  thanksTimer = setTimeout(closeThanksModal, 10000);
-}
-function closeThanksModal(){
-  const m = document.getElementById('thanksModal');
-  if(!m) return;
-  m.classList.remove('open');
-  setBodyScrollLock(false);
-  if(thanksTimer) { clearTimeout(thanksTimer); thanksTimer=null; }
-  resetIdlePromoTimer(); // после “спасибо” снова ждём простой
-}
-
-/* закрыть спасибо по тапу */
-document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
-  e.preventDefault(); e.stopPropagation();
-  closeThanksModal();
-}, {passive:false});
   
 /* ===== RPC ===== */
 async function rpc(payload){
@@ -1075,12 +1049,16 @@ schedulePromoAfterOrder();
     await pullAndMergeStatuses().catch(()=>{});
   },4000);
 
-  root.cleanup=()=>{
-    setBodyScrollLock(false);
-    clearInterval(syncTimer);
-    window.removeEventListener('resize', applyHeights);
-    clearIdlePromoTimer();
-  };
+ root.cleanup=()=>{
+  setBodyScrollLock(false);
+  clearInterval(syncTimer);
+  window.removeEventListener('resize', applyHeights);
+  clearIdlePromoTimer();
+
+  ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
+    root.removeEventListener(ev, onActivity);
+  });
+};
 
   return root;
 }
