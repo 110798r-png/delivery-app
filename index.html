@@ -61,8 +61,14 @@
     button:focus, a:focus { outline: none; box-shadow: none; }
 
     /* --- Promo video fullscreen --- */
-    #promoModal.modal.open{ background: rgba(0,0,0,0.9); }
-    #promoModal video{ width:100vw; height:100vh; object-fit:cover; }
+#promoModal{
+  z-index:200; /* выше шапки */
+}
+#promoModal.modal.open{ background: rgba(0,0,0,0.9); }
+#promoModal video{
+  width:100vw; height:100vh; object-fit:cover;
+  background:#000;
+}
 
     /* --- Роут-адаптация под 14" --- */
     body.route-landscape .phone-shell{
@@ -205,7 +211,7 @@ body.route-terminal .header-ghost{
 
   <!-- Promo video modal -->
   <div id="promoModal" class="modal" aria-hidden="true">
-   <video id="promoVideo" playsinline loop></video>
+   <video id="promoVideo" playsinline muted loop></video>
   </div>
 
   <div id="toast" class="toast hidden"></div>
@@ -254,6 +260,16 @@ const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGV
 
 /* ===== Promo video helpers ===== */
 let promoTimer = null;
+  const promoVideoEl = document.getElementById('promoVideo');
+if (promoVideoEl && !promoVideoEl._diagBound){
+  promoVideoEl._diagBound = true;
+
+  promoVideoEl.addEventListener('error', () => {
+    showToast('Видео не загрузилось. Проверь URL (mp4/webm) и доступность.');
+    console.warn('promo video error', promoVideoEl.error);
+  });
+}
+
 function openPromoModal(){
   const cfg = loadConfig();
   const url = (cfg.promoVideoUrl || '').trim();
@@ -262,28 +278,42 @@ function openPromoModal(){
     return;
   }
 
-  // минимальная проверка на прямой файл
   if(!/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)){
     showToast('Нужен прямой URL на mp4/webm файл');
-    // все равно попробуем открыть, вдруг подходит
+    // всё равно попробуем
   }
 
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
   if (!m || !v) return;
 
-   v.pause();
+  try{
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+  }catch{}
+
   v.src = url;
   v.currentTime = 0;
 
-  // автоплей только muted
+  // автоплей только muted (иначе таймерный автоплей режется)
   v.muted = true;
+  v.playsInline = true;
+  v.setAttribute('playsinline','');
   v.setAttribute('autoplay','');
-  v.play().catch(()=>{
-    showToast('Браузер блокирует автозапуск. Проверь URL.');
-  });
 
-  // флаг: первый тап = включить звук
+  // ОТКРЫВАЕМ МОДАЛКУ
+  m.classList.add('open');
+  setBodyScrollLock(true);
+
+  const p = v.play();
+  if (p && p.catch){
+    p.catch(()=>{
+      showToast('Автозапуск блокируется. Первый тап включит звук/запуск.');
+    });
+  }
+
+  // первый тап = звук, второй = закрыть
   m.dataset.stage = 'sound';
 }
 function closePromoModal(){
@@ -293,6 +323,7 @@ function closePromoModal(){
   m?.classList.remove('open');
   setBodyScrollLock(false);
    sessionStorage.removeItem(TABLO_PIN_OK); // <— добавь это
+    if(m) delete m.dataset.stage;
   location.hash = '#/order';
 }
 function schedulePromoAfterOrder(){
@@ -1459,7 +1490,8 @@ if(backBtn){
 document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
 
 if (h==='#/order' || h==='#/'){
-  document.body.classList.add('route-order');             // портрет
+  document.body.classList.add('route-order');
+    sessionStorage.removeItem(TABLO_PIN_OK);
 } else if (h==='#/dashboard'){
   document.body.classList.add('route-dashboard','route-landscape');
 } else if (h==='#/builder'){
