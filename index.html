@@ -60,15 +60,14 @@
 
     button:focus, a:focus { outline: none; box-shadow: none; }
 
-    /* --- Promo video fullscreen --- */
-#{
-  z-index:200; /* выше шапки */
-}
-#.modal.open{ background: rgba(0,0,0,0.9); }
-# video{
+/* --- Promo video fullscreen --- */
+#promoModal{ z-index:200; }
+#promoModal.modal.open{ background: rgba(0,0,0,0.9); }
+#promoModal video{
   width:100vw; height:100vh; object-fit:cover;
   background:#000;
 }
+
 
     /* --- Роут-адаптация под 14" --- */
     body.route-landscape .phone-shell{
@@ -222,9 +221,9 @@ body.route-terminal .header-ghost{
   </div>
 
   <!-- Promo video modal -->
-  <div id="" class="modal" aria-hidden="true">
-   <video id="promoVideo" playsinline muted loop></video>
-  </div>
+  <div id="promoModal" class="modal" aria-hidden="true">
+  <video id="promoVideo" playsinline loop></video>
+</div>
 
   <div id="toast" class="toast hidden"></div>
 
@@ -270,12 +269,12 @@ const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
-  /* ===== Idle promo trigger (только для #/order) ===== */
+ /* ===== Idle promo trigger (только для #/order) ===== */
 let idleTimer = null;
 const IDLE_DELAY = 60000; // 1 минута
 
 function clearIdlePromoTimer(){
-  if(idleTimer) { clearTimeout(idleTimer); idleTimer=null; }
+  if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; }
 }
 
 function resetIdlePromoTimer(){
@@ -286,9 +285,9 @@ function resetIdlePromoTimer(){
 
   idleTimer = setTimeout(()=>{
     const h2 = location.hash.split('?')[0];
-    const promoOpen   = document.getElementById('promoModal')?.classList.contains('open');
-    const payOpen     = document.getElementById('payModal')?.classList.contains('open');
-    const thanksOpen  = document.getElementById('thanksModal')?.classList.contains('open');
+    const promoOpen  = document.getElementById('promoModal')?.classList.contains('open');
+    const payOpen    = document.getElementById('payModal')?.classList.contains('open');
+    const thanksOpen = document.getElementById('thanksModal')?.classList.contains('open');
 
     if((h2 === '#/order' || h2 === '#/') && !promoOpen && !payOpen && !thanksOpen){
       openPromoModal();
@@ -298,79 +297,94 @@ function resetIdlePromoTimer(){
 
 /* ===== Promo video helpers ===== */
 let promoTimer = null;
-  const promoVideoEl = document.getElementById('promoVideo');
-if (promoVideoEl && !promoVideoEl._diagBound){
-  promoVideoEl._diagBound = true;
-
-  promoVideoEl.addEventListener('error', () => {
-    showToast('Видео не загрузилось. Проверь URL (mp4/webm) и доступность.');
-    console.warn('promo video error', promoVideoEl.error);
-  });
-}
 
 function openPromoModal(){
   const cfg = loadConfig();
   const url = (cfg.promoVideoUrl || '').trim();
-  if (!url){
-    showToast('Промо-ролик не задан в конструкторе');
-    return;
-  }
-
-  if(!/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)){
-    showToast('Нужен прямой URL на mp4/webm файл');
-    // всё равно попробуем
-  }
+  if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
 
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
-  if (!m || !v) return;
+  if(!m || !v) return;
 
-  try{
-    v.pause();
+  // Подготовка
+  v.pause();
   v.src = url;
   v.currentTime = 0;
 
-  // хотим звук сразу
+  // Пытаемся сразу со звуком
   v.muted = false;
   v.volume = 1;
   v.setAttribute('autoplay','');
 
-  // показываем модалку ДО play, чтобы UI уже был
   m.classList.add('open');
   setBodyScrollLock(true);
 
-  const tryPlayWithSound = v.play();
-
-  if (tryPlayWithSound && typeof tryPlayWithSound.catch === 'function') {
-    tryPlayWithSound.catch(() => {
-      // если браузер блокирует звук — всё равно покажем видео, но muted
+  const p = v.play();
+  if(p && p.catch){
+    p.catch(()=>{
+      // если браузер блокирует звук — играем muted
       v.muted = true;
       v.play().catch(()=>{});
     });
   }
-    
+}
+
 function closePromoModal(){
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
-  if (v){ v.pause(); v.removeAttribute('src'); v.load(); }
+  if(v){
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+  }
   m?.classList.remove('open');
+
+  // Возвращаемся на экран заказа, но НЕ трогаем PIN
   setBodyScrollLock(false);
-   sessionStorage.removeItem(TABLO_PIN_OK); // <— добавь это
-    if(m) delete m.dataset.stage;
   location.hash = '#/order';
-    resetIdlePromoTimer();
-}
-function schedulePromoAfterOrder(){
-  if (promoTimer) clearTimeout(promoTimer);
-  promoTimer = setTimeout(openPromoModal, 8000);
+
+  resetIdlePromoTimer();
 }
 
-/* close on any tap/click */
+function schedulePromoAfterOrder(){
+  if(promoTimer) clearTimeout(promoTimer);
+  promoTimer = setTimeout(openPromoModal, 17000); // 17 сек после заказа
+}
+
+/* закрыть видео по любому тапу */
 document.getElementById('promoModal')?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
   closePromoModal();
 }, {passive:false});
 
+
+/* ===== Thanks helpers ===== */
+let thanksTimer = null;
+
+function openThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.add('open');
+
+  // НЕ разблокируем body тут: order экран и так залочен
+  if(thanksTimer) clearTimeout(thanksTimer);
+  thanksTimer = setTimeout(closeThanksModal, 10000);
+}
+
+function closeThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.remove('open');
+
+  if(thanksTimer){ clearTimeout(thanksTimer); thanksTimer=null; }
+  resetIdlePromoTimer();
+}
+
+document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  closeThanksModal();
+}, {passive:false});
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
