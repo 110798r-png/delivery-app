@@ -79,6 +79,50 @@
       body.route-landscape .card{ border-radius:1.5rem; }
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
+
+    /* ===== Роут-правила для шапки/стрелок ===== */
+
+/* Невидимая, но рабочая стрелка */
+#backBtn.back-invisible{
+  opacity:0 !important;
+  background:transparent !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+  pointer-events:auto !important;
+}
+
+/* 1) Экран заказа (#/order): шапку НЕ трогаем, стрелка невидимая, но кликабельная */
+body.route-order #backBtn{
+  opacity:0 !important;
+  background:transparent !important;
+  border-color:transparent !important;
+  pointer-events:auto !important;
+}
+
+/* 2) Экран табло кухни (#/dashboard) и конструктор (#/builder):
+      красную полосу оставляем, но убираем надписи */
+body.route-dashboard .brand-wrap .leading-tight,
+body.route-builder   .brand-wrap .leading-tight{
+  display:none !important;
+}
+
+/* Стрелка там тоже невидимая, но работает */
+body.route-dashboard #backBtn,
+body.route-builder   #backBtn{
+  opacity:0 !important;
+  background:transparent !important;
+  border-color:transparent !important;
+  pointer-events:auto !important;
+}
+
+/* 3) Экран терминал клиента (#/terminal):
+      старую красную шапку СКРЫТЬ полностью */
+body.route-terminal .brand-strip,
+body.route-terminal .header-ghost{
+  display:none !important;
+}
+
+    
   </style>
 </head>
 <body>
@@ -1068,19 +1112,35 @@ function DashboardView(){
 /* ===== Терминал (две колонки "готовится/готово") ===== */
 function TerminalView(){
   let orders=loadDash();
-  const root=el(`
-    <div class="pb-10">
-      <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
+ const root=el(`
+  <div class="pb-10">
+    <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
+      
+      <!-- новая полоса терминала -->
+      <div class="relative col-span-2 grid grid-cols-2">
         <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
         <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
-        <div id="colCook" class="p-4 grid gap-4 bg-gray-50 min-h-[70vh]"></div>
-        <div id="colDone" class="p-4 grid gap-4 bg-gray-50 border-l min-h-[70vh]"></div>
+
+        <!-- невидимая кнопка "назад" справа на новой полосе -->
+        <button id="terminalBackHot"
+                class="absolute top-0 right-0 h-full w-28 opacity-0"
+                aria-label="Назад"></button>
       </div>
+
+      <div id="colCook" class="p-4 grid gap-4 bg-gray-50 min-h-[70vh]"></div>
+      <div id="colDone" class="p-4 grid gap-4 bg-gray-50 border-l min-h-[70vh]"></div>
     </div>
-  `);
+  </div>
+`);
 
   const colCook=root.querySelector('#colCook');
   const colDone=root.querySelector('#colDone');
+
+  const backHot = root.querySelector('#terminalBackHot');
+backHot?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  location.hash = '#/order';
+}, {passive:false});
 
   function orderCard(o){
     const created=o.createdAt?new Date(o.createdAt):new Date();
@@ -1309,12 +1369,31 @@ function router(){
   const backBtn=document.getElementById('backBtn');
   profileBtn?.classList.add('hidden');
 
-  const showBack=(h==='#/dashboard'||h==='#/builder'||h==='#/terminal');
-  if(backBtn){ showBack?backBtn.classList.remove('hidden'):backBtn.classList.add('hidden'); }
+ const showBack = (h==='#/order' || h==='#/' || h==='#/dashboard' || h==='#/builder' || h==='#/terminal');
+if(backBtn){
+  if(showBack){
+    backBtn.classList.remove('hidden');
+    backBtn.classList.add('back-invisible'); // всегда невидим, но кликабелен
+  }else{
+    backBtn.classList.add('hidden');
+    backBtn.classList.remove('back-invisible');
+  }
+}
 
-  // ориентация: выбор товаров — портрет, остальные — ландшафт
-  document.body.classList.toggle('route-landscape', h!=='#/order' && h!=='#/');
-  document.body.classList.toggle('route-order', h==='#/order' || h==='#/');
+// ===== классы роутов для CSS =====
+document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
+
+if (h==='#/order' || h==='#/'){
+  document.body.classList.add('route-order');             // портрет
+} else if (h==='#/dashboard'){
+  document.body.classList.add('route-dashboard','route-landscape');
+} else if (h==='#/builder'){
+  document.body.classList.add('route-builder','route-landscape');
+} else if (h==='#/terminal'){
+  document.body.classList.add('route-terminal','route-landscape');
+} else {
+  document.body.classList.add('route-order');
+}
 
   // pin-gate для табло и терминала
   if((h==='#/dashboard'||h==='#/terminal') && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
