@@ -35,6 +35,7 @@
     #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
     .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
 
+    /* --- Красная шапка --- */
     .brand-strip{ background:#e50000; color:#fff; }
     .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
     .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
@@ -50,23 +51,39 @@
       user-select: none;
     }
 
-    /* Секретные кнопки в шапке — теперь полностью прозрачные */
+    /* Секретные точки в шапке — полностью прозрачные, но кликабельные */
     .secret-dot{
-      width:22px;
-      height:22px;
-      border-radius:999px;
-      border:0;
-      background:transparent;
-      box-shadow:none;
-      opacity:0;            /* невидимые */
-      pointer-events:auto;  /* кликабельные */
+      width: 22px; height: 22px; border-radius: 999px;
+      opacity: 0; background: transparent; border: 0; box-shadow: none;
+      pointer-events: auto;
     }
 
     button:focus, a:focus { outline: none; box-shadow: none; }
+
+    /* --- Promo video fullscreen --- */
+    #promoModal.modal.open{ background: rgba(0,0,0,0.9); }
+    #promoModal video{ width:100vw; height:100vh; object-fit:cover; }
+
+    /* --- Роут-адаптация под 14" --- */
+    body.route-landscape .phone-shell{
+      width:100vw; max-width:100vw; padding:0 1rem;
+    }
+    body.route-landscape .brand-strip .phone-shell{
+      width:100vw; max-width:100vw;
+    }
+    body.route-landscape .confirm-bar{
+      width:100vw; max-width:100vw; border-radius:0;
+    }
+
+    @media (min-width: 900px){
+      body.route-landscape .card{ border-radius:1.5rem; }
+      body.route-landscape .menu-card{ border-radius:1.5rem; }
+    }
   </style>
 </head>
 <body>
   <div class="w-full">
+    <!-- Красная шапка -->
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
@@ -81,11 +98,10 @@
             <div class="brand-title" id="brandTitle">ЯмаMoto</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
-
           <!-- две секретные точки справа от названия -->
           <div class="flex items-center gap-2 ml-3">
-            <button id="termDot" class="secret-dot" title="Терминал" aria-label="Терминал"></button>
-            <button id="dashDot" class="secret-dot" title="Табло" aria-label="Табло"></button>
+            <button id="termDot" class="secret-dot" title="Терминал"></button>
+            <button id="dashDot" class="secret-dot" title="Табло"></button>
           </div>
         </div>
 
@@ -111,6 +127,7 @@
     <main id="app" class="phone-shell"></main>
   </div>
 
+  <!-- Оплата -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
@@ -130,6 +147,7 @@
     </div>
   </div>
 
+  <!-- Ключ для табло/терминала -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
       <h3 class="text-lg font-semibold">Введите ключ</h3>
@@ -141,46 +159,88 @@
     </div>
   </div>
 
+  <!-- Promo video modal -->
+  <div id="promoModal" class="modal" aria-hidden="true">
+    <video id="promoVideo" playsinline muted loop></video>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
+  <!-- звук уведомления -->
   <audio id="orderDing" preload="auto">
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
 
   <script>
-  if (!Element.prototype.matches) {
-    Element.prototype.matches =
-      Element.prototype.msMatchesSelector ||
-      Element.prototype.webkitMatchesSelector ||
-      function (selector) {
-        const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
-        let i = matches.length;
-        while (--i >= 0 && matches.item(i) !== this) {}
-        return i > -1;
-      };
-  }
-  if (!Element.prototype.closest) {
-    Element.prototype.closest = function (selector) {
-      let el = this;
-      while (el && el.nodeType === 1) {
-        if (el.matches(selector)) return el;
-        el = el.parentElement || el.parentNode;
-      }
-      return null;
+// ==== ПОЛИФИЛЫ ДЛЯ СТАРЫХ/КАПРИЗНЫХ БРАУЗЕРОВ ====
+if (!Element.prototype.matches) {
+  Element.prototype.matches =
+    Element.prototype.msMatchesSelector ||
+    Element.prototype.webkitMatchesSelector ||
+    function (selector) {
+      const matches = (this.document || this.ownerDocument).querySelectorAll(selector);
+      let i = matches.length;
+      while (--i >= 0 && matches.item(i) !== this) {}
+      return i > -1;
     };
-  }
-  if (!window.CSS) window.CSS = {};
-  if (typeof window.CSS.escape !== 'function') {
-    window.CSS.escape = function (value) {
-      return String(value).replace(/"/g, '\\"');
-    };
-  }
-  </script>
+}
+if (!Element.prototype.closest) {
+  Element.prototype.closest = function (selector) {
+    let el = this;
+    while (el && el.nodeType === 1) {
+      if (el.matches(selector)) return el;
+      el = el.parentElement || el.parentNode;
+    }
+    return null;
+  };
+}
+if (!window.CSS) window.CSS = {};
+if (typeof window.CSS.escape !== 'function') {
+  window.CSS.escape = function (value) {
+    return String(value).replace(/"/g, '\\"');
+  };
+}
+</script>
 
-  <script>
+<script>
+/* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
+
+/* ===== Promo video helpers ===== */
+let promoTimer = null;
+function openPromoModal(){
+  const cfg = loadConfig();
+  const url = (cfg.promoVideoUrl || '').trim();
+  if (!url) return;
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if (!m || !v) return;
+  v.src = url;
+  v.currentTime = 0;
+  v.play().catch(()=>{});
+  m.classList.add('open');
+  setBodyScrollLock(true);
+}
+function closePromoModal(){
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if (v){ v.pause(); v.removeAttribute('src'); v.load(); }
+  m?.classList.remove('open');
+  setBodyScrollLock(false);
+  location.hash = '#/order';
+}
+function schedulePromoAfterOrder(){
+  if (promoTimer) clearTimeout(promoTimer);
+  promoTimer = setTimeout(openPromoModal, 8000);
+}
+
+/* close on any tap/click */
+document.getElementById('promoModal')?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  closePromoModal();
+}, {passive:false});
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -190,7 +250,6 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
-
 async function initPushSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   const reg = await navigator.serviceWorker.ready;
@@ -208,6 +267,7 @@ async function initPushSubscription() {
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
 
+/* ===== RPC ===== */
 async function rpc(payload){
   if (!API_URL) throw new Error('API_URL empty');
   const res = await fetch(API_URL, {
@@ -222,62 +282,12 @@ async function rpc(payload){
   return res.json();
 }
 
-/* ===== секретные точки в шапке: 4 тапа ===== */
-function bindHeaderDots(){
-  const termDot = document.getElementById('termDot');
-  const dashDot = document.getElementById('dashDot');
-  if(!termDot || !dashDot || termDot._bound) return;
-  termDot._bound = dashDot._bound = true;
-
-  function makeTapHandler(onDone, tapsRequired=4){
-    let taps=0, first=0, timer=null;
-    const windowMs=1500;
-    const reset=()=>{ taps=0; first=0; if(timer){clearTimeout(timer); timer=null;} };
-    return ()=>{
-      const now=Date.now();
-      if(!first) first=now;
-      taps++;
-      if(now-first>windowMs){ reset(); taps=1; first=now; }
-      if(taps>=tapsRequired){ reset(); onDone(); }
-      else {
-        if(timer) clearTimeout(timer);
-        timer=setTimeout(reset, windowMs);
-      }
-    };
-  }
-
-  const goDash = ()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
-      location.hash = '#/dashboard';
-    } else {
-      sessionStorage.setItem(WANT_DASH,'1');
-      document.getElementById('pinModal')?.classList.add('open');
-    }
-  };
-
-  const goTerm = ()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
-      location.hash = '#/terminal';
-    } else {
-      sessionStorage.setItem(WANT_TERM,'1');
-      document.getElementById('pinModal')?.classList.add('open');
-    }
-  };
-
-  const onTermTap = makeTapHandler(goTerm, 4);
-  const onDashTap = makeTapHandler(goDash, 4);
-
-  ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); onTermTap(); }, {passive:false});
-    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); onDashTap(); }, {passive:false});
-  });
-}
-
 /* ===== маршрутизация по умолчанию ===== */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
 
+/* ===== ключи хранилищ ===== */
 const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
@@ -288,11 +298,11 @@ const WANT_TERM          = 'WANT_TERM';
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
 
+/* ===== утилиты ===== */
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
 const money = (x)=> `${x} руб.`;
 const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
-
 function safeParse(k, f){
   try{
     const v=JSON.parse(localStorage.getItem(k)||'null');
@@ -308,7 +318,6 @@ function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
 function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
 function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
 function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-
 function getClientId(){
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (id) return id;
@@ -319,8 +328,10 @@ function getClientId(){
   return id;
 }
 
+/* ===== конфиг (меню + promo video) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
+  promoVideoUrl: '', // URL промо-ролика
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
@@ -356,8 +367,9 @@ function applyTheme(theme){
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
   document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
 }
+
 function calcConfigVersion(cfg) {
-  try { return JSON.stringify((cfg && cfg.menu) || []).length; }
+  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
   catch { return 0; }
 }
 
@@ -391,6 +403,7 @@ async function fetchRemoteConfig(){
   return null;
 }
 
+/* ===== анимации ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 function animateScrollX(el, to, {duration=280, onEnd}={}){
   const from=el.scrollLeft; const diff=to-from;
@@ -404,6 +417,7 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
   requestAnimationFrame(step);
 }
 
+/* ===== синхронизация статуса локально ===== */
 function syncOrderStatus(id, status){
   let hist = loadHistory(); let changed = false;
   for (let i=0;i<hist.length;i++){
@@ -415,6 +429,7 @@ function syncOrderStatus(id, status){
   if (changed){ saveHistory(hist); window.dispatchEvent(new CustomEvent('orders:history-updated')); }
 }
 
+/* === ПУЛЛИНГ СТАТУСОВ ИЗ ОБЛАКА === */
 async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
@@ -437,44 +452,29 @@ async function pullAndMergeStatuses(){
   }catch(e){ console.warn('pullAndMergeStatuses error', e); }
 }
 
-/* ===== Нижние секретные зоны оставлены как есть (если их нет — не мешают) ===== */
-function bindSecretZones(){
-  const left  = document.getElementById('tapHotLeft');
-  const right = document.getElementById('tapHotRight');
-  if(!left || !right || left._bound) return;
-  left._bound = right._bound = true;
+/* ===== кнопки в шапке (терминал/табло) ===== */
+function bindHeaderDots(){
+  const termDot = document.getElementById('termDot');
+  const dashDot = document.getElementById('dashDot');
+  if(!termDot || !dashDot || termDot._bound) return;
+  termDot._bound = dashDot._bound = true;
 
-  function makeTapHandler(onDone){
-    let taps=0, first=0, timer=null;
-    const windowMs=1500;
-    const reset=()=>{ taps=0; first=0; if(timer){ clearTimeout(timer); timer=null; } };
-    return function(){
-      const now=Date.now();
-      if(!first) first=now;
-      taps++;
-      if(now-first>windowMs){ reset(); taps=1; first=now; }
-      if(taps>=8){ reset(); onDone(); }
-      else { if(timer) clearTimeout(timer); timer=setTimeout(reset, windowMs); }
-    };
-  }
-
-  const goDash = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash='#/dashboard';
+  const goDash = ()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/dashboard';
     else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal')?.classList.add('open'); }
-  });
-  const goTerm = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash='#/terminal';
+  };
+  const goTerm = ()=>{
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/terminal';
     else { sessionStorage.setItem(WANT_TERM,'1'); document.getElementById('pinModal')?.classList.add('open'); }
-  });
+  };
 
   ['click','pointerup','touchend'].forEach(ev=>{
-    left.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTerm(); }, {passive:false});
-    right.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDash(); }, {passive:false});
+    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTerm(); }, {passive:false});
+    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDash(); }, {passive:false});
   });
 }
 
-/* ===== дальше код без изменений ===== */
-/* ===== Order ===== */
+/* ===== Order (14" вертикаль) ===== */
 function OrderView(){
   const cfg = loadConfig();
   applyTheme(cfg.theme || {});
@@ -509,6 +509,7 @@ function OrderView(){
           </button>
         </div>
       </div>
+    </div>
   `);
 
   const categoryBar = root.querySelector('#categoryBar');
@@ -818,6 +819,9 @@ function OrderView(){
 
       close(); finalize(); resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
+
+      // ✅ показываем рекламу через 8 секунд
+      schedulePromoAfterOrder();
     };
 
     ok.onclick=onOk;
@@ -826,7 +830,6 @@ function OrderView(){
   })();
 
   rebuildMenu();
-  bindSecretZones();
   requestAnimationFrame(()=>{
     highlightChip(0);
     goToIndex(0,{animate:false});
@@ -860,26 +863,25 @@ function OrderView(){
   return root;
 }
 
-/* ===== Dashboard / Terminal / Builder / Router — без изменений, как у тебя ===== */
-
+/* ===== Dashboard (14" горизонталь, карточки) ===== */
 function DashboardView(){
   const root = el(`
-    <div class="grid gap-4 max-w-6xl pb-24">
+    <div class="grid gap-4 pb-12">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-2">
-          <h2 class="text-xl font-semibold">Текущие заказы</h2>
-          <button id="soundToggle" class="px-3 py-1.5 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
+          <h2 class="text-2xl font-extrabold tracking-tight">Текущие заказы</h2>
+          <button id="soundToggle" class="px-3 py-2 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
         </div>
         <div class="flex items-center gap-2">
-          <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
-          <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
+          <a href="#/builder" class="px-4 py-2 rounded-xl border bg-white font-semibold" title="Конструктор">Конструктор</a>
+          <button id="btnClearAll" class="px-4 py-2 rounded-xl border bg-red-50 text-red-700 font-semibold">Очистить всё</button>
         </div>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
 
       <div>
-        <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
+        <button class="px-4 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
       </div>
     </div>
   `);
@@ -923,30 +925,30 @@ function DashboardView(){
     const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
     const itemsHtml = (o.items || []).map(i => `
-      <div class="flex justify-between text-lg">
-        <div>${i.name}</div>
-        <div class="font-semibold">${i.qty} × ${i.price}</div>
+      <div class="flex justify-between text-base">
+        <div class="truncate">${i.name}</div>
+        <div class="font-semibold ml-2">${i.qty} × ${i.price}</div>
       </div>`).join('');
 
     const etaBlock = o.etaUntil
       ? `<div class="text-sm text-gray-700 mt-1">
-           Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+           Готово ~ ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
          </div>`
       : '';
 
     const card = el(`
       <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
         <div class="flex items-center justify-between">
-          <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-          <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'готовится'}</span>
+          <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
         </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         ${etaBlock}
-        <div class="mt-2 grid gap-1 text-lg">${itemsHtml || '—'}</div>
-        <div class="mt-3 flex items-center justify-between text-xl font-bold">
+        <div class="mt-2 grid gap-1">${itemsHtml || '—'}</div>
+        <div class="mt-2 flex items-center justify-between text-xl font-bold">
           <div>Итого:</div><div>${total} ₽</div>
         </div>
-        <div class="mt-2 flex flex-wrap gap-2 items-center">
+        <div class="mt-1 flex flex-wrap gap-2 items-center">
           <label class="text-sm">Статус:</label>
           <select class="border rounded-xl p-2 text-sm" data-k="status">
             ${['готовится','готово'].map(s=>`<option ${s===(o.status||'готовится')?'selected':''}>${s}</option>`).join('')}
@@ -1063,19 +1065,16 @@ function DashboardView(){
   return root;
 }
 
+/* ===== Терминал (две колонки "готовится/готово") ===== */
 function TerminalView(){
   let orders=loadDash();
   const root=el(`
-    <div class="p-4 pb-10">
-      <div class="grid grid-cols-2 gap-4">
-        <section>
-          <h2 class="text-xl font-bold mb-3">Готовится</h2>
-          <div id="colCook" class="grid gap-3"></div>
-        </section>
-        <section>
-          <h2 class="text-xl font-bold mb-3">Готово</h2>
-          <div id="colDone" class="grid gap-3"></div>
-        </section>
+    <div class="pb-10">
+      <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
+        <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
+        <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
+        <div id="colCook" class="p-4 grid gap-4 bg-gray-50 min-h-[70vh]"></div>
+        <div id="colDone" class="p-4 grid gap-4 bg-gray-50 border-l min-h-[70vh]"></div>
       </div>
     </div>
   `);
@@ -1086,20 +1085,20 @@ function TerminalView(){
   function orderCard(o){
     const created=o.createdAt?new Date(o.createdAt):new Date();
     const itemsHtml=(o.items||[]).map(i=>`
-      <div class="flex justify-between text-lg">
-        <div>${i.name}</div>
-        <div class="font-semibold">${i.qty}</div>
+      <div class="flex justify-between text-xl">
+        <div class="truncate">${i.name}</div>
+        <div class="font-bold ml-3">${i.qty}</div>
       </div>`).join('');
 
     return el(`
-      <div class="p-4 rounded-2xl border shadow-sm bg-white">
+      <div class="p-5 rounded-2xl border bg-white shadow-sm">
         <div class="flex items-center justify-between">
-          <div class="text-3xl font-extrabold tracking-tight">#${o.id||'—'}</div>
-          <span class="px-2 py-1 rounded-full text-xs font-medium border bg-white/70">${o.status||'готовится'}</span>
+          <div class="text-5xl font-extrabold tracking-tight">#${o.id||'—'}</div>
+          <span class="px-3 py-2 rounded-full text-sm font-semibold border bg-gray-50">${o.status||'готовится'}</span>
         </div>
-        <div class="text-gray-600 text-xs">${created.toLocaleString()}</div>
-        <div class="mt-2 grid gap-1">${itemsHtml||'—'}</div>
-        <div class="mt-2 text-lg font-bold">Итого: ${(o.total||0)} ₽</div>
+        <div class="text-gray-500 text-sm mt-1">${created.toLocaleString()}</div>
+        <div class="mt-4 grid gap-2">${itemsHtml||'—'}</div>
+        <div class="mt-4 text-2xl font-extrabold">Итого: ${(o.total||0)} ₽</div>
       </div>
     `);
   }
@@ -1126,17 +1125,18 @@ function TerminalView(){
   }
 
   render(); poll();
-  const timer=setInterval(poll,4000);
+  const timer=setInterval(poll,3000);
   root.cleanup=()=>clearInterval(timer);
   return root;
 }
 
+/* ===== КОНСТРУКТОР (меню + промо-видео) ===== */
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Конструктор меню</h2>
+        <h2 class="text-2xl font-extrabold">Конструктор меню</h2>
         <div class="flex gap-2">
           <button id="exportBtn" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
           <label class="px-3 py-2 rounded-xl border cursor-pointer">
@@ -1146,21 +1146,33 @@ function BuilderView(){
         </div>
       </div>
 
+      <section class="card p-4 grid gap-3">
+        <h3 class="font-semibold text-lg">Промо-ролик</h3>
+        <div class="text-sm text-gray-600">URL видео (mp4 / webm). Будет показываться на весь экран через 8 сек после заказа.</div>
+        <input id="promoUrl" class="border rounded-xl p-3" placeholder="https://..." value="${cfg.promoVideoUrl || ''}">
+        <div class="flex gap-2">
+          <button id="promoTest" class="px-3 py-2 rounded-xl border">Проверить показ</button>
+          <button id="promoClear" class="px-3 py-2 rounded-xl border text-red-600">Очистить URL</button>
+        </div>
+      </section>
+
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold">Категории и товары</h3>
+          <h3 class="font-semibold text-lg">Категории и товары</h3>
           <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
         </div>
         <div id="catsBox" class="grid gap-4"></div>
       </section>
 
       <div class="flex gap-2">
-        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white">Сохранить и обновить меню</button>
+        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white font-semibold">Сохранить и обновить меню</button>
       </div>
     </div>
   `);
 
   const catsBox = root.querySelector('#catsBox');
+  const promoUrlInp = root.querySelector('#promoUrl');
+
   function render(){
     catsBox.innerHTML='';
     cfg.menu.forEach((cat, cidx)=>{
@@ -1181,7 +1193,9 @@ function BuilderView(){
           <div class="mt-3 grid gap-2" data-items></div>
         </div>
       `);
+
       const itemsBox = catCard.querySelector('[data-items]');
+
       cat.items.forEach((it, iidx)=>{
         const row = el(`
           <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
@@ -1209,7 +1223,7 @@ function BuilderView(){
         itemsBox.appendChild(row);
       });
 
-      catCard.addEventListener('input',(e)=>{ if(e.target.dataset.k==='title'){ cat.title=e.target.value; }});
+      catCard.addEventListener('input',(e)=>{ if(e.target.dataset.k==='title') cat.title=e.target.value; });
       catCard.addEventListener('click',(e)=>{
         const act=e.target.dataset.act; if(!act) return;
         if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
@@ -1223,6 +1237,15 @@ function BuilderView(){
   }
   render();
 
+  root.querySelector('#promoTest').onclick = ()=>{
+    cfg.promoVideoUrl = promoUrlInp.value.trim();
+    saveConfig(cfg);
+    openPromoModal();
+  };
+  root.querySelector('#promoClear').onclick = ()=>{
+    promoUrlInp.value = '';
+  };
+
   root.querySelector('#addCatBtn').onclick=()=>{
     const id = 'cat'+(Date.now().toString().slice(-5));
     cfg.menu.push({ key:id, title:'Новая категория', items:[] });
@@ -1230,6 +1253,7 @@ function BuilderView(){
   };
 
   root.querySelector('#exportBtn').onclick=()=>{
+    cfg.promoVideoUrl = promoUrlInp.value.trim();
     const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='yamamoto-config.json'; a.click();
@@ -1247,6 +1271,7 @@ function BuilderView(){
   };
 
   root.querySelector('#applyBtn').onclick=async ()=>{
+    cfg.promoVideoUrl = promoUrlInp.value.trim();
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
@@ -1260,6 +1285,7 @@ function BuilderView(){
   return root;
 }
 
+/* ===== Router ===== */
 function mount(view){
   const app=document.getElementById('app');
   if(!app) return;
@@ -1286,6 +1312,11 @@ function router(){
   const showBack=(h==='#/dashboard'||h==='#/builder'||h==='#/terminal');
   if(backBtn){ showBack?backBtn.classList.remove('hidden'):backBtn.classList.add('hidden'); }
 
+  // ориентация: выбор товаров — портрет, остальные — ландшафт
+  document.body.classList.toggle('route-landscape', h!=='#/order' && h!=='#/');
+  document.body.classList.toggle('route-order', h==='#/order' || h==='#/');
+
+  // pin-gate для табло и терминала
   if((h==='#/dashboard'||h==='#/terminal') && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
     if(h==='#/dashboard') sessionStorage.setItem(WANT_DASH,'1');
     if(h==='#/terminal') sessionStorage.setItem(WANT_TERM,'1');
@@ -1299,10 +1330,9 @@ function router(){
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
 
+/* Header + PIN + SW */
 document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('profileBtn')?.classList.add('hidden');
-
-  /* бинд секретных точек в шапке */
   bindHeaderDots();
 
   const backBtn=document.getElementById('backBtn');
@@ -1346,8 +1376,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       initPushSubscription().catch(()=>{});
     }
   }
-  window.addEventListener('hashchange', bindSecretZones);
 });
-  </script>
+</script>
 </body>
 </html>
