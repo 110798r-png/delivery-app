@@ -50,20 +50,18 @@
       user-select: none;
     }
 
+    /* Секретные кнопки в шапке — теперь полностью прозрачные */
     .secret-dot{
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 2px solid rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.25);
-  box-shadow: 0 0 0 2px rgba(0,0,0,0.08) inset;
-}
-.secret-dot:active{
-  transform: scale(0.95);
-  background: rgba(255,255,255,0.45);
-}
+      width:22px;
+      height:22px;
+      border-radius:999px;
+      border:0;
+      background:transparent;
+      box-shadow:none;
+      opacity:0;            /* невидимые */
+      pointer-events:auto;  /* кликабельные */
+    }
 
-    
     button:focus, a:focus { outline: none; box-shadow: none; }
   </style>
 </head>
@@ -82,28 +80,14 @@
           <div class="leading-tight">
             <div class="brand-title" id="brandTitle">ЯмаMoto</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
-            
           </div>
+
+          <!-- две секретные точки справа от названия -->
           <div class="flex items-center gap-2 ml-3">
-  <button id="termDot" class="secret-dot" title="Терминал"></button>
-  <button id="dashDot" class="secret-dot" title="Табло"></button>
-</div>
+            <button id="termDot" class="secret-dot" title="Терминал" aria-label="Терминал"></button>
+            <button id="dashDot" class="secret-dot" title="Табло" aria-label="Табло"></button>
+          </div>
         </div>
-
-        <div class="brand-wrap">
-  <div class="sushi-icon" aria-hidden="true">...</div>
-  <div class="leading-tight">
-    <div class="brand-title" id="brandTitle">ЯмаMoto</div>
-    <div class="brand-sub">суши • роллы • фастфуд</div>
-  </div>
-</div>
-
-<!-- две точки-кнопки справа от названия -->
-<div class="flex items-center gap-2 ml-2">
-  <button id="termDot" class="secret-dot" title="Терминал"></button>
-  <button id="dashDot" class="secret-dot" title="Табло"></button>
-</div>
-
 
         <a id="profileBtn" href="#/profile"
            class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
@@ -238,11 +222,29 @@ async function rpc(payload){
   return res.json();
 }
 
-    function bindHeaderDots(){
+/* ===== секретные точки в шапке: 4 тапа ===== */
+function bindHeaderDots(){
   const termDot = document.getElementById('termDot');
   const dashDot = document.getElementById('dashDot');
   if(!termDot || !dashDot || termDot._bound) return;
   termDot._bound = dashDot._bound = true;
+
+  function makeTapHandler(onDone, tapsRequired=4){
+    let taps=0, first=0, timer=null;
+    const windowMs=1500;
+    const reset=()=>{ taps=0; first=0; if(timer){clearTimeout(timer); timer=null;} };
+    return ()=>{
+      const now=Date.now();
+      if(!first) first=now;
+      taps++;
+      if(now-first>windowMs){ reset(); taps=1; first=now; }
+      if(taps>=tapsRequired){ reset(); onDone(); }
+      else {
+        if(timer) clearTimeout(timer);
+        timer=setTimeout(reset, windowMs);
+      }
+    };
+  }
 
   const goDash = ()=>{
     if(sessionStorage.getItem(TABLO_PIN_OK)==='1'){
@@ -262,13 +264,16 @@ async function rpc(payload){
     }
   };
 
+  const onTermTap = makeTapHandler(goTerm, 4);
+  const onDashTap = makeTapHandler(goDash, 4);
+
   ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTerm(); }, {passive:false});
-    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDash(); }, {passive:false});
+    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); onTermTap(); }, {passive:false});
+    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); onDashTap(); }, {passive:false});
   });
 }
 
-
+/* ===== маршрутизация по умолчанию ===== */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
@@ -432,6 +437,7 @@ async function pullAndMergeStatuses(){
   }catch(e){ console.warn('pullAndMergeStatuses error', e); }
 }
 
+/* ===== Нижние секретные зоны оставлены как есть (если их нет — не мешают) ===== */
 function bindSecretZones(){
   const left  = document.getElementById('tapHotLeft');
   const right = document.getElementById('tapHotRight');
@@ -467,6 +473,8 @@ function bindSecretZones(){
   });
 }
 
+/* ===== дальше код без изменений ===== */
+/* ===== Order ===== */
 function OrderView(){
   const cfg = loadConfig();
   applyTheme(cfg.theme || {});
@@ -851,6 +859,8 @@ function OrderView(){
 
   return root;
 }
+
+/* ===== Dashboard / Terminal / Builder / Router — без изменений, как у тебя ===== */
 
 function DashboardView(){
   const root = el(`
@@ -1291,6 +1301,9 @@ try{ router(); }catch(e){ console.error(e); }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('profileBtn')?.classList.add('hidden');
+
+  /* бинд секретных точек в шапке */
+  bindHeaderDots();
 
   const backBtn=document.getElementById('backBtn');
   const goOrder=(e)=>{ e&&e.preventDefault(); e&&e.stopPropagation(); location.hash='#/order'; };
