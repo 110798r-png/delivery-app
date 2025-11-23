@@ -61,11 +61,11 @@
     button:focus, a:focus { outline: none; box-shadow: none; }
 
     /* --- Promo video fullscreen --- */
-#promoModal{
+#{
   z-index:200; /* выше шапки */
 }
-#promoModal.modal.open{ background: rgba(0,0,0,0.9); }
-#promoModal video{
+#.modal.open{ background: rgba(0,0,0,0.9); }
+# video{
   width:100vw; height:100vh; object-fit:cover;
   background:#000;
 }
@@ -222,7 +222,7 @@ body.route-terminal .header-ghost{
   </div>
 
   <!-- Promo video modal -->
-  <div id="promoModal" class="modal" aria-hidden="true">
+  <div id="" class="modal" aria-hidden="true">
    <video id="promoVideo" playsinline muted loop></video>
   </div>
 
@@ -371,23 +371,9 @@ function schedulePromoAfterOrder(){
 /* close on any tap/click */
 document.getElementById('promoModal')?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
-  const m = document.getElementById('promoModal');
-  const v = document.getElementById('promoVideo');
-  if(!m || !v) return;
-
-  // 1-й тап: включаем звук, не закрываем
-  if(m.dataset.stage === 'sound'){
-    m.dataset.stage = 'close';
-    v.muted = false;
-    v.volume = 1;
-    v.play().catch(()=>{});
-    showToast('Звук включён');
-    return;
-  }
-
-  // 2-й тап: закрываем
   closePromoModal();
 }, {passive:false});
+
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
