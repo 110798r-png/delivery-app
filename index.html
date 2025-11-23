@@ -327,27 +327,25 @@ function openPromoModal(){
 
   try{
     v.pause();
-    v.removeAttribute('src');
-    v.load();
-  }catch{}
-
   v.src = url;
   v.currentTime = 0;
 
-  // автоплей только muted (иначе таймерный автоплей режется)
-  v.muted = true;
-  v.playsInline = true;
-  v.setAttribute('playsinline','');
+  // хотим звук сразу
+  v.muted = false;
+  v.volume = 1;
   v.setAttribute('autoplay','');
 
-  // ОТКРЫВАЕМ МОДАЛКУ
+  // показываем модалку ДО play, чтобы UI уже был
   m.classList.add('open');
   setBodyScrollLock(true);
 
-  const p = v.play();
-  if (p && p.catch){
-    p.catch(()=>{
-      showToast('Автозапуск блокируется. Первый тап включит звук/запуск.');
+  const tryPlayWithSound = v.play();
+
+  if (tryPlayWithSound && typeof tryPlayWithSound.catch === 'function') {
+    tryPlayWithSound.catch(() => {
+      // если браузер блокирует звук — всё равно покажем видео, но muted
+      v.muted = true;
+      v.play().catch(()=>{});
     });
   }
 
