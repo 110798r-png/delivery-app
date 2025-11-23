@@ -205,7 +205,7 @@ body.route-terminal .header-ghost{
 
   <!-- Promo video modal -->
   <div id="promoModal" class="modal" aria-hidden="true">
-    <video id="promoVideo" playsinline muted loop></video>
+   <video id="promoVideo" playsinline loop></video>
   </div>
 
   <div id="toast" class="toast hidden"></div>
@@ -272,18 +272,19 @@ function openPromoModal(){
   const v = document.getElementById('promoVideo');
   if (!m || !v) return;
 
-  v.pause();
+   v.pause();
   v.src = url;
-  v.muted = true;
-  v.setAttribute('autoplay','');
   v.currentTime = 0;
 
-  m.classList.add('open');
-  setBodyScrollLock(true);
-
+  // автоплей только muted
+  v.muted = true;
+  v.setAttribute('autoplay','');
   v.play().catch(()=>{
     showToast('Браузер блокирует автозапуск. Проверь URL.');
   });
+
+  // флаг: первый тап = включить звук
+  m.dataset.stage = 'sound';
 }
 function closePromoModal(){
   const m = document.getElementById('promoModal');
@@ -302,6 +303,21 @@ function schedulePromoAfterOrder(){
 /* close on any tap/click */
 document.getElementById('promoModal')?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if(!m || !v) return;
+
+  // 1-й тап: включаем звук, не закрываем
+  if(m.dataset.stage === 'sound'){
+    m.dataset.stage = 'close';
+    v.muted = false;
+    v.volume = 1;
+    v.play().catch(()=>{});
+    showToast('Звук включён');
+    return;
+  }
+
+  // 2-й тап: закрываем
   closePromoModal();
 }, {passive:false});
 
@@ -827,7 +843,12 @@ function OrderView(){
     const cfg = loadConfig();
     const counts = window.__orderCounts || {};
     let sum=0;
-    cfg.menu.forEach(cat => cat.items.forEach(it => { sum += (counts[it.name]||0)*(it.price||0); }));
+    cfg.menu.forEach(cat => cat.items.forEach(it => {
+  const qty = counts[it.name] || 0;
+  const priceNum = Number(it.price);
+  const price = Number.isFinite(priceNum) ? priceNum : 0;
+  sum += qty * price;
+}));
     totalEl.textContent = money(sum);
     confirmBtn.disabled = sum <= 0;
     return sum;
@@ -1321,7 +1342,11 @@ function BuilderView(){
         `);
         row.addEventListener('input', (e)=>{
           const k=e.target.dataset.k;
-          if(k==='price') cat.items[iidx][k]=Number(e.target.value||0);
+         if(k==='price'){
+  const raw = String(e.target.value||'').replace(',', '.');
+  const num = Number(raw);
+  cat.items[iidx][k] = Number.isFinite(num) ? num : 0;
+}
           else cat.items[iidx][k]=e.target.value;
         });
         row.addEventListener('click',(e)=>{
