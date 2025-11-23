@@ -257,15 +257,33 @@ let promoTimer = null;
 function openPromoModal(){
   const cfg = loadConfig();
   const url = (cfg.promoVideoUrl || '').trim();
-  if (!url) return;
+  if (!url){
+    showToast('Промо-ролик не задан в конструкторе');
+    return;
+  }
+
+  // минимальная проверка на прямой файл
+  if(!/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)){
+    showToast('Нужен прямой URL на mp4/webm файл');
+    // все равно попробуем открыть, вдруг подходит
+  }
+
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
   if (!m || !v) return;
+
+  v.pause();
   v.src = url;
+  v.muted = true;
+  v.setAttribute('autoplay','');
   v.currentTime = 0;
-  v.play().catch(()=>{});
+
   m.classList.add('open');
   setBodyScrollLock(true);
+
+  v.play().catch(()=>{
+    showToast('Браузер блокирует автозапуск. Проверь URL.');
+  });
 }
 function closePromoModal(){
   const m = document.getElementById('promoModal');
@@ -273,6 +291,7 @@ function closePromoModal(){
   if (v){ v.pause(); v.removeAttribute('src'); v.load(); }
   m?.classList.remove('open');
   setBodyScrollLock(false);
+   sessionStorage.removeItem(TABLO_PIN_OK); // <— добавь это
   location.hash = '#/order';
 }
 function schedulePromoAfterOrder(){
@@ -503,18 +522,48 @@ function bindHeaderDots(){
   if(!termDot || !dashDot || termDot._bound) return;
   termDot._bound = dashDot._bound = true;
 
-  const goDash = ()=>{
+  function makeTapHandler(onDone){
+    let taps = 0, first = 0, timer = null;
+    const windowMs = 1500;
+
+    const reset = ()=>{
+      taps = 0; first = 0;
+      if(timer){ clearTimeout(timer); timer = null; }
+    };
+
+    return function(){
+      const now = Date.now();
+      if(!first) first = now;
+      taps++;
+
+      if(now - first > windowMs){
+        reset();
+        taps = 1; first = now;
+      }
+
+      if(taps >= 8){
+        reset();
+        onDone();
+      } else {
+        if(timer) clearTimeout(timer);
+        timer = setTimeout(reset, windowMs);
+      }
+    };
+  }
+
+  const goDashTap = makeTapHandler(()=>{
     if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/dashboard';
     else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal')?.classList.add('open'); }
-  };
-  const goTerm = ()=>{
+  });
+
+  const goTermTap = makeTapHandler(()=>{
     if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/terminal';
     else { sessionStorage.setItem(WANT_TERM,'1'); document.getElementById('pinModal')?.classList.add('open'); }
-  };
+  });
 
   ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTerm(); }, {passive:false});
-    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDash(); }, {passive:false});
+    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTermTap(); }, {passive:false});
+    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDashTap(); }, {passive:false});
   });
 }
 
@@ -1139,6 +1188,7 @@ function TerminalView(){
   const backHot = root.querySelector('#terminalBackHot');
 backHot?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
+  sessionStorage.removeItem(TABLO_PIN_OK);
   location.hash = '#/order';
 }, {passive:false});
 
@@ -1415,7 +1465,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindHeaderDots();
 
   const backBtn=document.getElementById('backBtn');
-  const goOrder=(e)=>{ e&&e.preventDefault(); e&&e.stopPropagation(); location.hash='#/order'; };
+ const goOrder=(e)=>{
+  e&&e.preventDefault(); e&&e.stopPropagation();
+  sessionStorage.removeItem(TABLO_PIN_OK); // <— сбрасываем пин
+  location.hash='#/order';
+};
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
   await fetchRemoteConfig().catch(()=>{});
