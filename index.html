@@ -86,6 +86,16 @@
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
+      <!-- Thanks modal -->
+  <div id="thanksModal" class="modal" aria-hidden="true">
+    <div class="bg-white rounded-3xl p-8 w-[min(520px,92vw)] text-center shadow-2xl">
+      <div class="text-3xl font-extrabold mb-3">Спасибо!</div>
+      <div class="text-lg text-gray-700">Ваш заказ скоро будет готов</div>
+      <div class="text-sm text-gray-500 mt-3">Коснитесь экрана, чтобы продолжить</div>
+    </div>
+  </div>
+
+    
     /* ===== Роут-правила для шапки/стрелок ===== */
 
 /* Невидимая, но рабочая стрелка */
@@ -127,6 +137,8 @@ body.route-terminal .brand-strip,
 body.route-terminal .header-ghost{
   display:none !important;
 }
+
+  #thanksModal.modal.open{ background: rgba(0,0,0,0.55); }
 
     
   </style>
@@ -258,6 +270,32 @@ const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
+  /* ===== Idle promo trigger (только для #/order) ===== */
+let idleTimer = null;
+const IDLE_DELAY = 60000; // 1 минута
+
+function clearIdlePromoTimer(){
+  if(idleTimer) { clearTimeout(idleTimer); idleTimer=null; }
+}
+
+function resetIdlePromoTimer(){
+  clearIdlePromoTimer();
+
+  const h = location.hash.split('?')[0];
+  if(h !== '#/order' && h !== '#/') return;
+
+  idleTimer = setTimeout(()=>{
+    const h2 = location.hash.split('?')[0];
+    const promoOpen   = document.getElementById('promoModal')?.classList.contains('open');
+    const payOpen     = document.getElementById('payModal')?.classList.contains('open');
+    const thanksOpen  = document.getElementById('thanksModal')?.classList.contains('open');
+
+    if((h2 === '#/order' || h2 === '#/') && !promoOpen && !payOpen && !thanksOpen){
+      openPromoModal();
+    }
+  }, IDLE_DELAY);
+}
+
 /* ===== Promo video helpers ===== */
 let promoTimer = null;
   const promoVideoEl = document.getElementById('promoVideo');
@@ -325,6 +363,7 @@ function closePromoModal(){
    sessionStorage.removeItem(TABLO_PIN_OK); // <— добавь это
     if(m) delete m.dataset.stage;
   location.hash = '#/order';
+    resetIdlePromoTimer();
 }
 function schedulePromoAfterOrder(){
   if (promoTimer) clearTimeout(promoTimer);
@@ -377,6 +416,32 @@ async function initPushSubscription() {
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
 
+/* ===== Thanks helpers ===== */
+let thanksTimer = null;
+function openThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.add('open');
+  setBodyScrollLock(true);
+
+  if(thanksTimer) clearTimeout(thanksTimer);
+  thanksTimer = setTimeout(closeThanksModal, 10000);
+}
+function closeThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.remove('open');
+  setBodyScrollLock(false);
+  if(thanksTimer) { clearTimeout(thanksTimer); thanksTimer=null; }
+  resetIdlePromoTimer(); // после “спасибо” снова ждём простой
+}
+
+/* закрыть спасибо по тапу */
+document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  closeThanksModal();
+}, {passive:false});
+  
 /* ===== RPC ===== */
 async function rpc(payload){
   if (!API_URL) throw new Error('API_URL empty');
@@ -659,6 +724,16 @@ function OrderView(){
 
   setBodyScrollLock(true);
   confirmBtn._busy = false;
+
+    // старт/сброс idle-триггера на видео
+  resetIdlePromoTimer();
+
+  // любая активность на экране заказа = сброс простоя
+  const onActivity = ()=> resetIdlePromoTimer();
+  ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
+    root.addEventListener(ev, onActivity, {passive:true});
+  });
+
 
   let activeIdx   = 0;
   let isAnimating = false;
@@ -962,11 +1037,17 @@ function OrderView(){
         finalize(); return;
       }
 
-      close(); finalize(); resetCounts();
-      window.dispatchEvent(new CustomEvent('orders:history-updated'));
+     close(); finalize(); resetCounts();
+window.dispatchEvent(new CustomEvent('orders:history-updated'));
 
-      // ✅ показываем рекламу через 8 секунд
-      schedulePromoAfterOrder();
+// 1) спасибо-экран
+openThanksModal();
+
+// 2) idle-триггер сбрасываем, чтобы не всплыло “по простою”
+clearIdlePromoTimer();
+
+// 3) видео после заказа через 17 сек
+schedulePromoAfterOrder();
     };
 
     ok.onclick=onOk;
@@ -1003,6 +1084,7 @@ function OrderView(){
     setBodyScrollLock(false);
     clearInterval(syncTimer);
     window.removeEventListener('resize', applyHeights);
+    clearIdlePromoTimer();
   };
 
   return root;
@@ -1501,6 +1583,13 @@ if (h==='#/order' || h==='#/'){
 } else {
   document.body.classList.add('route-order');
 }
+
+    // idle-триггер работает только в order
+  if (h==='#/order' || h==='#/'){
+    resetIdlePromoTimer();
+  } else {
+    clearIdlePromoTimer();
+  }
 
   // pin-gate для табло и терминала
   if((h==='#/dashboard'||h==='#/terminal') && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
