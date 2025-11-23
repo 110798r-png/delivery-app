@@ -164,7 +164,11 @@
     <video id="promoVideo" playsinline muted loop></video>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  
+  <div id="promoModal" class="promo-modal">
+    <video id="promoVideo" playsinline muted loop></video>
+  </div>
+<div id="toast" class="toast hidden"></div>
 
   <!-- звук уведомления -->
   <audio id="orderDing" preload="auto">
@@ -295,6 +299,39 @@ const CONFIG_LS_KEY      = 'app_config_v1';
 const TABLO_PIN_OK       = 'TABLO_PIN_OK';
 const WANT_DASH          = 'WANT_DASH';
 const WANT_TERM          = 'WANT_TERM';
+
+let __promoTimer = null;
+function showPromoVideo(){
+  const url = (loadConfig().promoVideoUrl||'').trim();
+  if(!url) return;
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if(!m || !v) return;
+  if(v.getAttribute('src') !== url){ v.setAttribute('src', url); v.load(); }
+  v.play().catch(()=>{});
+  m.classList.add('open');
+}
+function hidePromoVideo(goOrder=true){
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if(v) try{ v.pause(); }catch{}
+  if(m) m.classList.remove('open');
+  if(goOrder) location.hash = '#/order';
+}
+function schedulePromoAfterOrder(){
+  if(__promoTimer) clearTimeout(__promoTimer);
+  __promoTimer = setTimeout(()=>{ showPromoVideo(); }, 8000);
+}
+
+function setRouteClass(){
+  const h = location.hash.split('?')[0];
+  document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder');
+  if(h==='#/dashboard') document.body.classList.add('route-dashboard');
+  else if(h==='#/terminal') document.body.classList.add('route-terminal');
+  else if(h==='#/builder') document.body.classList.add('route-builder');
+  else document.body.classList.add('route-order');
+}
+
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
 
@@ -818,6 +855,7 @@ function OrderView(){
       }
 
       close(); finalize(); resetCounts();
+      schedulePromoAfterOrder();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
 
       // ✅ показываем рекламу через 8 секунд
@@ -1070,19 +1108,26 @@ function TerminalView(){
   let orders=loadDash();
   const root=el(`
     <div class="pb-10">
-      <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
+      <div class="relative grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
         <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
         <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
+        <button id="terminalBackHot" class="absolute top-0 right-0 w-16 h-16 z-10 back-invisible" aria-label="Назад" title="Назад"></button>
         <div id="colCook" class="p-4 grid gap-4 bg-gray-50 min-h-[70vh]"></div>
         <div id="colDone" class="p-4 grid gap-4 bg-gray-50 border-l min-h-[70vh]"></div>
       </div>
     </div>
-  `);
+`);
 
   const colCook=root.querySelector('#colCook');
   const colDone=root.querySelector('#colDone');
 
-  function orderCard(o){
+  
+  const backHot = root.querySelector('#terminalBackHot');
+  if(backHot){
+    const goOrder = (e)=>{ e&&e.preventDefault(); e&&e.stopPropagation(); location.hash='#/order'; };
+    ['click','pointerup','touchend'].forEach(ev=> backHot.addEventListener(ev, goOrder, {passive:false}));
+  }
+function orderCard(o){
     const created=o.createdAt?new Date(o.createdAt):new Date();
     const itemsHtml=(o.items||[]).map(i=>`
       <div class="flex justify-between text-xl">
@@ -1156,6 +1201,13 @@ function BuilderView(){
         </div>
       </section>
 
+      
+      <section class="card p-4">
+        <h3 class="font-semibold mb-2">Промо-видео для терминала</h3>
+        <input id="promoVideoInput" class="border rounded-xl p-2 w-full" placeholder="URL mp4/webm" value="${cfg.promoVideoUrl||''}">
+        <div class="text-xs text-gray-500 mt-1">Показывается через 8 секунд после подтверждения заказа. Нажатие по экрану скрывает видео и возвращает к меню.</div>
+      </section>
+
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-lg">Категории и товары</h3>
@@ -1171,7 +1223,12 @@ function BuilderView(){
   `);
 
   const catsBox = root.querySelector('#catsBox');
-  const promoUrlInp = root.querySelector('#promoUrl');
+  
+  const promoVideoInput = root.querySelector('#promoVideoInput');
+  if(promoVideoInput){
+    promoVideoInput.addEventListener('input', (e)=>{ cfg.promoVideoUrl = e.target.value.trim(); });
+  }
+const promoUrlInp = root.querySelector('#promoUrl');
 
   function render(){
     catsBox.innerHTML='';
@@ -1297,6 +1354,7 @@ function mount(view){
 
 function realRouter(){
   const h=location.hash.split('?')[0];
+  setRouteClass();
   if(h==='#/dashboard') mount(DashboardView());
   else if(h==='#/terminal') mount(TerminalView());
   else if(h==='#/builder') mount(BuilderView());
@@ -1305,12 +1363,16 @@ function realRouter(){
 
 function router(){
   const h=location.hash.split('?')[0];
+  setRouteClass();
   const profileBtn=document.getElementById('profileBtn');
   const backBtn=document.getElementById('backBtn');
   profileBtn?.classList.add('hidden');
 
-  const showBack=(h==='#/dashboard'||h==='#/builder'||h==='#/terminal');
-  if(backBtn){ showBack?backBtn.classList.remove('hidden'):backBtn.classList.add('hidden'); }
+  const showBack=(h==='#/dashboard'||h==='#/builder'||h==='#/terminal'||h==='#/order');
+  if(backBtn){
+    if(showBack){ backBtn.classList.remove('hidden'); backBtn.classList.add('back-invisible'); }
+    else { backBtn.classList.add('hidden'); backBtn.classList.remove('back-invisible'); }
+  }
 
   // ориентация: выбор товаров — портрет, остальные — ландшафт
   document.body.classList.toggle('route-landscape', h!=='#/order' && h!=='#/');
@@ -1332,6 +1394,8 @@ try{ router(); }catch(e){ console.error(e); }
 
 /* Header + PIN + SW */
 document.addEventListener('DOMContentLoaded', async ()=>{
+  document.getElementById('promoModal')?.addEventListener('click', ()=>hidePromoVideo(true));
+
   document.getElementById('profileBtn')?.classList.add('hidden');
   bindHeaderDots();
 
