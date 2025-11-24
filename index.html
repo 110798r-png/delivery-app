@@ -22,26 +22,26 @@
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
-  .modal{
-  position:fixed; inset:0;
-  display:none;
-  align-items:center; justify-content:center;
-  background:rgba(0,0,0,.45);
-  z-index:90;
-  opacity:0;
-  transition: opacity .18s ease;
-}
-.modal.open{
-  display:flex;
-  opacity:1;
-}
-.modal > *{
-  transform: scale(.98);
-  transition: transform .18s ease;
-}
-.modal.open > *{
-  transform: scale(1);
-}
+    .modal{
+      position:fixed; inset:0;
+      display:none;
+      align-items:center; justify-content:center;
+      background:rgba(0,0,0,.45);
+      z-index:90;
+      opacity:0;
+      transition: opacity .18s ease;
+    }
+    .modal.open{
+      display:flex;
+      opacity:1;
+    }
+    .modal > *{
+      transform: scale(.98);
+      transition: transform .18s ease;
+    }
+    .modal.open > *{
+      transform: scale(1);
+    }
     .app-header{ position:sticky; top:0; z-index:100; }
     button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
@@ -54,35 +54,35 @@
     .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
 
     /* ===== Micro animations ===== */
-.menu-card{
-  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-  will-change: transform;
-}
-.menu-card:active{
-  transform: scale(0.985);
-}
-.menu-card.pulse{
-  box-shadow: 0 10px 30px rgba(15,23,42,.12);
-  border-color: #cbd5e1;
-  transform: translateY(-1px);
-}
+    .menu-card{
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+      will-change: transform;
+    }
+    .menu-card:active{
+      transform: scale(0.985);
+    }
+    .menu-card.pulse{
+      box-shadow: 0 10px 30px rgba(15,23,42,.12);
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
 
-button[data-act], #confirmBtn{
-  transition: transform .08s ease, background-color .12s ease, opacity .12s ease;
-  will-change: transform;
-}
-button[data-act]:active, #confirmBtn:active{
-  transform: scale(0.96);
-}
+    button[data-act], #confirmBtn{
+      transition: transform .08s ease, background-color .12s ease, opacity .12s ease;
+      will-change: transform;
+    }
+    button[data-act]:active, #confirmBtn:active{
+      transform: scale(0.96);
+    }
 
-#totalVal.bump{
-  animation: totalBump .18s ease;
-}
-@keyframes totalBump{
-  0%{ transform: scale(1); }
-  50%{ transform: scale(1.06); }
-  100%{ transform: scale(1); }
-}
+    #totalVal.bump{
+      animation: totalBump .18s ease;
+    }
+    @keyframes totalBump{
+      0%{ transform: scale(1); }
+      50%{ transform: scale(1.06); }
+      100%{ transform: scale(1); }
+    }
 
     /* --- Красная шапка --- */
     .brand-strip{ background:#e50000; color:#fff; }
@@ -109,14 +109,13 @@ button[data-act]:active, #confirmBtn:active{
 
     button:focus, a:focus { outline: none; box-shadow: none; }
 
-/* --- Promo video fullscreen --- */
-#promoModal{ z-index:200; }
-#promoModal.modal.open{ background: rgba(0,0,0,0.9); }
-#promoModal video{
-  width:100vw; height:100vh; object-fit:cover;
-  background:#000;
-}
-
+    /* --- Promo video fullscreen --- */
+    #promoModal{ z-index:200; }
+    #promoModal.modal.open{ background: rgba(0,0,0,0.9); }
+    #promoModal video{
+      width:100vw; height:100vh; object-fit:cover;
+      background:#000;
+    }
 
     /* --- Роут-адаптация под 14" --- */
     body.route-landscape .phone-shell{
@@ -134,259 +133,229 @@ button[data-act]:active, #confirmBtn:active{
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
- /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
-@media (min-width: 1100px) and (orientation: portrait){
+    /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
+    @media (min-width: 1100px) and (orientation: portrait){
 
-  /* общий масштаб текста на экране заказа */
-  body.route-order{
-    font-size: 18px;
-  }
+      body.route-order{
+        font-size: 18px;
+      }
 
-  /* шире рабочая область */
-  body.route-order .phone-shell{
-    width: min(100vw, 900px);
-    max-width: 900px;
-    padding: 0 1.5rem;
-  }
-  body.route-order .brand-strip .phone-shell{
-    width: min(100vw, 900px);
-    max-width: 900px;
-  }
+      body.route-order .phone-shell{
+        width: min(100vw, 900px);
+        max-width: 900px;
+        padding: 0 1.5rem;
+      }
+      body.route-order .brand-strip .phone-shell{
+        width: min(100vw, 900px);
+        max-width: 900px;
+      }
 
-  /* шапка */
-  body.route-order .brand-title{
-    font-size: 30px;
-  }
-  body.route-order .brand-sub{
-    font-size: 13px;
-  }
-  body.route-order .sushi-icon{
-    width: 42px;
-    height: 42px;
-  }
+      body.route-order .brand-title{
+        font-size: 30px;
+      }
+      body.route-order .brand-sub{
+        font-size: 13px;
+      }
+      body.route-order .sushi-icon{
+        width: 42px;
+        height: 42px;
+      }
 
-  /* чипы категорий */
-  body.route-order #categoryBar button{
-    font-size: 0.95rem;
-    padding: 0.45rem 1rem;
-    border-radius: 999px;
-  }
+      body.route-order #categoryBar button{
+        font-size: 0.95rem;
+        padding: 0.45rem 1rem;
+        border-radius: 999px;
+      }
 
-  /* карточки меню */
-  body.route-order .menu-card{
-    min-height: 130px;
-    padding: 1.25rem;
-    gap: 1rem;
-    border-radius: 1.5rem;
-  }
-  body.route-order .menu-card .font-medium{
-    font-size: 1.05rem;
-  }
-  body.route-order .menu-card .text-xs{
-    font-size: 0.9rem;
-  }
+      body.route-order .menu-card{
+        min-height: 130px;
+        padding: 1.25rem;
+        gap: 1rem;
+        border-radius: 1.5rem;
+      }
+      body.route-order .menu-card .font-medium{
+        font-size: 1.05rem;
+      }
+      body.route-order .menu-card .text-xs{
+        font-size: 0.9rem;
+      }
 
-  /* фото товара */
-  body.route-order .menu-card-img{
-    width: 150px;
-    height: 96px;
-    border-radius: 1rem;
-  }
+      body.route-order .menu-card-img{
+        width: 150px;
+        height: 96px;
+        border-radius: 1rem;
+      }
 
-  /* кнопки +/– чуть больше */
-  body.route-order .menu-card button[data-act]{
-    width: 40px;
-    height: 40px;
-    font-size: 20px;
-    border-radius: 12px;
-  }
+      body.route-order .menu-card button[data-act]{
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        border-radius: 12px;
+      }
 
-  /* нижняя панель итого */
-  body.route-order .confirm-bar{
-    width: min(100vw, 900px);
-    max-width: 900px;
-    padding: .9rem 1.2rem;
-    border-radius: 0;
-  }
-  body.route-order #confirmBtn{
-    font-size: 1.05rem;
-    padding: .9rem 1.2rem;
-    border-radius: 14px;
-  }
-  body.route-order #totalVal{
-    font-size: 1.2rem;
-  }
-}
+      body.route-order .confirm-bar{
+        width: min(100vw, 900px);
+        max-width: 900px;
+        padding: .9rem 1.2rem;
+        border-radius: 0;
+      }
+      body.route-order #confirmBtn{
+        font-size: 1.05rem;
+        padding: .9rem 1.2rem;
+        border-radius: 14px;
+      }
+      body.route-order #totalVal{
+        font-size: 1.2rem;
+      }
+    }
 
-/* ===== Увеличенные модалки под 14" портрет (kiosk) ===== */
-body.kiosk-portrait.route-order #payModal .bg-white,
-body.kiosk-portrait.route-order #thanksModal .bg-white{
-  width: min(92vw, 640px);
-  max-width: 640px;
-  padding: 32px;
-  border-radius: 28px;
-  font-size: 1.1rem;
-  line-height: 1.35;
-}
+    /* ===== Увеличенные модалки под 14" портрет (kiosk) ===== */
+    body.kiosk-portrait.route-order #payModal .bg-white,
+    body.kiosk-portrait.route-order #thanksModal .bg-white{
+      width: min(92vw, 640px);
+      max-width: 640px;
+      padding: 32px;
+      border-radius: 28px;
+      font-size: 1.1rem;
+      line-height: 1.35;
+    }
 
-/* крупнее заголовки внутри модалок */
-body.kiosk-portrait.route-order #payModal h3{
-  font-size: 1.5rem;
-  font-weight: 800;
-}
+    body.kiosk-portrait.route-order #payModal h3{
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
 
-body.kiosk-portrait.route-order #thanksModal .text-3xl{
-  font-size: 2.2rem;
-}
-body.kiosk-portrait.route-order #thanksModal .text-lg{
-  font-size: 1.4rem;
-}
-body.kiosk-portrait.route-order #thanksModal .text-sm{
-  font-size: 1.05rem;
-}
+    body.kiosk-portrait.route-order #thanksModal .text-3xl{
+      font-size: 2.2rem;
+    }
+    body.kiosk-portrait.route-order #thanksModal .text-lg{
+      font-size: 1.4rem;
+    }
+    body.kiosk-portrait.route-order #thanksModal .text-sm{
+      font-size: 1.05rem;
+    }
 
-/* элементы оплаты: селект, кнопки */
-body.kiosk-portrait.route-order #payModal select,
-body.kiosk-portrait.route-order #payModal input{
-  font-size: 1.1rem;
-  padding: 14px 16px;
-  border-radius: 14px;
-}
+    body.kiosk-portrait.route-order #payModal select,
+    body.kiosk-portrait.route-order #payModal input{
+      font-size: 1.1rem;
+      padding: 14px 16px;
+      border-radius: 14px;
+    }
 
-body.kiosk-portrait.route-order #payModal button{
-  font-size: 1.1rem;
-  padding: 12px 18px;
-  border-radius: 14px;
-}
+    body.kiosk-portrait.route-order #payModal button{
+      font-size: 1.1rem;
+      padding: 12px 18px;
+      border-radius: 14px;
+    }
     
-    /* ===== 14" КИОСК ВЕРТИКАЛЬ (работает по class kiosk-portrait) =====
-   На реальных 14" 2560×1440 portrait CSS width часто 800–1000px,
-   поэтому min-width:1100 не срабатывал.
-*/
-body.kiosk-portrait.route-order{
-  font-size: 18px;
-}
+    /* ===== 14" КИОСК ВЕРТИКАЛЬ (работает по class kiosk-portrait) ===== */
+    body.kiosk-portrait.route-order{
+      font-size: 18px;
+    }
 
-body.kiosk-portrait.route-order .phone-shell{
-  width: min(100vw, 900px);
-  max-width: 900px;
-  padding: 0 1.5rem;
-}
-body.kiosk-portrait.route-order .brand-strip .phone-shell{
-  width: min(100vw, 900px);
-  max-width: 900px;
-}
+    body.kiosk-portrait.route-order .phone-shell{
+      width: min(100vw, 900px);
+      max-width: 900px;
+      padding: 0 1.5rem;
+    }
+    body.kiosk-portrait.route-order .brand-strip .phone-shell{
+      width: min(100vw, 900px);
+      max-width: 900px;
+    }
 
-/* шапка */
-body.kiosk-portrait.route-order .brand-title{ font-size: 30px; }
-body.kiosk-portrait.route-order .brand-sub{ font-size: 13px; }
-body.kiosk-portrait.route-order .sushi-icon{
-  width: 42px; height: 42px;
-}
+    body.kiosk-portrait.route-order .brand-title{ font-size: 30px; }
+    body.kiosk-portrait.route-order .brand-sub{ font-size: 13px; }
+    body.kiosk-portrait.route-order .sushi-icon{
+      width: 42px; height: 42px;
+    }
 
-/* чипы категорий */
-body.kiosk-portrait.route-order #categoryBar button{
-  font-size: 1rem;
-  padding: 0.5rem 1.1rem;
-  border-radius: 999px;
-}
+    body.kiosk-portrait.route-order #categoryBar button{
+      font-size: 1rem;
+      padding: 0.5rem 1.1rem;
+      border-radius: 999px;
+    }
 
-/* карточки меню */
-body.kiosk-portrait.route-order .menu-card{
-  min-height: 130px;
-  padding: 1.25rem;
-  gap: 1rem;
-  border-radius: 1.5rem;
-}
-body.kiosk-portrait.route-order .menu-card .font-medium{
-  font-size: 1.1rem;
-}
-body.kiosk-portrait.route-order .menu-card .text-xs{
-  font-size: 0.95rem;
-}
+    body.kiosk-portrait.route-order .menu-card{
+      min-height: 130px;
+      padding: 1.25rem;
+      gap: 1rem;
+      border-radius: 1.5rem;
+    }
+    body.kiosk-portrait.route-order .menu-card .font-medium{
+      font-size: 1.1rem;
+    }
+    body.kiosk-portrait.route-order .menu-card .text-xs{
+      font-size: 0.95rem;
+    }
 
-/* фото товара */
-body.kiosk-portrait.route-order .menu-card-img{
-  width: 160px;
-  height: 102px;
-  border-radius: 1rem;
-}
+    body.kiosk-portrait.route-order .menu-card-img{
+      width: 160px;
+      height: 102px;
+      border-radius: 1rem;
+    }
 
-/* кнопки +/– */
-body.kiosk-portrait.route-order .menu-card button[data-act]{
-  width: 42px;
-  height: 42px;
-  font-size: 22px;
-  border-radius: 12px;
-}
+    body.kiosk-portrait.route-order .menu-card button[data-act]{
+      width: 42px;
+      height: 42px;
+      font-size: 22px;
+      border-radius: 12px;
+    }
 
-/* нижняя панель */
-body.kiosk-portrait.route-order .confirm-bar{
-  width: min(100vw, 900px);
-  max-width: 900px;
-  padding: 1rem 1.4rem;
-  border-radius: 0;
-}
-body.kiosk-portrait.route-order #confirmBtn{
-  font-size: 1.1rem;
-  padding: 1rem 1.3rem;
-  border-radius: 14px;
-}
-body.kiosk-portrait.route-order #totalVal{
-  font-size: 1.25rem;
-}
+    body.kiosk-portrait.route-order .confirm-bar{
+      width: min(100vw, 900px);
+      max-width: 900px;
+      padding: 1rem 1.4rem;
+      border-radius: 0;
+    }
+    body.kiosk-portrait.route-order #confirmBtn{
+      font-size: 1.1rem;
+      padding: 1rem 1.3rem;
+      border-radius: 14px;
+    }
+    body.kiosk-portrait.route-order #totalVal{
+      font-size: 1.25rem;
+    }
 
-    
     /* ===== Роут-правила для шапки/стрелок ===== */
 
-/* Невидимая, но рабочая стрелка */
-#backBtn.back-invisible{
-  opacity:0 !important;
-  background:transparent !important;
-  border-color:transparent !important;
-  box-shadow:none !important;
-  pointer-events:auto !important;
-}
+    #backBtn.back-invisible{
+      opacity:0 !important;
+      background:transparent !important;
+      border-color:transparent !important;
+      box-shadow:none !important;
+      pointer-events:auto !important;
+    }
 
-/* 1) Экран заказа (#/order): шапку НЕ трогаем, стрелка невидимая, но кликабельная */
-body.route-order #backBtn{
-  opacity:0 !important;
-  background:transparent !important;
-  border-color:transparent !important;
-  pointer-events:auto !important;
-}
+    body.route-order #backBtn{
+      opacity:0 !important;
+      background:transparent !important;
+      border-color:transparent !important;
+      pointer-events:auto !important;
+    }
 
-/* 2) Экран табло кухни (#/dashboard) и конструктор (#/builder):
-      красную полосу оставляем, но убираем надписи */
-body.route-dashboard .brand-wrap .leading-tight,
-body.route-builder   .brand-wrap .leading-tight{
-  display:none !important;
-}
+    body.route-dashboard .brand-wrap .leading-tight,
+    body.route-builder   .brand-wrap .leading-tight{
+      display:none !important;
+    }
 
-/* Стрелка там тоже невидимая, но работает */
-body.route-dashboard #backBtn,
-body.route-builder   #backBtn{
-  opacity:0 !important;
-  background:transparent !important;
-  border-color:transparent !important;
-  pointer-events:auto !important;
-}
+    body.route-dashboard #backBtn,
+    body.route-builder   #backBtn{
+      opacity:0 !important;
+      background:transparent !important;
+      border-color:transparent !important;
+      pointer-events:auto !important;
+    }
 
-/* 3) Экран терминал клиента (#/terminal):
-      старую красную шапку СКРЫТЬ полностью */
-body.route-terminal .brand-strip,
-body.route-terminal .header-ghost{
-  display:none !important;
-}
+    body.route-terminal .brand-strip,
+    body.route-terminal .header-ghost{
+      display:none !important;
+    }
 
-  #thanksModal.modal.open{ background: rgba(0,0,0,0.55); }
-
-    
+    #thanksModal.modal.open{ background: rgba(0,0,0,0.55); }
   </style>
 </head>
 <body>
   <div class="w-full">
-    <!-- Красная шапка -->
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
@@ -401,7 +370,6 @@ body.route-terminal .header-ghost{
             <div class="brand-title" id="brandTitle">ЯмаMoto</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
-          <!-- две секретные точки справа от названия -->
           <div class="flex items-center gap-2 ml-3">
             <button id="termDot" class="secret-dot" title="Терминал"></button>
             <button id="dashDot" class="secret-dot" title="Табло"></button>
@@ -430,7 +398,6 @@ body.route-terminal .header-ghost{
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- Оплата -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
@@ -449,7 +416,6 @@ body.route-terminal .header-ghost{
     </div>
   </div>
 
-  <!-- Ключ для табло/терминала -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
       <h3 class="text-lg font-semibold">Введите ключ</h3>
@@ -461,12 +427,10 @@ body.route-terminal .header-ghost{
     </div>
   </div>
 
-  <!-- Promo video modal -->
   <div id="promoModal" class="modal" aria-hidden="true">
- <video id="promoVideo" playsinline loop muted autoplay></video>
-</div>
+    <video id="promoVideo" playsinline loop muted autoplay></video>
+  </div>
 
-    <!-- Thanks modal -->
   <div id="thanksModal" class="modal" aria-hidden="true">
     <div class="bg-white rounded-3xl p-8 w-[min(520px,92vw)] text-center shadow-2xl">
       <div class="text-3xl font-extrabold mb-3">Спасибо!</div>
@@ -477,13 +441,11 @@ body.route-terminal .header-ghost{
   
   <div id="toast" class="toast hidden"></div>
 
-  <!-- звук уведомления -->
   <audio id="orderDing" preload="auto">
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
 
   <script>
-// ==== ПОЛИФИЛЫ ДЛЯ СТАРЫХ/КАПРИЗНЫХ БРАУЗЕРОВ ====
 if (!Element.prototype.matches) {
   Element.prototype.matches =
     Element.prototype.msMatchesSelector ||
@@ -511,9 +473,9 @@ if (typeof window.CSS.escape !== 'function') {
     return String(value).replace(/"/g, '\\"');
   };
 }
-</script>
+  </script>
 
-<script>
+  <script>
 // ===== ЕДИНЫЙ ПУЛЛИНГ list() ДЛЯ ВСЕХ ЭКРАНОВ =====
 let LIST_IN_FLIGHT = false;
 let cloudOrdersCache = [];
@@ -536,27 +498,22 @@ async function listOrdersOnce(){
   }
 }
 
-// стартуем пуллер
 setInterval(listOrdersOnce, 3000);
   
-/* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
-  /* ===== Media unlock (чтобы отложенное видео потом играло со звуком) ===== */
 let MEDIA_UNLOCKED = false;
 
 function unlockMediaOnce(){
   if (MEDIA_UNLOCKED) return;
   MEDIA_UNLOCKED = true;
-
-  // Самый надёжный способ: коротко "потрогать" любой аудио-элемент после тапа
   try{
     const a = document.getElementById('orderDing');
     if(a){
       const prevVol = a.volume;
-      a.volume = 0;                 // чтобы пользователь не услышал "пик"
+      a.volume = 0;
       const p = a.play();
       if(p && p.catch) p.catch(()=>{});
       a.pause();
@@ -566,9 +523,8 @@ function unlockMediaOnce(){
   }catch(e){}
 }
 
- /* ===== Idle promo trigger (только для #/order) ===== */
 let idleTimer = null;
-const IDLE_DELAY = 60000; // 1 минута
+const IDLE_DELAY = 60000;
 
 function clearIdlePromoTimer(){
   if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; }
@@ -592,11 +548,9 @@ function resetIdlePromoTimer(){
   }, IDLE_DELAY);
 }
 
-/* ===== Promo video helpers ===== */
 let promoTimer = null;
 
 async function openPromoModal(){
-  // 1) пробуем подтянуть свежий конфиг с сервера
   await fetchRemoteConfig().catch(()=>{});
 
   const cfg = loadConfig();
@@ -611,26 +565,23 @@ async function openPromoModal(){
   v.src = url;
   v.currentTime = 0;
 
-  v.muted = !MEDIA_UNLOCKED;   // если разлочили — сразу со звуком
-v.volume = 1;
-v.setAttribute('autoplay','');
-v.load();
+  v.muted = !MEDIA_UNLOCKED;
+  v.volume = 1;
+  v.setAttribute('autoplay','');
+  v.load();
 
   m.classList.add('open');
   setBodyScrollLock(true);
 
- const p = v.play();
-if(p && p.catch){
-  p.catch(()=>{
-    // Если звук ещё не был "разблокирован" пользователем — тогда fallback в muted
-    if(!MEDIA_UNLOCKED){
-      v.muted = true;
-      v.play().catch(()=>{});
-    }
-    // если MEDIA_UNLOCKED=true, то просто ничего не делаем:
-    // при первом же следующем касании звук пойдёт
-  });
-}
+  const p = v.play();
+  if(p && p.catch){
+    p.catch(()=>{
+      if(!MEDIA_UNLOCKED){
+        v.muted = true;
+        v.play().catch(()=>{});
+      }
+    });
+  }
 }
   
 function closePromoModal(){
@@ -642,26 +593,21 @@ function closePromoModal(){
     v.load();
   }
   m?.classList.remove('open');
-
-  // Возвращаемся на экран заказа, но НЕ трогаем PIN
   setBodyScrollLock(false);
   location.hash = '#/order';
-
   resetIdlePromoTimer();
 }
 
 function schedulePromoAfterOrder(){
   if(promoTimer) clearTimeout(promoTimer);
-  promoTimer = setTimeout(openPromoModal, 30000); // 17 сек после заказа
+  promoTimer = setTimeout(openPromoModal, 30000);
 }
 
-/* закрыть видео по любому тапу */
 document.getElementById('promoModal')?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
   closePromoModal();
 }, {passive:false});
 
-  /* ===== Разблокировка звука для промо (нужен первый жест пользователя) ===== */
 let promoAudioUnlocked = false;
 function unlockPromoAudioOnce(){
   if(promoAudioUnlocked) return;
@@ -669,7 +615,6 @@ function unlockPromoAudioOnce(){
   const v = document.getElementById('promoVideo');
   if(!v) return;
 
-  // если ролик открыт и был muted — пробуем включить звук
   if(v.muted){
     v.muted = false;
     v.volume = 1;
@@ -680,15 +625,12 @@ function unlockPromoAudioOnce(){
   window.addEventListener(ev, unlockPromoAudioOnce, {once:true, passive:true});
 });
 
-/* ===== Thanks helpers ===== */
 let thanksTimer = null;
 
 function openThanksModal(){
   const m = document.getElementById('thanksModal');
   if(!m) return;
   m.classList.add('open');
-
-  // НЕ разблокируем body тут: order экран и так залочен
   if(thanksTimer) clearTimeout(thanksTimer);
   thanksTimer = setTimeout(closeThanksModal, 10000);
 }
@@ -732,7 +674,6 @@ async function initPushSubscription() {
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
   
-/* ===== RPC ===== */
 async function rpc(payload){
   if (!API_URL) throw new Error('API_URL empty');
   const res = await fetch(API_URL, {
@@ -747,12 +688,10 @@ async function rpc(payload){
   return res.json();
 }
 
-/* ===== маршрутизация по умолчанию ===== */
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
 
-/* ===== ключи хранилищ ===== */
 const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
@@ -763,7 +702,6 @@ const WANT_TERM          = 'WANT_TERM';
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
 
-/* ===== утилиты ===== */
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
 const money = (x)=> `${x} руб.`;
@@ -793,10 +731,9 @@ function getClientId(){
   return id;
 }
 
-/* ===== конфиг (меню + promo video) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
-  promoVideoUrl: '', // URL промо-ролика
+  promoVideoUrl: '',
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
@@ -868,7 +805,6 @@ async function fetchRemoteConfig(){
   return null;
 }
 
-/* ===== анимации ===== */
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 function animateScrollX(el, to, {duration=280, onEnd}={}){
   const from=el.scrollLeft; const diff=to-from;
@@ -882,7 +818,6 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
   requestAnimationFrame(step);
 }
 
-/* ===== синхронизация статуса локально ===== */
 function syncOrderStatus(id, status){
   let hist = loadHistory();
   let changed = false;
@@ -890,7 +825,7 @@ function syncOrderStatus(id, status){
   for (let i=0;i<hist.length;i++){
     if (String(hist[i].id) === String(id)){
       if (hist[i].status !== status){
-        hist[i] = { ...hist[i], status };   // <-- вот правильный spread
+        hist[i] = { ...hist[i], status };
         changed = true;
       }
       break;
@@ -903,7 +838,6 @@ function syncOrderStatus(id, status){
   }
 }
 
-/* === ПУЛЛИНГ СТАТУСОВ ИЗ ОБЛАКА === */
 async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
@@ -919,7 +853,7 @@ async function pullAndMergeStatuses(){
       if (!fromCloud) continue;
 
       const next = {
-        ...hist[i],                       // <-- правильный spread
+        ...hist[i],
         status: fromCloud.status,
         etaMinutes: fromCloud.etaMinutes,
         etaUntil: fromCloud.etaUntil
@@ -940,7 +874,6 @@ async function pullAndMergeStatuses(){
   }
 }
 
-/* ===== кнопки в шапке (терминал/табло) ===== */
 function bindHeaderDots(){
   const termDot = document.getElementById('termDot');
   const dashDot = document.getElementById('dashDot');
@@ -992,7 +925,7 @@ function bindHeaderDots(){
   });
 }
 
-/* ===== Order (14" вертикаль) ===== */
+/* ===== OrderView ===== */
 function OrderView(){
   const cfg = loadConfig();
   applyTheme(cfg.theme || {});
@@ -1038,15 +971,12 @@ function OrderView(){
   setBodyScrollLock(true);
   confirmBtn._busy = false;
 
-    // старт/сброс idle-триггера на видео
   resetIdlePromoTimer();
 
-  // любая активность на экране заказа = сброс простоя
-const onActivity = ()=> resetIdlePromoTimer();
+  const onActivity = ()=> resetIdlePromoTimer();
   ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
-  root.addEventListener(ev, onActivity, {passive:true});
-});
-
+    root.addEventListener(ev, onActivity, {passive:true});
+  });
 
   let activeIdx   = 0;
   let isAnimating = false;
@@ -1180,8 +1110,6 @@ const onActivity = ()=> resetIdlePromoTimer();
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list);
       panel.appendChild(vbox);
-     
-
       catPager.appendChild(panel);
 
       let down=false, used=false, sx=0, sy=0, locked=null;
@@ -1217,35 +1145,35 @@ const onActivity = ()=> resetIdlePromoTimer();
     });
   }
 
- catPager.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn || btn.disabled) return;
+  catPager.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn || btn.disabled) return;
 
-  const card = btn.closest('.menu-card');
-  if (card) {
-    card.classList.remove('pulse');
-    void card.offsetWidth; // reflow чтобы анимация перезапустилась
-    card.classList.add('pulse');
-    setTimeout(() => card.classList.remove('pulse'), 180);
-  }
+    const card = btn.closest('.menu-card');
+    if (card) {
+      card.classList.remove('pulse');
+      void card.offsetWidth;
+      card.classList.add('pulse');
+      setTimeout(() => card.classList.remove('pulse'), 180);
+    }
 
-  const name  = btn.dataset.name;
-  const delta = btn.dataset.act === 'inc' ? 1 : -1;
-  const selector = `[data-q="${escAttr(name)}"]`;
+    const name  = btn.dataset.name;
+    const delta = btn.dataset.act === 'inc' ? 1 : -1;
+    const selector = `[data-q="${escAttr(name)}"]`;
 
-  const cur = parseInt(catPager.querySelector(selector)?.textContent || '0', 10) || 0;
-  const next = Math.max(0, cur + delta);
+    const cur = parseInt(catPager.querySelector(selector)?.textContent || '0', 10) || 0;
+    const next = Math.max(0, cur + delta);
 
-  catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
-  window.__orderCounts = window.__orderCounts || {};
-  window.__orderCounts[name] = next;
+    catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
+    window.__orderCounts = window.__orderCounts || {};
+    window.__orderCounts[name] = next;
 
-  recalcTotal();
+    recalcTotal();
 
-  totalEl.classList.remove('bump');
-  void totalEl.offsetWidth;
-  totalEl.classList.add('bump');
-});
+    totalEl.classList.remove('bump');
+    void totalEl.offsetWidth;
+    totalEl.classList.add('bump');
+  });
 
   function applyHeights(){
     try {
@@ -1278,11 +1206,11 @@ const onActivity = ()=> resetIdlePromoTimer();
     const counts = window.__orderCounts || {};
     let sum=0;
     cfg.menu.forEach(cat => cat.items.forEach(it => {
-  const qty = counts[it.name] || 0;
-  const priceNum = Number(it.price);
-  const price = Number.isFinite(priceNum) ? priceNum : 0;
-  sum += qty * price;
-}));
+      const qty = counts[it.name] || 0;
+      const priceNum = Number(it.price);
+      const price = Number.isFinite(priceNum) ? priceNum : 0;
+      sum += qty * price;
+    }));
     totalEl.textContent = money(sum);
     confirmBtn.disabled = sum <= 0;
     return sum;
@@ -1340,7 +1268,7 @@ const onActivity = ()=> resetIdlePromoTimer();
 
     const onOk=async (e)=>{
       e&&e.preventDefault(); e&&e.stopPropagation();
-      unlockMediaOnce(); // <-- разлочили звук именно по кнопке ОК
+      unlockMediaOnce();
       const cfg=loadConfig();
       const counts=window.__orderCounts||{};
       const itemsSel=[];
@@ -1366,17 +1294,12 @@ const onActivity = ()=> resetIdlePromoTimer();
         finalize(); return;
       }
 
-     close(); finalize(); resetCounts();
-window.dispatchEvent(new CustomEvent('orders:history-updated'));
+      close(); finalize(); resetCounts();
+      window.dispatchEvent(new CustomEvent('orders:history-updated'));
 
-// 1) спасибо-экран
-openThanksModal();
-
-// 2) idle-триггер сбрасываем, чтобы не всплыло “по простою”
-clearIdlePromoTimer();
-
-// 3) видео после заказа через 17 сек
-schedulePromoAfterOrder();
+      openThanksModal();
+      clearIdlePromoTimer();
+      schedulePromoAfterOrder();
     };
 
     ok.onclick=onOk;
@@ -1393,42 +1316,42 @@ schedulePromoAfterOrder();
     applyRepeatOrder();
   });
 
- let syncInFlight = false;
+  let syncInFlight = false;
 
-const syncTimer = setInterval(async () => {
-  if (syncInFlight) return;
-  syncInFlight = true;
-  try {
-    const cfgRemote = await fetchRemoteConfig();
-    if (cfgRemote) {
-      const v = calcConfigVersion(cfgRemote);
-      if (v !== lastConfigVersion) {
-        lastConfigVersion = v;
-        rebuildMenu();
-        recalcTotal();
-        applyHeights();
+  const syncTimer = setInterval(async () => {
+    if (syncInFlight) return;
+    syncInFlight = true;
+    try {
+      const cfgRemote = await fetchRemoteConfig();
+      if (cfgRemote) {
+        const v = calcConfigVersion(cfgRemote);
+        if (v !== lastConfigVersion) {
+          lastConfigVersion = v;
+          rebuildMenu();
+          recalcTotal();
+          applyHeights();
+        }
       }
+    } finally {
+      syncInFlight = false;
     }
-  } finally {
-    syncInFlight = false;
-  }
-}, 4000);
+  }, 4000);
 
- root.cleanup=()=>{
-  setBodyScrollLock(false);
-  clearInterval(syncTimer);
-  window.removeEventListener('resize', applyHeights);
-  clearIdlePromoTimer();
+  root.cleanup=()=>{
+    setBodyScrollLock(false);
+    clearInterval(syncTimer);
+    window.removeEventListener('resize', applyHeights);
+    clearIdlePromoTimer();
 
-  ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
-    root.removeEventListener(ev, onActivity);
-  });
-};
+    ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
+      root.removeEventListener(ev, onActivity);
+    });
+  };
 
   return root;
 }
 
-/* ===== Dashboard (14" горизонталь, карточки) ===== */
+/* ===== Dashboard ===== */
 function DashboardView(){
   const root = el(`
     <div class="grid gap-4 pb-12">
@@ -1608,16 +1531,36 @@ function DashboardView(){
     catch{ for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} } }
   };
 
- async function loadOrdersFromCloud(){
-  try{
-    const res = await rpc({op:'list'});
-    if(!Array.isArray(res.orders)) return;
+  async function loadOrdersFromCloud(){
+    try{
+      const res = await rpc({op:'list'});
+      if(!Array.isArray(res.orders)) return;
 
+      const local = loadDash();
+      const byId = new Map(local.map(o => [String(o.id), o]));
+
+      res.orders.forEach(o => {
+        byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
+      });
+
+      dashOrders = [...byId.values()]
+        .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+      saveDash(dashOrders);
+      load();
+    }catch(e){
+      console.warn('loadOrdersFromCloud', e);
+    }
+  }
+
+  load();
+
+  function onCloudOrders(e){
+    const serverList = e.detail || [];
     const local = loadDash();
     const byId = new Map(local.map(o => [String(o.id), o]));
 
-    // обновляем/добавляем серверные
-    res.orders.forEach(o => {
+    serverList.forEach(o => {
       byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
     });
 
@@ -1626,51 +1569,29 @@ function DashboardView(){
 
     saveDash(dashOrders);
     load();
-  }catch(e){
-    console.warn('loadOrdersFromCloud', e);
   }
-}
-    load();
-  function onCloudOrders(e){
-  const serverList = e.detail || [];
-  const local = loadDash();
-  const byId = new Map(local.map(o => [String(o.id), o]));
 
-  // серверные обновляем поверх локальных
-  serverList.forEach(o => {
-    byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
-  });
+  window.addEventListener('cloud:orders', onCloudOrders);
 
-  dashOrders = [...byId.values()]
-    .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-
-  saveDash(dashOrders);
-  load();            // твой рендер с проверкой новых
-}
-
-window.addEventListener('cloud:orders', onCloudOrders);
-
- root.cleanup = () => {
-  window.removeEventListener('cloud:orders', onCloudOrders);
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
-  if(pollTimer) clearInterval(pollTimer);
-};
+  root.cleanup = () => {
+    window.removeEventListener('cloud:orders', onCloudOrders);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if(pollTimer) clearInterval(pollTimer);
+  };
 
   return root;
 }
-   
-/* ===== Терминал (две колонки "готовится/готово") ===== */
+
+/* ===== Terminal ===== */
 function TerminalView(){
   let orders = loadDash();
 
   const root = el(`
     <div class="pb-10">
       <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
-
         <div class="relative col-span-2 grid grid-cols-2">
           <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
           <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
-
           <button id="terminalBackHot"
                   class="absolute top-0 right-0 h-full w-28 opacity-0"
                   aria-label="Назад"></button>
@@ -1685,11 +1606,14 @@ function TerminalView(){
   const colCook = root.querySelector('#colCook');
   const colDone = root.querySelector('#colDone');
 
-  root.querySelector('#terminalBackHot')?.addEventListener('click', (e)=>{
-    e.preventDefault(); e.stopPropagation();
-    sessionStorage.removeItem(TABLO_PIN_OK);
-    location.hash = '#/order';
-  }, {passive:false});
+  const backHot = root.querySelector('#terminalBackHot');
+  if(backHot){
+    backHot.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      sessionStorage.removeItem(TABLO_PIN_OK);
+      location.hash = '#/order';
+    }, {passive:false});
+  }
 
   function orderCard(o){
     return el(`
@@ -1722,40 +1646,16 @@ function TerminalView(){
 
   window.addEventListener('cloud:orders', onCloudOrders);
 
-  render(); // первый рендер из локалки
+  render();
 
-   = () => {
+  root.cleanup = () => {
     window.removeEventListener('cloud:orders', onCloudOrders);
   };
 
   return root;
 }
 
-    return el(`
-      <div class="p-5 rounded-2xl border bg-white shadow-sm">
-        <div class="flex items-center justify-between">
-          <div class="text-5xl font-extrabold tracking-tight">#${o.id||'—'}</div>
-          <span class="px-3 py-2 rounded-full text-sm font-semibold border bg-gray-50">${o.status||'готовится'}</span>
-        </div>
-        <div class="text-gray-500 text-sm mt-1">${created.toLocaleString()}</div>
-        <div class="mt-4 grid gap-2">${itemsHtml||'—'}</div>
-        <div class="mt-4 text-2xl font-extrabold">Итого: ${(o.total||0)} ₽</div>
-      </div>
-    `);
-  }
-
-  function render(){
-    colCook.innerHTML=''; colDone.innerHTML='';
-    orders.forEach(o=>{
-      const st=o.status||'готовится';
-      const card=orderCard(o);
-      if(st==='готово'||st==='готов') colDone.appendChild(card);
-      else colCook.appendChild(card);
-    });
-  }
-
-
-/* ===== КОНСТРУКТОР (меню + промо-видео) ===== */
+/* ===== Builder ===== */
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
@@ -1836,12 +1736,13 @@ function BuilderView(){
         `);
         row.addEventListener('input', (e)=>{
           const k=e.target.dataset.k;
-         if(k==='price'){
-  const raw = String(e.target.value||'').replace(',', '.');
-  const num = Number(raw);
-  cat.items[iidx][k] = Number.isFinite(num) ? num : 0;
-}
-          else cat.items[iidx][k]=e.target.value;
+          if(k==='price'){
+            const raw = String(e.target.value||'').replace(',', '.');
+            const num = Number(raw);
+            cat.items[iidx][k] = Number.isFinite(num) ? num : 0;
+          } else {
+            cat.items[iidx][k]=e.target.value;
+          }
         });
         row.addEventListener('click',(e)=>{
           const act=e.target.dataset.act; if(!act) return;
@@ -1914,22 +1815,19 @@ function BuilderView(){
   return root;
 }
 
-/* ===== KIOSK auto scale for 14" ===== */
+/* ===== kiosk scale ===== */
 function applyKioskClasses(){
   const w = window.innerWidth;
   const h = window.innerHeight;
   const portrait = h > w;
-
-  // "большой экран" — порог в CSS px (работает даже при Windows scaling)
   const large = Math.max(w, h) >= 900;
 
   document.body.classList.toggle('kiosk-large', large);
   document.body.classList.toggle('kiosk-portrait', large && portrait);
   document.body.classList.toggle('kiosk-landscape', large && !portrait);
 
-  // Ключевой момент: поднимаем БАЗУ rem
   if(large){
-    const scale = portrait ? 1.18 : 1.10;   // портрет чуть сильнее
+    const scale = portrait ? 1.18 : 1.10;
     document.documentElement.style.fontSize = (16 * scale) + 'px';
   }else{
     document.documentElement.style.fontSize = '';
@@ -1964,41 +1862,38 @@ function router(){
   const backBtn=document.getElementById('backBtn');
   profileBtn?.classList.add('hidden');
 
- const showBack = (h==='#/order' || h==='#/' || h==='#/dashboard' || h==='#/builder' || h==='#/terminal');
-if(backBtn){
-  if(showBack){
-    backBtn.classList.remove('hidden');
-    backBtn.classList.add('back-invisible'); // всегда невидим, но кликабелен
-  }else{
-    backBtn.classList.add('hidden');
-    backBtn.classList.remove('back-invisible');
+  const showBack = (h==='#/order' || h==='#/' || h==='#/dashboard' || h==='#/builder' || h==='#/terminal');
+  if(backBtn){
+    if(showBack){
+      backBtn.classList.remove('hidden');
+      backBtn.classList.add('back-invisible');
+    }else{
+      backBtn.classList.add('hidden');
+      backBtn.classList.remove('back-invisible');
+    }
   }
-}
 
-// ===== классы роутов для CSS =====
-document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
+  document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
 
-if (h==='#/order' || h==='#/'){
-  document.body.classList.add('route-order');
+  if (h==='#/order' || h==='#/'){
+    document.body.classList.add('route-order');
     sessionStorage.removeItem(TABLO_PIN_OK);
-} else if (h==='#/dashboard'){
-  document.body.classList.add('route-dashboard','route-landscape');
-} else if (h==='#/builder'){
-  document.body.classList.add('route-builder','route-landscape');
-} else if (h==='#/terminal'){
-  document.body.classList.add('route-terminal','route-landscape');
-} else {
-  document.body.classList.add('route-order');
-}
+  } else if (h==='#/dashboard'){
+    document.body.classList.add('route-dashboard','route-landscape');
+  } else if (h==='#/builder'){
+    document.body.classList.add('route-builder','route-landscape');
+  } else if (h==='#/terminal'){
+    document.body.classList.add('route-terminal','route-landscape');
+  } else {
+    document.body.classList.add('route-order');
+  }
 
-    // idle-триггер работает только в order
   if (h==='#/order' || h==='#/'){
     resetIdlePromoTimer();
   } else {
     clearIdlePromoTimer();
   }
 
-  // pin-gate для табло и терминала
   if((h==='#/dashboard'||h==='#/terminal') && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
     if(h==='#/dashboard') sessionStorage.setItem(WANT_DASH,'1');
     if(h==='#/terminal') sessionStorage.setItem(WANT_TERM,'1');
@@ -2012,17 +1907,16 @@ if (h==='#/order' || h==='#/'){
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
 
-/* Header + PIN + SW */
 document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('profileBtn')?.classList.add('hidden');
   bindHeaderDots();
 
   const backBtn=document.getElementById('backBtn');
- const goOrder=(e)=>{
-  e&&e.preventDefault(); e&&e.stopPropagation();
-  sessionStorage.removeItem(TABLO_PIN_OK); // <— сбрасываем пин
-  location.hash='#/order';
-};
+  const goOrder=(e)=>{
+    e&&e.preventDefault(); e&&e.stopPropagation();
+    sessionStorage.removeItem(TABLO_PIN_OK);
+    location.hash='#/order';
+  };
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
   await fetchRemoteConfig().catch(()=>{});
@@ -2063,6 +1957,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     }
   }
 });
-</script>
+  </script>
 </body>
 </html>
