@@ -887,7 +887,7 @@ function OrderView(){
     catPager.innerHTML = '';
     const cfg = loadConfig();
 
-    cfg.menu.forEach((cat) => {
+    cfg.menu.forEach((cat, idx) => {
       const panel = el(`<div class="cat-panel"></div>`);
       const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
       const list  = el(`<div class="grid gap-3"></div>`);
@@ -914,6 +914,37 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list);
       panel.appendChild(vbox);
+      // --- автопереход категорий при вертикальном скролле ---
+let lastScrollTop = 0;
+let edgeLockUntil = 0;
+
+vbox.addEventListener('scroll', () => {
+  if (isAnimating) return;
+
+  const now = Date.now();
+  if (now < edgeLockUntil) return;
+
+  const st = vbox.scrollTop;
+  const dir = st > lastScrollTop ? 'down' : 'up';
+  lastScrollTop = st;
+
+  const nearBottom = st + vbox.clientHeight >= vbox.scrollHeight - 8;
+  const nearTop = st <= 0;
+
+  // важно: реагируем только если это активная панель
+  if (activeIdx !== idx) return;
+
+  if (dir === 'down' && nearBottom && idx < cfg.menu.length - 1) {
+    edgeLockUntil = now + 350; // короткий антидребезг
+    goToIndex(idx + 1, { animate: true });
+  }
+
+  if (dir === 'up' && nearTop && idx > 0) {
+    edgeLockUntil = now + 350;
+    goToIndex(idx - 1, { animate: true });
+  }
+}, { passive: true });
+
       catPager.appendChild(panel);
 
       let down=false, used=false, sx=0, sy=0, locked=null;
