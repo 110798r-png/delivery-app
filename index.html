@@ -22,8 +22,26 @@
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
-    .modal.open{ display:flex }
+  .modal{
+  position:fixed; inset:0;
+  display:none;
+  align-items:center; justify-content:center;
+  background:rgba(0,0,0,.45);
+  z-index:90;
+  opacity:0;
+  transition: opacity .18s ease;
+}
+.modal.open{
+  display:flex;
+  opacity:1;
+}
+.modal > *{
+  transform: scale(.98);
+  transition: transform .18s ease;
+}
+.modal.open > *{
+  transform: scale(1);
+}
     .app-header{ position:sticky; top:0; z-index:100; }
     button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
     .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
@@ -34,6 +52,37 @@
     #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
     #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
     .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
+
+    /* ===== Micro animations ===== */
+.menu-card{
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  will-change: transform;
+}
+.menu-card:active{
+  transform: scale(0.985);
+}
+.menu-card.pulse{
+  box-shadow: 0 10px 30px rgba(15,23,42,.12);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+button[data-act], #confirmBtn{
+  transition: transform .08s ease, background-color .12s ease, opacity .12s ease;
+  will-change: transform;
+}
+button[data-act]:active, #confirmBtn:active{
+  transform: scale(0.96);
+}
+
+#totalVal.bump{
+  animation: totalBump .18s ease;
+}
+@keyframes totalBump{
+  0%{ transform: scale(1); }
+  50%{ transform: scale(1.06); }
+  100%{ transform: scale(1); }
+}
 
     /* --- Красная шапка --- */
     .brand-strip{ background:#e50000; color:#fff; }
@@ -872,8 +921,14 @@ function OrderView(){
   }
 
   catPager.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-act]');
-    if (!btn || btn.disabled) return;
+    const card = btn.closest('.menu-card');
+if(card){
+  card.classList.remove('pulse');
+  // reflow чтобы анимация перезапустилась
+  void card.offsetWidth;
+  card.classList.add('pulse');
+  setTimeout(()=>card.classList.remove('pulse'), 180);
+}
 
     const name  = btn.dataset.name;
     const delta = btn.dataset.act === 'inc' ? 1 : -1;
@@ -886,6 +941,9 @@ function OrderView(){
     window.__orderCounts = window.__orderCounts || {};
     window.__orderCounts[name] = next;
     recalcTotal();
+    totalEl.classList.remove('bump');
+void totalEl.offsetWidth;
+totalEl.classList.add('bump');
   });
 
   function applyHeights(){
