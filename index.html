@@ -545,7 +545,30 @@ async function listOrdersOnce(){
   }
 }
 
-setInterval(listOrdersOnce, 2500); // можно 2.5с, чуть живее
+    let ws = null;
+
+function connectWS(){
+  ws = new WebSocket("wss://YOUR_GATEWAY_URL/ws");
+
+  ws.onopen = () => console.log("WS connected");
+
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "orders") {
+        window.dispatchEvent(new CustomEvent("cloud:orders", { detail: msg.orders }));
+      }
+    } catch(e){
+      console.warn("ws msg error", e);
+    }
+  };
+
+  ws.onclose = () => setTimeout(connectWS, 1000);
+}
+
+connectWS();
+
+    
   
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
 const CONFIG_REMOTE_URL = '';
