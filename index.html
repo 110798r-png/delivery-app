@@ -1430,7 +1430,10 @@ function OrderView(){
   ok.onclick = onOk;
   cancel.onclick = onCancel;
   m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
-})();
+});        // ← закрытие addEventListener
+return card;
+}          // ← закрытие function orderCard
+
 
   rebuildMenu();
   requestAnimationFrame(()=>{
