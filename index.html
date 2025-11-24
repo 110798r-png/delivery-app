@@ -869,14 +869,23 @@ function animateScrollX(el, to, {duration=280, onEnd}={}){
 
 /* ===== синхронизация статуса локально ===== */
 function syncOrderStatus(id, status){
-  let hist = loadHistory(); let changed = false;
+  let hist = loadHistory();
+  let changed = false;
+
   for (let i=0;i<hist.length;i++){
     if (String(hist[i].id) === String(id)){
-      if (hist[i].status !== status){ hist[i] = { ...hist[i], status }; changed = true; }
+      if (hist[i].status !== status){
+        hist[i] = { ...hist[i], status };   // <-- вот правильный spread
+        changed = true;
+      }
       break;
     }
   }
-  if (changed){ saveHistory(hist); window.dispatchEvent(new CustomEvent('orders:history-updated')); }
+
+  if (changed){
+    saveHistory(hist);
+    window.dispatchEvent(new CustomEvent('orders:history-updated'));
+  }
 }
 
 /* === ПУЛЛИНГ СТАТУСОВ ИЗ ОБЛАКА === */
@@ -884,6 +893,7 @@ async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
     if(!cloud || !Array.isArray(cloud.orders)) return;
+
     const byId = new Map(cloud.orders.map(o => [String(o.id), o]));
     const hist = loadHistory();
     let changed = false;
@@ -892,14 +902,27 @@ async function pullAndMergeStatuses(){
       const id = String(hist[i].id);
       const fromCloud = byId.get(id);
       if (!fromCloud) continue;
-      const next = { ...hist[i], status: fromCloud.status, etaMinutes: fromCloud.etaMinutes, etaUntil: fromCloud.etaUntil };
-      if (JSON.stringify(next) !== JSON.stringify(hist[i])) { hist[i]=next; changed=true; }
+
+      const next = {
+        ...hist[i],                       // <-- правильный spread
+        status: fromCloud.status,
+        etaMinutes: fromCloud.etaMinutes,
+        etaUntil: fromCloud.etaUntil
+      };
+
+      if (JSON.stringify(next) !== JSON.stringify(hist[i])) {
+        hist[i] = next;
+        changed = true;
+      }
     }
+
     if(changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     }
-  }catch(e){ console.warn('pullAndMergeStatuses error', e); }
+  }catch(e){
+    console.warn('pullAndMergeStatuses error', e);
+  }
 }
 
 /* ===== кнопки в шапке (терминал/табло) ===== */
