@@ -1584,166 +1584,85 @@ function DashboardView(){
     `);
 
     card.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button[data-act]');
-      if(!btn) return;
-      const act=btn.dataset.act;
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const act = btn.dataset.act;
 
-     if(act==='save'){
-  const status=card.querySelector('[data-k="status"]').value;
-  const etaSel=card.querySelector('[data-k="eta"]').value;
-  const etaMinutes=etaSel?Number(etaSel):null;
+  if(act === 'save'){
+    const status   = card.querySelector('[data-k="status"]').value;
+    const etaSel   = card.querySelector('[data-k="eta"]').value;
+    const etaMinutes = etaSel ? Number(etaSel) : null;
 
-  const patch={status};
-  if(etaMinutes){
-    patch.etaMinutes=etaMinutes;
-    patch.etaUntil=Date.now()+etaMinutes*60*1000;
-  }else{
-    patch.etaMinutes=null; patch.etaUntil=null;
+    const patch = { status };
+    if(etaMinutes){
+      patch.etaMinutes = etaMinutes;
+      patch.etaUntil   = Date.now() + etaMinutes*60*1000;
+    }else{
+      patch.etaMinutes = null;
+      patch.etaUntil   = null;
+    }
+
+    const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
+    if(i>=0){
+      dashOrders[i] = { ...dashOrders[i], ...patch };
+      saveDash(dashOrders);
+      syncOrderStatus(o.id, patch.status);
+      showToast(`Статус #${o.id} обновлён`);
+      renderOrders();
+    }
+
+    try{
+      await rpc({ op:'update', data:{ id:o.id, patch } });
+    }catch(e1){
+      try{ await rpc({ op:'update', id:o.id, patch }); }
+      catch(e2){ console.warn('update failed', e1, e2); }
+    }
   }
 
-  const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
-  if(i>=0){
-    dashOrders[i]={...dashOrders[i], ...patch};
+  if(act === 'issue'){
+    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
     saveDash(dashOrders);
-    syncOrderStatus(o.id, patch.status);
-    showToast(`Статус #${o.id} обновлён`);
-    renderOrders();
-  }
+    card.remove();
+    showToast(`Заказ #${o.id} выдан`);
 
-  // ✅ ВАЖНО: шлём на сервер ПРАВИЛЬНО
-  try{
-    await rpc({ op:'update', data:{ id:o.id, patch } });
-  }catch(e1){
-    // fallback на старый формат — на всякий случай
-    try{ await rpc({ op:'update', id:o.id, patch }); }
-    catch(e2){ console.warn('update failed', e1, e2); }
-  }
-}
-    if(act==='issue'){
-  dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-  saveDash(dashOrders);
-  card.remove();
-  showToast(`Заказ #${o.id} выдан`);
-
-  try{
-    await rpc({ op:'delete', data:{ id:o.id } });
-  }catch(e1){
-    try{ await rpc({ op:'delete', id:o.id }); }
-    catch(e2){ console.warn('delete failed', e1, e2); }
-  }
-  return;
-}
-      
-      if(act==='delete'){
-  if(!card.dataset.confirm){
-    card.dataset.confirm='1';
-    btn.textContent='Точно удалить?';
-    setTimeout(()=>{ 
-      if(card.dataset.confirm==='1'){ 
-        delete card.dataset.confirm; 
-        btn.textContent='Удалить'; 
-      } 
-    },3000);
+    try{
+      await rpc({ op:'delete', data:{ id:o.id } });
+    }catch(e1){
+      try{ await rpc({ op:'delete', id:o.id }); }
+      catch(e2){ console.warn('delete failed', e1, e2); }
+    }
     return;
   }
 
-  dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id));
-  saveDash(dashOrders);
-  card.remove();
-  showToast(`Заказ #${o.id} удалён`);
-
-  try{
-    await rpc({ op:'delete', data:{ id:o.id } });
-  }catch(e1){
-    try{ await rpc({ op:'delete', id:o.id }); }
-    catch(e2){ console.warn('delete failed', e1, e2); }
-  }
-}
-    return card;
-  }
-
-  function renderOrders(){
-    const unique=new Map();
-    dashOrders.forEach(o=>unique.set(String(o.id), o));
-    const orders=[...unique.values()];
-    list.innerHTML='';
-    orders.forEach(o=>list.appendChild(orderCard(o)));
-  }
-
-  function load(){
-    const unique=new Map();
-    dashOrders.forEach(o=>unique.set(String(o.id), o));
-    const incoming=[...unique.keys()].filter(id=>!knownIds.has(id));
-    if(incoming.length){
-      if(document.visibilityState==='visible' && soundOn()){
-        try{ ding.currentTime=0; ding.play().catch(()=>{});}catch{}
-      }else if(document.visibilityState==='hidden'){
-        hiddenNewCount += incoming.length;
-      }
+  if(act === 'delete'){
+    if(!card.dataset.confirm){
+      card.dataset.confirm='1';
+      btn.textContent='Точно удалить?';
+      setTimeout(()=>{ 
+        if(card.dataset.confirm==='1'){ 
+          delete card.dataset.confirm; 
+          btn.textContent='Удалить'; 
+        } 
+      },3000);
+      return;
     }
-    knownIds=new Set(unique.keys());
-    dashOrders=[...unique.values()];
-    renderOrders();
-  }
 
-  root.querySelector('#btnClearAll').onclick=async ()=>{
-    if(!confirm('Удалить все заказы?')) return;
-    const ids=(dashOrders||[]).map(o=>o.id);
-    dashOrders=[]; saveDash(dashOrders); load();
-    try{ await rpc({op:'clear'}); }
-    catch{ for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} } }
-  };
-
-  async function loadOrdersFromCloud(){
-    try{
-      const res = await rpc({op:'list'});
-      if(!Array.isArray(res.orders)) return;
-
-      const local = loadDash();
-      const byId = new Map(local.map(o => [String(o.id), o]));
-
-      res.orders.forEach(o => {
-        byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
-      });
-
-      dashOrders = [...byId.values()]
-        .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-
-      saveDash(dashOrders);
-      load();
-    }catch(e){
-      console.warn('loadOrdersFromCloud', e);
-    }
-  }
-
-  load();
-
-  function onCloudOrders(e){
-    const serverList = e.detail || [];
-    const local = loadDash();
-    const byId = new Map(local.map(o => [String(o.id), o]));
-
-    serverList.forEach(o => {
-      byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
-    });
-
-    dashOrders = [...byId.values()]
-      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-
+    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
     saveDash(dashOrders);
-    load();
+    card.remove();
+    showToast(`Заказ #${o.id} удалён`);
+
+    try{
+      await rpc({ op:'delete', data:{ id:o.id } });
+    }catch(e1){
+      try{ await rpc({ op:'delete', id:o.id }); }
+      catch(e2){ console.warn('delete failed', e1, e2); }
+    }
   }
+});
 
-  window.addEventListener('cloud:orders', onCloudOrders);
+return card;
 
-  root.cleanup = () => {
-    window.removeEventListener('cloud:orders', onCloudOrders);
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    if(pollTimer) clearInterval(pollTimer);
-  };
-
-  return root;
-}
 
 /* ===== Terminal ===== */
 function TerminalView(){
