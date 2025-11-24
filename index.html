@@ -218,6 +218,47 @@ button[data-act]:active, #confirmBtn:active{
   }
 }
 
+/* ===== Увеличенные модалки под 14" портрет (kiosk) ===== */
+body.kiosk-portrait.route-order #payModal .bg-white,
+body.kiosk-portrait.route-order #thanksModal .bg-white{
+  width: min(92vw, 640px);
+  max-width: 640px;
+  padding: 32px;
+  border-radius: 28px;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
+/* крупнее заголовки внутри модалок */
+body.kiosk-portrait.route-order #payModal h3{
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+body.kiosk-portrait.route-order #thanksModal .text-3xl{
+  font-size: 2.2rem;
+}
+body.kiosk-portrait.route-order #thanksModal .text-lg{
+  font-size: 1.4rem;
+}
+body.kiosk-portrait.route-order #thanksModal .text-sm{
+  font-size: 1.05rem;
+}
+
+/* элементы оплаты: селект, кнопки */
+body.kiosk-portrait.route-order #payModal select,
+body.kiosk-portrait.route-order #payModal input{
+  font-size: 1.1rem;
+  padding: 14px 16px;
+  border-radius: 14px;
+}
+
+body.kiosk-portrait.route-order #payModal button{
+  font-size: 1.1rem;
+  padding: 12px 18px;
+  border-radius: 14px;
+}
+    
     /* ===== 14" КИОСК ВЕРТИКАЛЬ (работает по class kiosk-portrait) =====
    На реальных 14" 2560×1440 portrait CSS width часто 800–1000px,
    поэтому min-width:1100 не срабатывал.
@@ -1628,8 +1669,8 @@ function TerminalView(){
                 aria-label="Назад"></button>
       </div>
 
-      <div id="colCook" class="p-4 grid gap-4 bg-gray-50 min-h-[70vh]"></div>
-      <div id="colDone" class="p-4 grid gap-4 bg-gray-50 border-l min-h-[70vh]"></div>
+      <div id="colCook" class="p-4 flex flex-col gap-4 bg-gray-50 min-h-[70vh] items-start"></div>
+<div id="colDone" class="p-4 flex flex-col gap-4 bg-gray-50 border-l min-h-[70vh] items-start"></div>
     </div>
   </div>
 `);
