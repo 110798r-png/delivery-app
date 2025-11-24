@@ -134,33 +134,94 @@ button[data-act]:active, #confirmBtn:active{
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
-    /* --- 14" вертикаль для экрана заказа --- */
+   /* ===== 14" вертикаль: экран заказа (#/order) ===== */
 @media (min-width: 700px) and (orientation: portrait){
+
+  /* шире рабочая зона */
   body.route-order .phone-shell{
-    width: min(100vw, 720px);
-    max-width: 720px;
-    padding: 0 1rem;
+    width: min(100vw, 760px);
+    max-width: 760px;
+    padding: 0 1.2rem;
   }
 
   body.route-order .brand-strip .phone-shell{
-    width: min(100vw, 720px);
-    max-width: 720px;
+    width: min(100vw, 760px);
+    max-width: 760px;
   }
 
   body.route-order .confirm-bar{
-    width: min(720px, 100%);
-    max-width: 720px;
+    width: min(760px, 100%);
+    max-width: 760px;
     border-radius: 0;
+    padding: .9rem 1.2rem;
   }
 
+  /* шапка крупнее */
+  body.route-order .brand-title{
+    font-size: 30px;
+  }
+  body.route-order .brand-sub{
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  body.route-order .sushi-icon{
+    width: 44px;
+    height: 44px;
+  }
+  body.route-order .sushi-icon svg{
+    width: 30px;
+    height: 30px;
+  }
+
+  /* карточки крупнее */
   body.route-order .menu-card{
-    border-radius: 1.5rem;
-    min-height: 120px; /* чуть «воздушнее» для большого экрана */
+    border-radius: 1.6rem;
+    min-height: 128px;
+    padding: 1.1rem 1.2rem;
   }
 
   body.route-order .menu-card-img{
-    width: 140px;
-    height: 90px;
+    width: 150px;
+    height: 100px;
+    border-radius: 1rem;
+  }
+
+  /* текст в карточке */
+  body.route-order .menu-card .font-medium{
+    font-size: 18px;
+  }
+  body.route-order .menu-card .text-xs{
+    font-size: 14px;
+  }
+
+  /* кнопки + / − больше */
+  body.route-order button[data-act]{
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 20px;
+    border-radius: 14px !important;
+  }
+  body.route-order [data-q]{
+    font-size: 18px;
+    width: 36px;
+  }
+
+  /* чипы категорий крупнее */
+  body.route-order #categoryBar button{
+    font-size: 16px;
+    padding: .45rem .9rem;
+    border-radius: 999px;
+  }
+
+  /* кнопка оформить заказ */
+  body.route-order #confirmBtn{
+    font-size: 18px;
+    padding: .9rem 1.2rem;
+    border-radius: 16px;
+  }
+
+  body.route-order #totalVal{
+    font-size: 20px;
   }
 }
     
@@ -265,7 +326,6 @@ body.route-terminal .header-ghost{
       <div class="grid gap-1">
         <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
         <select id="paySelect" class="border rounded-xl p-3 w-full">
-          <option value="cash">Наличные</option>
           <option value="card">Банковская карта</option>
           <option value="transfer">Перевод</option>
         </select>
@@ -291,7 +351,7 @@ body.route-terminal .header-ghost{
 
   <!-- Promo video modal -->
   <div id="promoModal" class="modal" aria-hidden="true">
-  <video id="promoVideo" playsinline loop></video>
+ <video id="promoVideo" playsinline loop muted autoplay></video>
 </div>
 
     <!-- Thanks modal -->
@@ -385,25 +445,24 @@ function openPromoModal(){
   const v = document.getElementById('promoVideo');
   if(!m || !v) return;
 
-  // Подготовка
   v.pause();
   v.src = url;
   v.currentTime = 0;
 
-  // Пытаемся сразу со звуком
-  v.muted = false;
+  // важное: сразу muted для автозапуска на любом устройстве
+  v.muted = true;
   v.volume = 1;
   v.setAttribute('autoplay','');
+  v.load();
 
   m.classList.add('open');
   setBodyScrollLock(true);
 
   const p = v.play();
   if(p && p.catch){
-    p.catch(()=>{
-      // если браузер блокирует звук — играем muted
-      v.muted = true;
-      v.play().catch(()=>{});
+    p.catch(()=>{ 
+      // если даже muted не стартанул — просто молча игнорим
+      console.warn('promo autoplay blocked');
     });
   }
 }
@@ -914,36 +973,7 @@ function OrderView(){
       list.appendChild(el(`<div class="h-24"></div>`));
       vbox.appendChild(list);
       panel.appendChild(vbox);
-      // --- автопереход категорий при вертикальном скролле ---
-let lastScrollTop = 0;
-let edgeLockUntil = 0;
-
-vbox.addEventListener('scroll', () => {
-  if (isAnimating) return;
-
-  const now = Date.now();
-  if (now < edgeLockUntil) return;
-
-  const st = vbox.scrollTop;
-  const dir = st > lastScrollTop ? 'down' : 'up';
-  lastScrollTop = st;
-
-  const nearBottom = st + vbox.clientHeight >= vbox.scrollHeight - 8;
-  const nearTop = st <= 0;
-
-  // важно: реагируем только если это активная панель
-  if (activeIdx !== idx) return;
-
-  if (dir === 'down' && nearBottom && idx < cfg.menu.length - 1) {
-    edgeLockUntil = now + 350; // короткий антидребезг
-    goToIndex(idx + 1, { animate: true });
-  }
-
-  if (dir === 'up' && nearTop && idx > 0) {
-    edgeLockUntil = now + 350;
-    goToIndex(idx - 1, { animate: true });
-  }
-}, { passive: true });
+     
 
       catPager.appendChild(panel);
 
