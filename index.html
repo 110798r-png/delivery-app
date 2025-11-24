@@ -514,6 +514,31 @@ if (typeof window.CSS.escape !== 'function') {
 </script>
 
 <script>
+// ===== ЕДИНЫЙ ПУЛЛИНГ list() ДЛЯ ВСЕХ ЭКРАНОВ =====
+let LIST_IN_FLIGHT = false;
+let cloudOrdersCache = [];
+
+async function listOrdersOnce(){
+  if (LIST_IN_FLIGHT) return cloudOrdersCache;
+  LIST_IN_FLIGHT = true;
+  try{
+    const res = await rpc({ op:'list' });
+    cloudOrdersCache = Array.isArray(res.orders) ? res.orders.slice() : [];
+    window.dispatchEvent(new CustomEvent('cloud:orders', {
+      detail: cloudOrdersCache
+    }));
+    return cloudOrdersCache;
+  }catch(e){
+    console.warn('listOrdersOnce', e);
+    return cloudOrdersCache;
+  }finally{
+    LIST_IN_FLIGHT = false;
+  }
+}
+
+// стартуем пуллер
+setInterval(listOrdersOnce, 3000);
+  
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
 const CONFIG_REMOTE_URL = '';
@@ -1384,7 +1409,6 @@ const syncTimer = setInterval(async () => {
         applyHeights();
       }
     }
-    await pullAndMergeStatuses().catch(()=>{});
   } finally {
     syncInFlight = false;
   }
@@ -1607,8 +1631,29 @@ function DashboardView(){
   }
 }
     load();
-  loadOrdersFromCloud();
-  pollTimer = setInterval(loadOrdersFromCloud, 12000);
+  function onCloudOrders(e){
+  const serverList = e.detail || [];
+  const local = loadDash();
+  const byId = new Map(local.map(o => [String(o.id), o]));
+
+  // серверные обновляем поверх локальных
+  serverList.forEach(o => {
+    byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
+  });
+
+  dashOrders = [...byId.values()]
+    .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+  saveDash(dashOrders);
+  load();            // твой рендер с проверкой новых
+}
+
+window.addEventListener('cloud:orders', onCloudOrders);
+
+root.cleanup = () => {
+  window.removeEventListener('cloud:orders', onCloudOrders);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+};
 
   root.cleanup = () => {
     if(pollTimer) clearInterval(pollTimer);
@@ -1652,13 +1697,16 @@ backHot?.addEventListener('click', (e)=>{
   location.hash = '#/order';
 }, {passive:false});
 
-  function orderCard(o){
-    const created=o.createdAt?new Date(o.createdAt):new Date();
-    const itemsHtml=(o.items||[]).map(i=>`
-      <div class="flex justify-between text-xl">
-        <div class="truncate">${i.name}</div>
-        <div class="font-bold ml-3">${i.qty}</div>
-      </div>`).join('');
+ function orderCard(o){
+  return el(`
+    <div class="p-5 rounded-2xl border bg-white shadow-sm
+                flex items-center justify-center min-h-[150px]">
+      <div class="text-6xl font-extrabold tracking-tight">
+        #${o.id || '—'}
+      </div>
+    </div>
+  `);
+}
 
     return el(`
       <div class="p-5 rounded-2xl border bg-white shadow-sm">
@@ -1683,22 +1731,6 @@ backHot?.addEventListener('click', (e)=>{
     });
   }
 
-  async function poll(){
-    try{
-      const res=await rpc({op:'list'});
-      if(Array.isArray(res.orders)){
-        orders=res.orders.slice();
-        saveDash(orders);
-        render();
-      }
-    }catch(e){ console.warn('terminal poll', e); }
-  }
-
-  render(); poll();
-  const timer=setInterval(poll,3000);
-  root.cleanup=()=>clearInterval(timer);
-  return root;
-}
 
 /* ===== КОНСТРУКТОР (меню + промо-видео) ===== */
 function BuilderView(){
