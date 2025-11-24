@@ -1341,7 +1341,6 @@ function OrderView(){
   const close = ()=> m.classList.remove('open');
   const finalize = ()=>{
     confirmBtn._busy = false;
-    // confirmBtn.disabled вернём после close/cancel, а после ok мы всё равно resetCounts()
     confirmBtn.disabled = false;
   };
 
@@ -1422,17 +1421,16 @@ function OrderView(){
     resetCounts();
     window.dispatchEvent(new CustomEvent('orders:history-updated'));
 
-    // спасибо-экран
     openThanksModal();
     clearIdlePromoTimer();
     schedulePromoAfterOrder();
+  };
 
+  // обработчики ставим СНАРУЖИ onOk
   ok.onclick = onOk;
   cancel.onclick = onCancel;
   m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
-});        // ← закрытие addEventListener
-return card;
-}          // ← закрытие function orderCard
+})();
 
 
   rebuildMenu();
@@ -1665,6 +1663,94 @@ function DashboardView(){
 });
 
 return card;
+
+      } // <-- ЗАКРЫЛИ orderCard
+
+  function renderOrders(){
+    const unique=new Map();
+    dashOrders.forEach(o=>unique.set(String(o.id), o));
+    const orders=[...unique.values()];
+    list.innerHTML='';
+    orders.forEach(o=>list.appendChild(orderCard(o)));
+  }
+
+  function load(){
+    const unique=new Map();
+    dashOrders.forEach(o=>unique.set(String(o.id), o));
+    const incoming=[...unique.keys()].filter(id=>!knownIds.has(id));
+    if(incoming.length){
+      if(document.visibilityState==='visible' && soundOn()){
+        try{ ding.currentTime=0; ding.play().catch(()=>{});}catch{}
+      }else if(document.visibilityState==='hidden'){
+        hiddenNewCount += incoming.length;
+      }
+    }
+    knownIds=new Set(unique.keys());
+    dashOrders=[...unique.values()];
+    renderOrders();
+  }
+
+  root.querySelector('#btnClearAll').onclick=async ()=>{
+    if(!confirm('Удалить все заказы?')) return;
+    const ids=(dashOrders||[]).map(o=>o.id);
+    dashOrders=[]; saveDash(dashOrders); load();
+    try{ await rpc({op:'clear'}); }
+    catch{ for(const id of ids){ try{ await rpc({op:'delete', id}); }catch{} } }
+  };
+
+  async function loadOrdersFromCloud(){
+    try{
+      const res = await rpc({op:'list'});
+      if(!Array.isArray(res.orders)) return;
+
+      const local = loadDash();
+      const byId = new Map(local.map(o => [String(o.id), o]));
+
+      res.orders.forEach(o => {
+        byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
+      });
+
+      dashOrders = [...byId.values()]
+        .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+      saveDash(dashOrders);
+      load();
+    }catch(e){
+      console.warn('loadOrdersFromCloud', e);
+    }
+  }
+
+  load();
+  loadOrdersFromCloud();
+
+  function onCloudOrders(e){
+    const serverList = e.detail || [];
+    if(!serverList.length) return;
+
+    const local = loadDash();
+    const byId = new Map(local.map(o => [String(o.id), o]));
+
+    serverList.forEach(o => {
+      byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
+    });
+
+    dashOrders = [...byId.values()]
+      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+    saveDash(dashOrders);
+    load();
+  }
+
+  window.addEventListener('cloud:orders', onCloudOrders);
+
+  root.cleanup = () => {
+    window.removeEventListener('cloud:orders', onCloudOrders);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if(pollTimer) clearInterval(pollTimer);
+  };
+
+  return root;
+} // <-- ЗАКРЫЛИ DashboardView
 
 
 /* ===== Terminal ===== */
