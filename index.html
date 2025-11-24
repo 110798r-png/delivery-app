@@ -1550,7 +1550,7 @@ function DashboardView(){
          </div>`
       : '';
 
-    const card = el(`
+        const card = el(`
       <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
         <div class="flex items-center justify-between">
           <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1573,96 +1573,127 @@ function DashboardView(){
             ${[5,10,15,20,25,30].map(m=>`<option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>`).join('')}
           </select>
           ${(o.status==='готово' || o.status==='готов') ? `
-  <button type="button"
-          class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
-          data-act="issue">Выдать</button>
-` : ''}
-<button type="button" class="px-3 py-2 rounded-xl border bg-white" data-act="save">Сохранить</button>
-<button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
-
+            <button type="button"
+                    class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
+                    data-act="issue">Выдать</button>
+          ` : ''}
+          <button type="button" class="px-3 py-2 rounded-xl border bg-white" data-act="save">Сохранить</button>
+          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
 
+    const statusSel = card.querySelector('[data-k="status"]');
+    const etaSelEl  = card.querySelector('[data-k="eta"]');
+
+    async function applyAndSync({ silent=false } = {}){
+      const status = statusSel.value;
+      const etaSel = etaSelEl.value;
+      const etaMinutes = etaSel ? Number(etaSel) : null;
+
+      const patch = { status };
+      if (etaMinutes){
+        patch.etaMinutes = etaMinutes;
+        patch.etaUntil   = Date.now() + etaMinutes*60*1000;
+      } else {
+        patch.etaMinutes = null;
+        patch.etaUntil   = null;
+      }
+
+      const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
+      if (i >= 0){
+        dashOrders[i] = { ...dashOrders[i], ...patch };
+        saveDash(dashOrders);
+        syncOrderStatus(o.id, patch.status);
+
+        // ✅ сразу обновляем терминал (готовится/готово) без F5
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
+
+        if(!silent) showToast(`Статус #${o.id} обновлён`);
+
+        // ✅ перерисовываем дашборд, чтобы кнопка "Выдать" появилась сразу
+        renderOrders();
+      }
+
+      // ✅ шлём на сервер
+      try{
+        await rpc({ op:'update', data:{ id:o.id, patch } });
+      }catch(e1){
+        try{ await rpc({ op:'update', id:o.id, patch }); }
+        catch(e2){ console.warn('update failed', e1, e2); }
+      }
+    }
+
+    // ✅ Автосейв при смене статуса/времени (без кнопки "Сохранить")
+    statusSel.addEventListener('change', ()=> applyAndSync({ silent:true }));
+    etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
+
     card.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('button[data-act]');
-  if(!btn) return;
-  const act = btn.dataset.act;
+      const btn = e.target.closest('button[data-act]');
+      if(!btn) return;
+      const act = btn.dataset.act;
 
-  if(act === 'save'){
-    const status   = card.querySelector('[data-k="status"]').value;
-    const etaSel   = card.querySelector('[data-k="eta"]').value;
-    const etaMinutes = etaSel ? Number(etaSel) : null;
+      if(act === 'save'){
+        return applyAndSync();
+      }
 
-    const patch = { status };
-    if(etaMinutes){
-      patch.etaMinutes = etaMinutes;
-      patch.etaUntil   = Date.now() + etaMinutes*60*1000;
-    }else{
-      patch.etaMinutes = null;
-      patch.etaUntil   = null;
-    }
+      if(act === 'issue'){
+        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+        saveDash(dashOrders);
 
-    const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
-    if(i>=0){
-      dashOrders[i] = { ...dashOrders[i], ...patch };
-      saveDash(dashOrders);
-      syncOrderStatus(o.id, patch.status);
-      showToast(`Статус #${o.id} обновлён`);
-      renderOrders();
-    }
+        // ✅ сразу обновляем терминал
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
 
-    try{
-      await rpc({ op:'update', data:{ id:o.id, patch } });
-    }catch(e1){
-      try{ await rpc({ op:'update', id:o.id, patch }); }
-      catch(e2){ console.warn('update failed', e1, e2); }
-    }
-  }
+        card.remove();
+        showToast(`Заказ #${o.id} выдан`);
 
-  if(act === 'issue'){
-    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-    saveDash(dashOrders);
-    card.remove();
-    showToast(`Заказ #${o.id} выдан`);
+        try{
+          await rpc({ op:'delete', data:{ id:o.id } });
+        }catch(e1){
+          try{ await rpc({ op:'delete', id:o.id }); }
+          catch(e2){ console.warn('delete failed', e1, e2); }
+        }
+        return;
+      }
 
-    try{
-      await rpc({ op:'delete', data:{ id:o.id } });
-    }catch(e1){
-      try{ await rpc({ op:'delete', id:o.id }); }
-      catch(e2){ console.warn('delete failed', e1, e2); }
-    }
-    return;
-  }
+      if(act === 'delete'){
+        if(!card.dataset.confirm){
+          card.dataset.confirm='1';
+          btn.textContent='Точно удалить?';
+          setTimeout(()=>{ 
+            if(card.dataset.confirm==='1'){ 
+              delete card.dataset.confirm; 
+              btn.textContent='Удалить'; 
+            } 
+          },3000);
+          return;
+        }
 
-  if(act === 'delete'){
-    if(!card.dataset.confirm){
-      card.dataset.confirm='1';
-      btn.textContent='Точно удалить?';
-      setTimeout(()=>{ 
-        if(card.dataset.confirm==='1'){ 
-          delete card.dataset.confirm; 
-          btn.textContent='Удалить'; 
-        } 
-      },3000);
-      return;
-    }
+        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+        saveDash(dashOrders);
 
-    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-    saveDash(dashOrders);
-    card.remove();
-    showToast(`Заказ #${o.id} удалён`);
+        // ✅ сразу обновляем терминал
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
 
-    try{
-      await rpc({ op:'delete', data:{ id:o.id } });
-    }catch(e1){
-      try{ await rpc({ op:'delete', id:o.id }); }
-      catch(e2){ console.warn('delete failed', e1, e2); }
-    }
-  }
-});
+        card.remove();
+        showToast(`Заказ #${o.id} удалён`);
 
-return card;
+        try{
+          await rpc({ op:'delete', data:{ id:o.id } });
+        }catch(e1){
+          try{ await rpc({ op:'delete', id:o.id }); }
+          catch(e2){ console.warn('delete failed', e1, e2); }
+        }
+      }
+    });
+
+    return card;
 
       } // <-- ЗАКРЫЛИ orderCard
 
