@@ -1577,12 +1577,11 @@ function DashboardView(){
                     class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
                     data-act="issue">Выдать</button>
           ` : ''}
-          <button type="button" class="px-3 py-2 rounded-xl border bg-white" data-act="save">Сохранить</button>
           <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
-
+    
     const statusSel = card.querySelector('[data-k="status"]');
     const etaSelEl  = card.querySelector('[data-k="eta"]');
 
@@ -1635,8 +1634,6 @@ function DashboardView(){
       if(!btn) return;
       const act = btn.dataset.act;
 
-      if(act === 'save'){
-        return applyAndSync();
       }
 
       if(act === 'issue'){
@@ -1754,31 +1751,25 @@ function DashboardView(){
   load();
   loadOrdersFromCloud();
 
- function onCloudOrders(e){
+function onCloudOrders(e){
   const serverList = Array.isArray(e.detail) ? e.detail : [];
 
-  // Берём локальные заказы
-  let local = loadDash();
+  // если сервер прислал пусто, а локально что-то есть — не мигаем
+  if(serverList.length === 0 && dashOrders.length > 0){
+    return;
+  }
 
-  // Делаем map по ID
-  const byId = new Map(local.map(o => [String(o.id), o]));
+  const local = loadDash();
+  const localById = new Map(local.map(o => [String(o.id), o]));
 
-  // Накладываем обновления с сервера
-  serverList.forEach(o => {
+  // сервер = источник истины, локальное только подмешиваем
+  dashOrders = serverList.map(o=>{
     const id = String(o.id);
-    const prev = byId.get(id) || {};
-    byId.set(id, { ...prev, ...o });
-  });
+    return { ...localById.get(id), ...o };
+  }).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
 
-  // Преобразуем обратно в массив
-  orders = [...byId.values()]
-    .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-
-  // Сохраняем
-  saveDash(orders);
-
-  // Перерисовываем UI
-  render();
+  saveDash(dashOrders);
+  load(); // перерисовываем
 }
 
   window.addEventListener('cloud:orders', onCloudOrders);
