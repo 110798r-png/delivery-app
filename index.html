@@ -1630,69 +1630,64 @@ function DashboardView(){
     etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
 
     card.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button[data-act]');
-      if(!btn) return;
-      const act = btn.dataset.act;
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const act = btn.dataset.act;
 
-      }
+  if(act === 'issue'){
+    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+    saveDash(dashOrders);
 
-      if(act === 'issue'){
-        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders);
+    // сразу пушим обновление всем экранам
+    window.dispatchEvent(new CustomEvent('cloud:orders', {
+      detail: dashOrders
+    }));
 
-        // ✅ сразу обновляем терминал
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
+    card.remove();
+    showToast(`Заказ #${o.id} выдан`);
 
-        card.remove();
-        showToast(`Заказ #${o.id} выдан`);
+    try{
+      await rpc({ op:'delete', data:{ id:o.id } });
+    }catch(e1){
+      try{ await rpc({ op:'delete', id:o.id }); }
+      catch(e2){ console.warn('delete failed', e1, e2); }
+    }
+    return;
+  }
 
-        try{
-          await rpc({ op:'delete', data:{ id:o.id } });
-        }catch(e1){
-          try{ await rpc({ op:'delete', id:o.id }); }
-          catch(e2){ console.warn('delete failed', e1, e2); }
-        }
-        return;
-      }
+  if(act === 'delete'){
+    if(!card.dataset.confirm){
+      card.dataset.confirm='1';
+      btn.textContent='Точно удалить?';
+      setTimeout(()=>{ 
+        if(card.dataset.confirm==='1'){ 
+          delete card.dataset.confirm; 
+          btn.textContent='Удалить'; 
+        } 
+      },3000);
+      return;
+    }
 
-      if(act === 'delete'){
-        if(!card.dataset.confirm){
-          card.dataset.confirm='1';
-          btn.textContent='Точно удалить?';
-          setTimeout(()=>{ 
-            if(card.dataset.confirm==='1'){ 
-              delete card.dataset.confirm; 
-              btn.textContent='Удалить'; 
-            } 
-          },3000);
-          return;
-        }
+    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+    saveDash(dashOrders);
 
-        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders);
+    window.dispatchEvent(new CustomEvent('cloud:orders', {
+      detail: dashOrders
+    }));
 
-        // ✅ сразу обновляем терминал
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
+    card.remove();
+    showToast(`Заказ #${o.id} удалён`);
 
-        card.remove();
-        showToast(`Заказ #${o.id} удалён`);
+    try{
+      await rpc({ op:'delete', data:{ id:o.id } });
+    }catch(e1){
+      try{ await rpc({ op:'delete', id:o.id }); }
+      catch(e2){ console.warn('delete failed', e1, e2); }
+    }
+    return;
+  }
+});
 
-        try{
-          await rpc({ op:'delete', data:{ id:o.id } });
-        }catch(e1){
-          try{ await rpc({ op:'delete', id:o.id }); }
-          catch(e2){ console.warn('delete failed', e1, e2); }
-        }
-      }
-    });
-
-    return card;
-
-      } // <-- ЗАКРЫЛИ orderCard
 
   function renderOrders(){
     const unique=new Map();
@@ -1839,14 +1834,15 @@ function TerminalView(){
     });
   }
 
- function onCloudOrders(e){
-  const serverList = e.detail || [];
-  if(!serverList.length) { 
-    // пустые апдейты игнорим, чтобы не мигало
-    return; 
+function onCloudOrders(e){
+  const serverList = Array.isArray(e.detail) ? e.detail : [];
+
+  // если пришло пусто, но локально что-то есть — это может быть глюк сети
+  const local = loadDash();
+  if(serverList.length === 0 && local.length > 0){
+    return;
   }
 
-  const local = loadDash();
   const byId = new Map(local.map(o => [String(o.id), o]));
 
   serverList.forEach(o=>{
