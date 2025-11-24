@@ -1505,7 +1505,8 @@ function DashboardView(){
   let knownIds = new Set(dashOrders.map(o => String(o.id)));
   const ding = document.getElementById('orderDing');
   const soundBtn = root.querySelector('#soundToggle');
-  let hiddenNewCount = 0;
+  let hiddenNewCount=0;
+  let pollTimer=null;
 
   const soundOn  = () => localStorage.getItem(SOUND_ON_KEY) === '1';
   const setSound = (on) => {
@@ -1519,7 +1520,7 @@ function DashboardView(){
   function handleVisibilityChange(){
     if (document.visibilityState === 'visible' && hiddenNewCount > 0){
       showToast(`Новых заказов: ${hiddenNewCount}`);
-      hiddenNewCount = 0;
+      hiddenNewCount=0;
     }
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1549,7 +1550,7 @@ function DashboardView(){
          </div>`
       : '';
 
-    const card = el(`
+        const card = el(`
       <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
         <div class="flex items-center justify-between">
           <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1571,16 +1572,13 @@ function DashboardView(){
             <option value="">—</option>
             ${[5,10,15,20,25,30].map(m=>`<option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>`).join('')}
           </select>
-
           ${(o.status==='готово' || o.status==='готов') ? `
             <button type="button"
                     class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
                     data-act="issue">Выдать</button>
           ` : ''}
-
-          <button type="button"
-                  class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto"
-                  data-act="delete">Удалить</button>
+          <button type="button" class="px-3 py-2 rounded-xl border bg-white" data-act="save">Сохранить</button>
+          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
         </div>
       </div>
     `);
@@ -1608,13 +1606,18 @@ function DashboardView(){
         saveDash(dashOrders);
         syncOrderStatus(o.id, patch.status);
 
-        // мгновенно обновляем все экраны
-        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
+        // ✅ сразу обновляем терминал (готовится/готово) без F5
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
 
         if(!silent) showToast(`Статус #${o.id} обновлён`);
-        renderOrders(); // чтобы кнопка "Выдать" появилась сразу
+
+        // ✅ перерисовываем дашборд, чтобы кнопка "Выдать" появилась сразу
+        renderOrders();
       }
 
+      // ✅ шлём на сервер
       try{
         await rpc({ op:'update', data:{ id:o.id, patch } });
       }catch(e1){
@@ -1623,7 +1626,7 @@ function DashboardView(){
       }
     }
 
-    // автосейв при смене статуса/времени
+    // ✅ Автосейв при смене статуса/времени (без кнопки "Сохранить")
     statusSel.addEventListener('change', ()=> applyAndSync({ silent:true }));
     etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
 
@@ -1632,11 +1635,18 @@ function DashboardView(){
       if(!btn) return;
       const act = btn.dataset.act;
 
+      if(act === 'save'){
+        return applyAndSync();
+      }
+
       if(act === 'issue'){
         dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
         saveDash(dashOrders);
 
-        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
+        // ✅ сразу обновляем терминал
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
 
         card.remove();
         showToast(`Заказ #${o.id} выдан`);
@@ -1666,7 +1676,10 @@ function DashboardView(){
         dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
         saveDash(dashOrders);
 
-        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
+        // ✅ сразу обновляем терминал
+        window.dispatchEvent(new CustomEvent('cloud:orders', {
+          detail: dashOrders
+        }));
 
         card.remove();
         showToast(`Заказ #${o.id} удалён`);
@@ -1677,12 +1690,12 @@ function DashboardView(){
           try{ await rpc({ op:'delete', id:o.id }); }
           catch(e2){ console.warn('delete failed', e1, e2); }
         }
-        return;
       }
     });
 
     return card;
-  } // <-- закрыли orderCard
+
+      } // <-- ЗАКРЫЛИ orderCard
 
   function renderOrders(){
     const unique=new Map();
@@ -1738,21 +1751,22 @@ function DashboardView(){
     }
   }
 
-  function onCloudOrders(e){
-    const serverList = Array.isArray(e.detail) ? e.detail : [];
+  load();
+  loadOrdersFromCloud();
 
-    // если сервер прислал пусто, а локально что-то есть — не мигаем
-    if(serverList.length === 0 && dashOrders.length > 0){
-      return;
-    }
+  function onCloudOrders(e){
+    const serverList = e.detail || [];
+    if(!serverList.length) return;
 
     const local = loadDash();
-    const localById = new Map(local.map(o => [String(o.id), o]));
+    const byId = new Map(local.map(o => [String(o.id), o]));
 
-    dashOrders = serverList.map(o=>{
-      const id = String(o.id);
-      return { ...localById.get(id), ...o };
-    }).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+    serverList.forEach(o => {
+      byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
+    });
+
+    dashOrders = [...byId.values()]
+      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
 
     saveDash(dashOrders);
     load();
@@ -1760,16 +1774,15 @@ function DashboardView(){
 
   window.addEventListener('cloud:orders', onCloudOrders);
 
-  load();
-  loadOrdersFromCloud();
-
   root.cleanup = () => {
     window.removeEventListener('cloud:orders', onCloudOrders);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if(pollTimer) clearInterval(pollTimer);
   };
 
   return root;
 } // <-- ЗАКРЫЛИ DashboardView
+
 
 /* ===== Terminal ===== */
 function TerminalView(){
@@ -1826,15 +1839,14 @@ function TerminalView(){
     });
   }
 
-function onCloudOrders(e){
-  const serverList = Array.isArray(e.detail) ? e.detail : [];
-
-  // если пришло пусто, но локально что-то есть — это может быть глюк сети
-  const local = loadDash();
-  if(serverList.length === 0 && local.length > 0){
-    return;
+ function onCloudOrders(e){
+  const serverList = e.detail || [];
+  if(!serverList.length) { 
+    // пустые апдейты игнорим, чтобы не мигало
+    return; 
   }
 
+  const local = loadDash();
   const byId = new Map(local.map(o => [String(o.id), o]));
 
   serverList.forEach(o=>{
