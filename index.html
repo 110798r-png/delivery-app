@@ -1456,11 +1456,6 @@ function OrderView(){
   m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
 })();
 
-    ok.onclick=onOk;
-    cancel.onclick=onCancel;
-    m.onclick=(e)=>{ if(e.target===m) onCancel(e); };
-  })();
-
   rebuildMenu();
   requestAnimationFrame(()=>{
     highlightChip(0);
