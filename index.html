@@ -795,8 +795,6 @@ function applyTheme(theme){
   r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
-  r.style.setProperty('--btn-size', (theme.btnSize||32)+'px');
-r.style.setProperty('--btn-font', (theme.btnFont||18)+'px');
   document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
 }
 
@@ -1187,13 +1185,6 @@ function OrderView(){
       setTimeout(() => card.classList.remove('pulse'), 180);
     }
 
-    .menu-card button[data-act]{
-  width: var(--btn-size);
-  height: var(--btn-size);
-  font-size: var(--btn-font);
-  border-radius: 12px;
-}
-    
     const name  = btn.dataset.name;
     const delta = btn.dataset.act === 'inc' ? 1 : -1;
     const selector = `[data-q="${escAttr(name)}"]`;
