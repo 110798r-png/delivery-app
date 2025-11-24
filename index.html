@@ -133,6 +133,15 @@
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
+    @media print{
+  body * { visibility: hidden !important; }
+  #printArea, #printArea * { visibility: visible !important; }
+  #printArea{
+    position: fixed; left: 0; top: 0; width: 80mm; /* под термопринтер */
+    padding: 6mm; font-size: 12px;
+  }
+}
+    
     /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
     @media (min-width: 1100px) and (orientation: portrait){
 
@@ -354,6 +363,9 @@
     #thanksModal.modal.open{ background: rgba(0,0,0,0.55); }
   </style>
 </head>
+  
+<div id="printArea" class="hidden"></div>
+  
 <body>
   <div class="w-full">
     <div class="brand-strip">
@@ -1328,6 +1340,43 @@ function OrderView(){
       openThanksModal();
       clearIdlePromoTimer();
       schedulePromoAfterOrder();
+
+      // --- ПЕЧАТЬ ЧЕКА ---
+try{
+  const area = document.getElementById('printArea');
+  const created = new Date(order.createdAt || Date.now());
+
+  area.innerHTML = `
+    <div style="font-weight:800; font-size:16px; text-align:center; margin-bottom:6px;">
+      ${loadConfig().brandTitle || 'ЯмаMoto'}
+    </div>
+    <div style="text-align:center; margin-bottom:6px;">
+      Заказ #${order.id}
+    </div>
+    <div style="font-size:11px; margin-bottom:6px;">
+      ${created.toLocaleString()}
+    </div>
+    <hr/>
+    ${(order.items||[]).map(i=>`
+      <div style="display:flex; justify-content:space-between; margin:2px 0;">
+        <div>${i.name} ×${i.qty}</div>
+        <div>${i.qty*(i.price||0)}₽</div>
+      </div>
+    `).join('')}
+    <hr/>
+    <div style="display:flex; justify-content:space-between; font-weight:800; margin-top:6px;">
+      <div>Итого</div><div>${order.total||0}₽</div>
+    </div>
+    <div style="margin-top:8px; font-size:11px;">
+      Оплата: ${order.pay === 'card' ? 'Карта' : 'Перевод/Нал'}
+    </div>
+  `;
+
+  window.print();
+}catch(e){
+  console.warn('print error', e);
+}
+      
     };
 
     ok.onclick=onOk;
