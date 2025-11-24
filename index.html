@@ -1505,8 +1505,7 @@ function DashboardView(){
   let knownIds = new Set(dashOrders.map(o => String(o.id)));
   const ding = document.getElementById('orderDing');
   const soundBtn = root.querySelector('#soundToggle');
-  let hiddenNewCount=0;
-  let pollTimer=null;
+  let hiddenNewCount = 0;
 
   const soundOn  = () => localStorage.getItem(SOUND_ON_KEY) === '1';
   const setSound = (on) => {
@@ -1520,7 +1519,7 @@ function DashboardView(){
   function handleVisibilityChange(){
     if (document.visibilityState === 'visible' && hiddenNewCount > 0){
       showToast(`Новых заказов: ${hiddenNewCount}`);
-      hiddenNewCount=0;
+      hiddenNewCount = 0;
     }
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1550,7 +1549,7 @@ function DashboardView(){
          </div>`
       : '';
 
-        const card = el(`
+    const card = el(`
       <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
         <div class="flex items-center justify-between">
           <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1572,16 +1571,20 @@ function DashboardView(){
             <option value="">—</option>
             ${[5,10,15,20,25,30].map(m=>`<option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>`).join('')}
           </select>
+
           ${(o.status==='готово' || o.status==='готов') ? `
             <button type="button"
                     class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
                     data-act="issue">Выдать</button>
           ` : ''}
-          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
+
+          <button type="button"
+                  class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto"
+                  data-act="delete">Удалить</button>
         </div>
       </div>
     `);
-    
+
     const statusSel = card.querySelector('[data-k="status"]');
     const etaSelEl  = card.querySelector('[data-k="eta"]');
 
@@ -1605,18 +1608,13 @@ function DashboardView(){
         saveDash(dashOrders);
         syncOrderStatus(o.id, patch.status);
 
-        // ✅ сразу обновляем терминал (готовится/готово) без F5
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
+        // мгновенно обновляем все экраны
+        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
 
         if(!silent) showToast(`Статус #${o.id} обновлён`);
-
-        // ✅ перерисовываем дашборд, чтобы кнопка "Выдать" появилась сразу
-        renderOrders();
+        renderOrders(); // чтобы кнопка "Выдать" появилась сразу
       }
 
-      // ✅ шлём на сервер
       try{
         await rpc({ op:'update', data:{ id:o.id, patch } });
       }catch(e1){
@@ -1625,71 +1623,66 @@ function DashboardView(){
       }
     }
 
-    // ✅ Автосейв при смене статуса/времени (без кнопки "Сохранить")
+    // автосейв при смене статуса/времени
     statusSel.addEventListener('change', ()=> applyAndSync({ silent:true }));
     etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
 
     card.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('button[data-act]');
-  if(!btn) return;
-  const act = btn.dataset.act;
+      const btn = e.target.closest('button[data-act]');
+      if(!btn) return;
+      const act = btn.dataset.act;
 
-  if(act === 'issue'){
-    // удаляем заказ локально
-    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-    saveDash(dashOrders);
+      if(act === 'issue'){
+        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+        saveDash(dashOrders);
 
-    // сразу пушим апдейт во все экраны
-    window.dispatchEvent(new CustomEvent('cloud:orders', {
-      detail: dashOrders
-    }));
+        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
 
-    card.remove();
-    showToast(`Заказ #${o.id} выдан`);
+        card.remove();
+        showToast(`Заказ #${o.id} выдан`);
 
-    // удаляем на сервере
-    try{
-      await rpc({ op:'delete', data:{ id:o.id } });
-    }catch(e1){
-      try{ await rpc({ op:'delete', id:o.id }); }
-      catch(e2){ console.warn('delete failed', e1, e2); }
-    }
-    return;
-  }
+        try{
+          await rpc({ op:'delete', data:{ id:o.id } });
+        }catch(e1){
+          try{ await rpc({ op:'delete', id:o.id }); }
+          catch(e2){ console.warn('delete failed', e1, e2); }
+        }
+        return;
+      }
 
-  if(act === 'delete'){
-    if(!card.dataset.confirm){
-      card.dataset.confirm='1';
-      btn.textContent='Точно удалить?';
-      setTimeout(()=>{ 
-        if(card.dataset.confirm==='1'){ 
-          delete card.dataset.confirm; 
-          btn.textContent='Удалить'; 
-        } 
-      },3000);
-      return;
-    }
+      if(act === 'delete'){
+        if(!card.dataset.confirm){
+          card.dataset.confirm='1';
+          btn.textContent='Точно удалить?';
+          setTimeout(()=>{ 
+            if(card.dataset.confirm==='1'){ 
+              delete card.dataset.confirm; 
+              btn.textContent='Удалить'; 
+            } 
+          },3000);
+          return;
+        }
 
-    dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-    saveDash(dashOrders);
+        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+        saveDash(dashOrders);
 
-    window.dispatchEvent(new CustomEvent('cloud:orders', {
-      detail: dashOrders
-    }));
+        window.dispatchEvent(new CustomEvent('cloud:orders', { detail: dashOrders }));
 
-    card.remove();
-    showToast(`Заказ #${o.id} удалён`);
+        card.remove();
+        showToast(`Заказ #${o.id} удалён`);
 
-    try{
-      await rpc({ op:'delete', data:{ id:o.id } });
-    }catch(e1){
-      try{ await rpc({ op:'delete', id:o.id }); }
-      catch(e2){ console.warn('delete failed', e1, e2); }
-    }
-    return;
-  }
-});
+        try{
+          await rpc({ op:'delete', data:{ id:o.id } });
+        }catch(e1){
+          try{ await rpc({ op:'delete', id:o.id }); }
+          catch(e2){ console.warn('delete failed', e1, e2); }
+        }
+        return;
+      }
+    });
 
+    return card;
+  } // <-- закрыли orderCard
 
   function renderOrders(){
     const unique=new Map();
@@ -1745,41 +1738,38 @@ function DashboardView(){
     }
   }
 
-  load();
-  loadOrdersFromCloud();
+  function onCloudOrders(e){
+    const serverList = Array.isArray(e.detail) ? e.detail : [];
 
-function onCloudOrders(e){
-  const serverList = Array.isArray(e.detail) ? e.detail : [];
+    // если сервер прислал пусто, а локально что-то есть — не мигаем
+    if(serverList.length === 0 && dashOrders.length > 0){
+      return;
+    }
 
-  // если сервер прислал пусто, а локально что-то есть — не мигаем
-  if(serverList.length === 0 && dashOrders.length > 0){
-    return;
+    const local = loadDash();
+    const localById = new Map(local.map(o => [String(o.id), o]));
+
+    dashOrders = serverList.map(o=>{
+      const id = String(o.id);
+      return { ...localById.get(id), ...o };
+    }).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+    saveDash(dashOrders);
+    load();
   }
 
-  const local = loadDash();
-  const localById = new Map(local.map(o => [String(o.id), o]));
-
-  // сервер = источник истины, локальное только подмешиваем
-  dashOrders = serverList.map(o=>{
-    const id = String(o.id);
-    return { ...localById.get(id), ...o };
-  }).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
-
-  saveDash(dashOrders);
-  load(); // перерисовываем
-}
-
   window.addEventListener('cloud:orders', onCloudOrders);
+
+  load();
+  loadOrdersFromCloud();
 
   root.cleanup = () => {
     window.removeEventListener('cloud:orders', onCloudOrders);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
-    if(pollTimer) clearInterval(pollTimer);
   };
 
   return root;
 } // <-- ЗАКРЫЛИ DashboardView
-
 
 /* ===== Terminal ===== */
 function TerminalView(){
