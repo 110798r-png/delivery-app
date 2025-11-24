@@ -1700,20 +1700,31 @@ function BuilderView(){
   return root;
 }
 
- // ===== kiosk portrait helper (14" вертикаль) =====
-function applyKioskPortraitClass(){
-  document.body.classList.remove('kiosk-portrait');
-
+/* ===== KIOSK auto scale for 14" ===== */
+function applyKioskClasses(){
   const w = window.innerWidth;
   const h = window.innerHeight;
+  const portrait = h > w;
 
-  // вертикаль + достаточно большой экран
-  if(h > w && w >= 520){ 
-    document.body.classList.add('kiosk-portrait');
+  // "большой экран" — порог в CSS px (работает даже при Windows scaling)
+  const large = Math.max(w, h) >= 900;
+
+  document.body.classList.toggle('kiosk-large', large);
+  document.body.classList.toggle('kiosk-portrait', large && portrait);
+  document.body.classList.toggle('kiosk-landscape', large && !portrait);
+
+  // Ключевой момент: поднимаем БАЗУ rem
+  if(large){
+    const scale = portrait ? 1.18 : 1.10;   // портрет чуть сильнее
+    document.documentElement.style.fontSize = (16 * scale) + 'px';
+  }else{
+    document.documentElement.style.fontSize = '';
   }
 }
-applyKioskPortraitClass();
-window.addEventListener('resize', applyKioskPortraitClass);
+
+applyKioskClasses();
+window.addEventListener('resize', applyKioskClasses);
+window.addEventListener('orientationchange', applyKioskClasses);
   
 /* ===== Router ===== */
 function mount(view){
