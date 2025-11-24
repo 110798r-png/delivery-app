@@ -1368,21 +1368,27 @@ schedulePromoAfterOrder();
     applyRepeatOrder();
   });
 
-  const syncTimer=setInterval(async ()=>{
-    try{
-      const cfgRemote=await fetchRemoteConfig();
-      if(cfgRemote){
-        const v=calcConfigVersion(cfgRemote);
-        if(v!==lastConfigVersion){
-          lastConfigVersion=v;
-          rebuildMenu();
-          recalcTotal();
-          applyHeights();
-        }
+ let syncInFlight = false;
+
+const syncTimer = setInterval(async () => {
+  if (syncInFlight) return;
+  syncInFlight = true;
+  try {
+    const cfgRemote = await fetchRemoteConfig();
+    if (cfgRemote) {
+      const v = calcConfigVersion(cfgRemote);
+      if (v !== lastConfigVersion) {
+        lastConfigVersion = v;
+        rebuildMenu();
+        recalcTotal();
+        applyHeights();
       }
-    }catch{}
+    }
     await pullAndMergeStatuses().catch(()=>{});
-  },4000);
+  } finally {
+    syncInFlight = false;
+  }
+}, 4000);
 
  root.cleanup=()=>{
   setBodyScrollLock(false);
@@ -1600,7 +1606,18 @@ function DashboardView(){
     console.warn('loadOrdersFromCloud', e);
   }
 }
+    load();
+  loadOrdersFromCloud();
+  pollTimer = setInterval(loadOrdersFromCloud, 12000);
 
+  root.cleanup = () => {
+    if(pollTimer) clearInterval(pollTimer);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+
+  return root;
+}
+   
 /* ===== Терминал (две колонки "готовится/готово") ===== */
 function TerminalView(){
   let orders=loadDash();
