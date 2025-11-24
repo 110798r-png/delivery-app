@@ -1635,10 +1635,11 @@ function DashboardView(){
   const act = btn.dataset.act;
 
   if(act === 'issue'){
+    // удаляем заказ локально
     dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
     saveDash(dashOrders);
 
-    // сразу пушим обновление всем экранам
+    // сразу пушим апдейт во все экраны
     window.dispatchEvent(new CustomEvent('cloud:orders', {
       detail: dashOrders
     }));
@@ -1646,6 +1647,7 @@ function DashboardView(){
     card.remove();
     showToast(`Заказ #${o.id} выдан`);
 
+    // удаляем на сервере
     try{
       await rpc({ op:'delete', data:{ id:o.id } });
     }catch(e1){
