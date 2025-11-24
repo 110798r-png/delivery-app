@@ -770,11 +770,17 @@ const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
   promoVideoUrl: '',
   theme: {
-  cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104,
-  showPrice:true,
-  btnSize: 42,
-  btnFont: 22
-},
+    cardRadius:20,
+    imgRadius:12,
+    imgW:110,
+    imgH:70,
+    cardMinH:104,
+    showPrice:true,
+
+    // размер кнопок +/-
+    btnSize: 42,   // px
+    btnFont: 22    // px
+  },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -793,10 +799,21 @@ const DEFAULT_CONFIG = {
       { name:'Добрый кола', price:100 }, { name:'Добрый апельсин', price:100 }, { name:'Добрый лайм', price:100 },
       { name:'фдэт-уайт', price:100 }, { name:'Раф банан', price:100 }, { name:'Эспрессо', price:100 }
     ]},
-    { key:'sushi',   title:'Суши / роллы', items:[ { name:'Калифорния', price:350 }, { name:'Филадельфия', price:390 }, { name:'Аляска', price:350 } ]},
-    { key:'semi',    title:'Полуфабрикаты', items:[ { name:'Курзе с мясом', price:160 }, { name:'Курзе с творогом ', price:210 }, { name:'хинкал слоенный', price:190 }, { name:'Хинкал тонкий', price:190 }, { name:'Хинкал толстый', price:190 } ]}
+    { key:'sushi',   title:'Суши / роллы', items:[
+      { name:'Калифорния', price:350 },
+      { name:'Филадельфия', price:390 },
+      { name:'Аляска', price:350 }
+    ]},
+    { key:'semi',    title:'Полуфабрикаты', items:[
+      { name:'Курзе с мясом', price:160 },
+      { name:'Курзе с творогом ', price:210 },
+      { name:'хинкал слоенный', price:190 },
+      { name:'Хинкал тонкий', price:190 },
+      { name:'Хинкал толстый', price:190 }
+    ]}
   ]
 };
+    
 function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
@@ -807,7 +824,13 @@ function applyTheme(theme){
   r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
-  document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
+
+  // НОВОЕ:
+  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
+  r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
+
+  document.getElementById('brandTitle').textContent =
+    (loadConfig().brandTitle || 'ЯмаMoto');
 }
 
 function calcConfigVersion(cfg) {
@@ -1136,9 +1159,9 @@ function OrderView(){
               <div class="font-medium text-sm flex items-center gap-2">${it.name}</div>
               ${cfg.theme.showPrice ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>` : ''}
               <div class="flex items-center gap-3 mt-3">
-                <button type="button" class="w-8 h-8 rounded-xl border" data-name="${it.name}" data-act="dec">−</button>
+                <button type="button" class="rounded-xl border" data-name="${it.name}" data-act="dec">−</button>
                 <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-                <button type="button" class="w-8 h-8 rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc">+</button>
+                <button type="button" class="rounded-xl bg-black text-white" data-name="${it.name}" data-act="inc">+</button>
               </div>
             </div>
             <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
@@ -1320,19 +1343,33 @@ function OrderView(){
       }));
       if(!itemsSel.length){ close(); finalize(); return; }
 
-      try{
-        const res=await rpc({ op:'create', data:{ clientId:getClientId(), items:itemsSel, total, pay:sel.value||'cash' } });
-        const order = res?.order || { id:Date.now().toString().slice(-6), createdAt:Date.now(), items:itemsSel, total, pay:sel.value||'cash', status:'готовится' };
+      let order;
 
-        const history=loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
-        const dash=loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
+try{
+  const res = await rpc({
+    op:'create',
+    data:{ clientId:getClientId(), items:itemsSel, total, pay:sel.value||'cash' }
+  });
 
-        const p=loadProfile(); p.paymentMethod=sel.value||'cash'; saveProfile(p);
-      }catch(err){
-        console.warn('RPC create error', err);
-        showToast('Не удалось отправить заказ, попробуйте ещё раз.');
-        finalize(); return;
-      }
+  order = res?.order || {
+    id:Date.now().toString().slice(-6),
+    createdAt:Date.now(),
+    items:itemsSel,
+    total,
+    pay:sel.value||'cash',
+    status:'готовится'
+  };
+
+  const history=loadHistory(); history.unshift(order); saveHistory(history.slice(0,50));
+  const dash=loadDash(); dash.unshift(order); saveDash(dash.slice(0,200));
+
+  const p=loadProfile(); p.paymentMethod=sel.value||'cash'; saveProfile(p);
+}catch(err){
+  console.warn('RPC create error', err);
+  showToast('Не удалось отправить заказ, попробуйте ещё раз.');
+  finalize(); 
+  return;
+}
 
       close(); finalize(); resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
