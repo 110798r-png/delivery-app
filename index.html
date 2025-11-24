@@ -324,7 +324,7 @@
     body.kiosk-portrait.route-order #totalVal{
       font-size: 1.25rem;
     }
-
+    
     /* ===== Роут-правила для шапки/стрелок ===== */
 
     #backBtn.back-invisible{
@@ -361,6 +361,18 @@
     }
 
     #thanksModal.modal.open{ background: rgba(0,0,0,0.55); }
+
+        /* Кнопки +/- берут размер из theme */
+.menu-card button[data-act]{
+  width: var(--btn-size);
+  height: var(--btn-size);
+  font-size: var(--btn-font);
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  line-height: 1;
+}
+    
   </style>
 </head>
     
@@ -1415,42 +1427,6 @@ function OrderView(){
     clearIdlePromoTimer();
     schedulePromoAfterOrder();
 
-    // --- ПЕЧАТЬ ЧЕКА ---
-    try{
-      const area = document.getElementById('printArea');
-      const created = new Date(order.createdAt || Date.now());
-
-      area.innerHTML = `
-        <div style="font-weight:800; font-size:16px; text-align:center; margin-bottom:6px;">
-          ${loadConfig().brandTitle || 'ЯмаMoto'}
-        </div>
-        <div style="text-align:center; margin-bottom:6px;">
-          Заказ #${order.id}
-        </div>
-        <div style="font-size:11px; margin-bottom:6px;">
-          ${created.toLocaleString()}
-        </div>
-        <hr/>
-        ${(order.items||[]).map(i=>`
-          <div style="display:flex; justify-content:space-between; margin:2px 0;">
-            <div>${i.name} ×${i.qty}</div>
-            <div>${i.qty*(i.price||0)}₽</div>
-          </div>
-        `).join('')}
-        <hr/>
-        <div style="display:flex; justify-content:space-between; font-weight:800; margin-top:6px;">
-          <div>Итого</div><div>${order.total||0}₽</div>
-        </div>
-        <div style="margin-top:8px; font-size:11px;">
-          Оплата: ${order.pay === 'card' ? 'Карта' : 'Перевод'}
-        </div>
-      `;
-      window.print();
-    }catch(er){
-      console.warn('print error', er);
-    }
-  };
-
   ok.onclick = onOk;
   cancel.onclick = onCancel;
   m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
@@ -1607,61 +1583,82 @@ function DashboardView(){
       </div>
     `);
 
-    card.addEventListener('click', (e)=>{
+    card.addEventListener('click', async (e)=>{
       const btn = e.target.closest('button[data-act]');
       if(!btn) return;
       const act=btn.dataset.act;
 
-      if(act==='save'){
-        const status=card.querySelector('[data-k="status"]').value;
-        const etaSel=card.querySelector('[data-k="eta"]').value;
-        const etaMinutes=etaSel?Number(etaSel):null;
+     if(act==='save'){
+  const status=card.querySelector('[data-k="status"]').value;
+  const etaSel=card.querySelector('[data-k="eta"]').value;
+  const etaMinutes=etaSel?Number(etaSel):null;
 
-        const patch={status};
-        if(etaMinutes){
-          patch.etaMinutes=etaMinutes;
-          patch.etaUntil=Date.now()+etaMinutes*60*1000;
-        }else{
-          patch.etaMinutes=null; patch.etaUntil=null;
-        }
+  const patch={status};
+  if(etaMinutes){
+    patch.etaMinutes=etaMinutes;
+    patch.etaUntil=Date.now()+etaMinutes*60*1000;
+  }else{
+    patch.etaMinutes=null; patch.etaUntil=null;
+  }
 
-        const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
-        if(i>=0){
-          dashOrders[i]={...dashOrders[i], ...patch};
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, patch.status);
-          showToast(`Статус #${o.id} обновлён`);
-          renderOrders();
-        }
-        try{ rpc({op:'update', id:o.id, patch}).catch(()=>{});}catch{}
-      }
+  const i=dashOrders.findIndex(x=>String(x.id)===String(o.id));
+  if(i>=0){
+    dashOrders[i]={...dashOrders[i], ...patch};
+    saveDash(dashOrders);
+    syncOrderStatus(o.id, patch.status);
+    showToast(`Статус #${o.id} обновлён`);
+    renderOrders();
+  }
 
-      if(act==='issue'){
-  // выдаём = удаляем заказ как завершённый
+  // ✅ ВАЖНО: шлём на сервер ПРАВИЛЬНО
+  try{
+    await rpc({ op:'update', data:{ id:o.id, patch } });
+  }catch(e1){
+    // fallback на старый формат — на всякий случай
+    try{ await rpc({ op:'update', id:o.id, patch }); }
+    catch(e2){ console.warn('update failed', e1, e2); }
+  }
+}
+    if(act==='issue'){
   dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
   saveDash(dashOrders);
   card.remove();
   showToast(`Заказ #${o.id} выдан`);
 
-  try{ rpc({op:'delete', id:o.id}).catch(()=>{});}catch{}
+  try{
+    await rpc({ op:'delete', data:{ id:o.id } });
+  }catch(e1){
+    try{ await rpc({ op:'delete', id:o.id }); }
+    catch(e2){ console.warn('delete failed', e1, e2); }
+  }
   return;
 }
       
       if(act==='delete'){
-        if(!card.dataset.confirm){
-          card.dataset.confirm='1';
-          btn.textContent='Точно удалить?';
-          setTimeout(()=>{ if(card.dataset.confirm==='1'){ delete card.dataset.confirm; btn.textContent='Удалить'; } },3000);
-          return;
-        }
-        dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders);
-        card.remove();
-        showToast(`Заказ #${o.id} удалён`);
-        try{ rpc({op:'delete', id:o.id}).catch(()=>{});}catch{}
-      }
-    });
+  if(!card.dataset.confirm){
+    card.dataset.confirm='1';
+    btn.textContent='Точно удалить?';
+    setTimeout(()=>{ 
+      if(card.dataset.confirm==='1'){ 
+        delete card.dataset.confirm; 
+        btn.textContent='Удалить'; 
+      } 
+    },3000);
+    return;
+  }
 
+  dashOrders=dashOrders.filter(x=>String(x.id)!==String(o.id));
+  saveDash(dashOrders);
+  card.remove();
+  showToast(`Заказ #${o.id} удалён`);
+
+  try{
+    await rpc({ op:'delete', data:{ id:o.id } });
+  }catch(e1){
+    try{ await rpc({ op:'delete', id:o.id }); }
+    catch(e2){ console.warn('delete failed', e1, e2); }
+  }
+}
     return card;
   }
 
