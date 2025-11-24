@@ -134,96 +134,72 @@ button[data-act]:active, #confirmBtn:active{
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
-   /* ===== 14" вертикаль: экран заказа (#/order) ===== */
-@media (min-width: 700px) and (orientation: portrait){
-
-  /* шире рабочая зона */
-  body.route-order .phone-shell{
-    width: min(100vw, 760px);
-    max-width: 760px;
-    padding: 0 1.2rem;
-  }
-
-  body.route-order .brand-strip .phone-shell{
-    width: min(100vw, 760px);
-    max-width: 760px;
-  }
-
-  body.route-order .confirm-bar{
-    width: min(760px, 100%);
-    max-width: 760px;
-    border-radius: 0;
-    padding: .9rem 1.2rem;
-  }
-
-  /* шапка крупнее */
-  body.route-order .brand-title{
-    font-size: 30px;
-  }
-  body.route-order .brand-sub{
-    font-size: 13px;
-    margin-top: 4px;
-  }
-  body.route-order .sushi-icon{
-    width: 44px;
-    height: 44px;
-  }
-  body.route-order .sushi-icon svg{
-    width: 30px;
-    height: 30px;
-  }
-
-  /* карточки крупнее */
-  body.route-order .menu-card{
-    border-radius: 1.6rem;
-    min-height: 128px;
-    padding: 1.1rem 1.2rem;
-  }
-
-  body.route-order .menu-card-img{
-    width: 150px;
-    height: 100px;
-    border-radius: 1rem;
-  }
-
-  /* текст в карточке */
-  body.route-order .menu-card .font-medium{
-    font-size: 18px;
-  }
-  body.route-order .menu-card .text-xs{
-    font-size: 14px;
-  }
-
-  /* кнопки + / − больше */
-  body.route-order button[data-act]{
-    width: 44px !important;
-    height: 44px !important;
-    font-size: 20px;
-    border-radius: 14px !important;
-  }
-  body.route-order [data-q]{
-    font-size: 18px;
-    width: 36px;
-  }
-
-  /* чипы категорий крупнее */
-  body.route-order #categoryBar button{
-    font-size: 16px;
-    padding: .45rem .9rem;
-    border-radius: 999px;
-  }
-
-  /* кнопка оформить заказ */
-  body.route-order #confirmBtn{
-    font-size: 18px;
-    padding: .9rem 1.2rem;
-    border-radius: 16px;
-  }
-
-  body.route-order #totalVal{
-    font-size: 20px;
-  }
+  /* ===== 14" вертикаль: экран заказа (#/order) через класс ===== */
+body.route-order.kiosk-portrait .phone-shell{
+  width: min(100vw, 760px);
+  max-width: 760px;
+  padding: 0 1.2rem;
 }
+
+body.route-order.kiosk-portrait .brand-strip .phone-shell{
+  width: min(100vw, 760px);
+  max-width: 760px;
+}
+
+body.route-order.kiosk-portrait .confirm-bar{
+  width: min(760px, 100%);
+  max-width: 760px;
+  border-radius: 0;
+  padding: .9rem 1.2rem;
+}
+
+/* шапка крупнее */
+body.route-order.kiosk-portrait .brand-title{ font-size: 30px; }
+body.route-order.kiosk-portrait .brand-sub{ font-size: 13px; margin-top:4px; }
+body.route-order.kiosk-portrait .sushi-icon{ width:44px; height:44px; }
+body.route-order.kiosk-portrait .sushi-icon svg{ width:30px; height:30px; }
+
+/* карточки крупнее */
+body.route-order.kiosk-portrait .menu-card{
+  border-radius: 1.6rem;
+  min-height: 128px;
+  padding: 1.1rem 1.2rem;
+}
+body.route-order.kiosk-portrait .menu-card-img{
+  width: 150px;
+  height: 100px;
+  border-radius: 1rem;
+}
+
+/* текст в карточке */
+body.route-order.kiosk-portrait .menu-card .font-medium{ font-size:18px; }
+body.route-order.kiosk-portrait .menu-card .text-xs{ font-size:14px; }
+
+/* кнопки */
+body.route-order.kiosk-portrait button[data-act]{
+  width:44px !important;
+  height:44px !important;
+  font-size:20px;
+  border-radius:14px !important;
+}
+body.route-order.kiosk-portrait [data-q]{
+  font-size:18px;
+  width:36px;
+}
+
+/* чипы категорий */
+body.route-order.kiosk-portrait #categoryBar button{
+  font-size:16px;
+  padding:.45rem .9rem;
+}
+
+/* нижняя кнопка */
+body.route-order.kiosk-portrait #confirmBtn{
+  font-size:18px;
+  padding:.9rem 1.2rem;
+  border-radius:16px;
+}
+body.route-order.kiosk-portrait #totalVal{ font-size:20px; }
     
     /* ===== Роут-правила для шапки/стрелок ===== */
 
@@ -436,7 +412,10 @@ function resetIdlePromoTimer(){
 /* ===== Promo video helpers ===== */
 let promoTimer = null;
 
-function openPromoModal(){
+async function openPromoModal(){
+  // 1) пробуем подтянуть свежий конфиг с сервера
+  await fetchRemoteConfig().catch(()=>{});
+
   const cfg = loadConfig();
   const url = (cfg.promoVideoUrl || '').trim();
   if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
@@ -449,9 +428,7 @@ function openPromoModal(){
   v.src = url;
   v.currentTime = 0;
 
-  // важное: сразу muted для автозапуска на любом устройстве
   v.muted = true;
-  v.volume = 1;
   v.setAttribute('autoplay','');
   v.load();
 
@@ -460,10 +437,7 @@ function openPromoModal(){
 
   const p = v.play();
   if(p && p.catch){
-    p.catch(()=>{ 
-      // если даже muted не стартанул — просто молча игнорим
-      console.warn('promo autoplay blocked');
-    });
+    p.catch(()=>console.warn('promo autoplay blocked'));
   }
 }
 
@@ -1695,6 +1669,22 @@ if(backBtn){
 
 // ===== классы роутов для CSS =====
 document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
+
+  // ===== kiosk portrait helper (14" вертикаль) =====
+function applyKioskPortraitClass(){
+  document.body.classList.remove('kiosk-portrait');
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // вертикаль + достаточно большой экран
+  if(h > w && w >= 520){ 
+    document.body.classList.add('kiosk-portrait');
+  }
+}
+applyKioskPortraitClass();
+window.addEventListener('resize', applyKioskPortraitClass);
+
 
 if (h==='#/order' || h==='#/'){
   document.body.classList.add('route-order');
