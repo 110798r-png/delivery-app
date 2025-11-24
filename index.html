@@ -134,6 +134,35 @@ button[data-act]:active, #confirmBtn:active{
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
+    /* --- 14" вертикаль для экрана заказа --- */
+@media (min-width: 700px) and (orientation: portrait){
+  body.route-order .phone-shell{
+    width: min(100vw, 720px);
+    max-width: 720px;
+    padding: 0 1rem;
+  }
+
+  body.route-order .brand-strip .phone-shell{
+    width: min(100vw, 720px);
+    max-width: 720px;
+  }
+
+  body.route-order .confirm-bar{
+    width: min(720px, 100%);
+    max-width: 720px;
+    border-radius: 0;
+  }
+
+  body.route-order .menu-card{
+    border-radius: 1.5rem;
+    min-height: 120px; /* чуть «воздушнее» для большого экрана */
+  }
+
+  body.route-order .menu-card-img{
+    width: 140px;
+    height: 90px;
+  }
+}
     
     /* ===== Роут-правила для шапки/стрелок ===== */
 
