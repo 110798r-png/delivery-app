@@ -218,6 +218,134 @@ button[data-act]:active, #confirmBtn:active{
   }
 }
 
+    /* ===== 14" КИОСК ВЕРТИКАЛЬ (работает по class kiosk-portrait) =====
+   На реальных 14" 2560×1440 portrait CSS width часто 800–1000px,
+   поэтому min-width:1100 не срабатывал.
+*/
+body.kiosk-portrait.route-order{
+  font-size: 18px;
+}
+
+body.kiosk-portrait.route-order .phone-shell{
+  width: min(100vw, 900px);
+  max-width: 900px;
+  padding: 0 1.5rem;
+}
+body.kiosk-portrait.route-order .brand-strip .phone-shell{
+  width: min(100vw, 900px);
+  max-width: 900px;
+}
+
+/* шапка */
+body.kiosk-portrait.route-order .brand-title{ font-size: 30px; }
+body.kiosk-portrait.route-order .brand-sub{ font-size: 13px; }
+body.kiosk-portrait.route-order .sushi-icon{
+  width: 42px; height: 42px;
+}
+
+/* чипы категорий */
+body.kiosk-portrait.route-order #categoryBar button{
+  font-size: 1rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+}
+
+/* карточки меню */
+body.kiosk-portrait.route-order .menu-card{
+  min-height: 130px;
+  padding: 1.25rem;
+  gap: 1rem;
+  border-radius: 1.5rem;
+}
+body.kiosk-portrait.route-order .menu-card .font-medium{
+  font-size: 1.1rem;
+}
+body.kiosk-portrait.route-order .menu-card .text-xs{
+  font-size: 0.95rem;
+}
+
+/* фото товара */
+body.kiosk-portrait.route-order .menu-card-img{
+  width: 160px;
+  height: 102px;
+  border-radius: 1rem;
+}
+
+/* кнопки +/– */
+body.kiosk-portrait.route-order .menu-card button[data-act]{
+  width: 42px;
+  height: 42px;
+  font-size: 22px;
+  border-radius: 12px;
+}
+
+/* нижняя панель */
+body.kiosk-portrait.route-order .confirm-bar{
+  width: min(100vw, 900px);
+  max-width: 900px;
+  padding: 1rem 1.4rem;
+  border-radius: 0;
+}
+body.kiosk-portrait.route-order #confirmBtn{
+  font-size: 1.1rem;
+  padding: 1rem 1.3rem;
+  border-radius: 14px;
+}
+body.kiosk-portrait.route-order #totalVal{
+  font-size: 1.25rem;
+}
+
+
+/* ===== 14" ЛАНДШАФТ ДЛЯ DASHBOARD / TERMINAL ===== */
+@media (min-width: 1000px) and (orientation: landscape){
+
+  body.route-landscape{
+    font-size: 18px;
+  }
+
+  /* Dashboard */
+  body.route-dashboard h2.text-2xl{
+    font-size: 2.25rem; /* крупнее заголовок */
+  }
+  body.route-dashboard #list > div{
+    border-width: 2px;
+  }
+  body.route-dashboard #list .text-3xl{
+    font-size: 2.1rem;
+  }
+  body.route-dashboard #list .text-xl{
+    font-size: 1.4rem;
+  }
+  body.route-dashboard #list .p-6{
+    padding: 1.75rem;
+  }
+  body.route-dashboard select,
+  body.route-dashboard button{
+    font-size: 1rem;
+    padding: .6rem .9rem;
+  }
+
+  /* Terminal */
+  body.route-terminal #app{
+    font-size: 20px;
+  }
+  body.route-terminal .text-5xl{
+    font-size: 4.5rem;
+    line-height: 1;
+  }
+  body.route-terminal .text-3xl{
+    font-size: 2.4rem;
+  }
+  body.route-terminal .text-2xl{
+    font-size: 2rem;
+  }
+  body.route-terminal .text-xl{
+    font-size: 1.5rem;
+  }
+  body.route-terminal .p-4{ padding: 1.25rem; }
+  body.route-terminal .p-5{ padding: 1.5rem; }
+}
+
     
     /* ===== Роут-правила для шапки/стрелок ===== */
 
