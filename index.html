@@ -1754,23 +1754,32 @@ function DashboardView(){
   load();
   loadOrdersFromCloud();
 
-  function onCloudOrders(e){
-    const serverList = e.detail || [];
-    if(!serverList.length) return;
+ function onCloudOrders(e){
+  const serverList = Array.isArray(e.detail) ? e.detail : [];
 
-    const local = loadDash();
-    const byId = new Map(local.map(o => [String(o.id), o]));
+  // Берём локальные заказы
+  let local = loadDash();
 
-    serverList.forEach(o => {
-      byId.set(String(o.id), { ...byId.get(String(o.id)), ...o });
-    });
+  // Делаем map по ID
+  const byId = new Map(local.map(o => [String(o.id), o]));
 
-    dashOrders = [...byId.values()]
-      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+  // Накладываем обновления с сервера
+  serverList.forEach(o => {
+    const id = String(o.id);
+    const prev = byId.get(id) || {};
+    byId.set(id, { ...prev, ...o });
+  });
 
-    saveDash(dashOrders);
-    load();
-  }
+  // Преобразуем обратно в массив
+  orders = [...byId.values()]
+    .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+  // Сохраняем
+  saveDash(orders);
+
+  // Перерисовываем UI
+  render();
+}
 
   window.addEventListener('cloud:orders', onCloudOrders);
 
