@@ -1318,33 +1318,145 @@ function OrderView(){
     confirmBtn.disabled=true;
   }
 
-  (function bindPayModal(){
-  const m=document.getElementById('payModal');
-  const ok=document.getElementById('payOk');
-  const cancel=document.getElementById('payCancel');
-  const sel=document.getElementById('paySelect');
+(function bindPayModal(){
+  const m      = document.getElementById('payModal');
+  const ok     = document.getElementById('payOk');
+  const cancel = document.getElementById('payCancel');
+  const sel    = document.getElementById('paySelect');
 
-  const close=()=>m.classList.remove('open');
-  const finalize=()=>{ confirmBtn._busy=false; confirmBtn.disabled=false; };
+  if(!m || !ok || !cancel || !sel) return;
 
-  const onCancel=(e)=>{ e&&e.preventDefault(); e&&e.stopPropagation(); close(); finalize(); };
+  const close = ()=> m.classList.remove('open');
+  const finalize = ()=>{
+    confirmBtn._busy = false;
+    // confirmBtn.disabled вернём после close/cancel, а после ok мы всё равно resetCounts()
+    confirmBtn.disabled = false;
+  };
+
+  const onCancel = (e)=>{
+    e && e.preventDefault();
+    e && e.stopPropagation();
+    close();
+    finalize();
+  };
 
   const onOk = async (e)=>{
-    e&&e.preventDefault(); e&&e.stopPropagation();
+    e && e.preventDefault();
+    e && e.stopPropagation();
+
     unlockMediaOnce();
 
-    const cfg=loadConfig();
-    const counts=window.__orderCounts||{};
-    const itemsSel=[];
-    let total=0;
+    const cfg    = loadConfig();
+    const counts = window.__orderCounts || {};
+    const itemsSel = [];
+    let total = 0;
 
-    cfg.menu.forEach(cat=>cat.items.forEach(it=>{
-      const q=counts[it.name]||0;
-      if(q>0){
-        itemsSel.push({name:it.name, qty:q, price:it.price||0});
-        total += q*(it.price||0);
+    cfg.menu.forEach(cat => cat.items.forEach(it=>{
+      const q = counts[it.name] || 0;
+      if(q > 0){
+        itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
+        total += q * (it.price || 0);
       }
     }));
+
+    if(!itemsSel.length){
+      close(); finalize();
+      return;
+    }
+
+    let order = null;
+
+    try{
+      const res = await rpc({
+        op: 'create',
+        data: {
+          clientId: getClientId(),
+          items: itemsSel,
+          total,
+          pay: sel.value || 'card'
+        }
+      });
+
+      order = res?.order || {
+        id: Date.now().toString().slice(-6),
+        createdAt: Date.now(),
+        items: itemsSel,
+        total,
+        pay: sel.value || 'card',
+        status: 'готовится'
+      };
+
+      const history = loadHistory();
+      history.unshift(order);
+      saveHistory(history.slice(0,50));
+
+      const dash = loadDash();
+      dash.unshift(order);
+      saveDash(dash.slice(0,200));
+
+      const p = loadProfile();
+      p.paymentMethod = sel.value || 'card';
+      saveProfile(p);
+
+    }catch(err){
+      console.warn('RPC create error', err);
+      showToast('Не удалось отправить заказ, попробуйте ещё раз.');
+      finalize();
+      return;
+    }
+
+    close();
+    finalize();
+    resetCounts();
+    window.dispatchEvent(new CustomEvent('orders:history-updated'));
+
+    // спасибо-экран
+    openThanksModal();
+    clearIdlePromoTimer();
+    schedulePromoAfterOrder();
+
+    // --- ПЕЧАТЬ ЧЕКА ---
+    try{
+      const area = document.getElementById('printArea');
+      const created = new Date(order.createdAt || Date.now());
+
+      area.innerHTML = `
+        <div style="font-weight:800; font-size:16px; text-align:center; margin-bottom:6px;">
+          ${loadConfig().brandTitle || 'ЯмаMoto'}
+        </div>
+        <div style="text-align:center; margin-bottom:6px;">
+          Заказ #${order.id}
+        </div>
+        <div style="font-size:11px; margin-bottom:6px;">
+          ${created.toLocaleString()}
+        </div>
+        <hr/>
+        ${(order.items||[]).map(i=>`
+          <div style="display:flex; justify-content:space-between; margin:2px 0;">
+            <div>${i.name} ×${i.qty}</div>
+            <div>${i.qty*(i.price||0)}₽</div>
+          </div>
+        `).join('')}
+        <hr/>
+        <div style="display:flex; justify-content:space-between; font-weight:800; margin-top:6px;">
+          <div>Итого</div><div>${order.total||0}₽</div>
+        </div>
+        <div style="margin-top:8px; font-size:11px;">
+          Оплата: ${order.pay === 'card' ? 'Карта' : 'Перевод'}
+        </div>
+      `;
+      window.print();
+    }catch(er){
+      console.warn('print error', er);
+    }
+  };
+
+  ok.onclick = onOk;
+  cancel.onclick = onCancel;
+  m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
+})();
+
+  
     if(!itemsSel.length){ close(); finalize(); return; }
 
     let order = null;
