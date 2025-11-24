@@ -134,72 +134,90 @@ button[data-act]:active, #confirmBtn:active{
       body.route-landscape .menu-card{ border-radius:1.5rem; }
     }
 
-  /* ===== 14" вертикаль: экран заказа (#/order) через класс ===== */
-body.route-order.kiosk-portrait .phone-shell{
-  width: min(100vw, 760px);
-  max-width: 760px;
-  padding: 0 1.2rem;
+ /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
+@media (min-width: 1100px) and (orientation: portrait){
+
+  /* общий масштаб текста на экране заказа */
+  body.route-order{
+    font-size: 18px;
+  }
+
+  /* шире рабочая область */
+  body.route-order .phone-shell{
+    width: min(100vw, 900px);
+    max-width: 900px;
+    padding: 0 1.5rem;
+  }
+  body.route-order .brand-strip .phone-shell{
+    width: min(100vw, 900px);
+    max-width: 900px;
+  }
+
+  /* шапка */
+  body.route-order .brand-title{
+    font-size: 30px;
+  }
+  body.route-order .brand-sub{
+    font-size: 13px;
+  }
+  body.route-order .sushi-icon{
+    width: 42px;
+    height: 42px;
+  }
+
+  /* чипы категорий */
+  body.route-order #categoryBar button{
+    font-size: 0.95rem;
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+  }
+
+  /* карточки меню */
+  body.route-order .menu-card{
+    min-height: 130px;
+    padding: 1.25rem;
+    gap: 1rem;
+    border-radius: 1.5rem;
+  }
+  body.route-order .menu-card .font-medium{
+    font-size: 1.05rem;
+  }
+  body.route-order .menu-card .text-xs{
+    font-size: 0.9rem;
+  }
+
+  /* фото товара */
+  body.route-order .menu-card-img{
+    width: 150px;
+    height: 96px;
+    border-radius: 1rem;
+  }
+
+  /* кнопки +/– чуть больше */
+  body.route-order .menu-card button[data-act]{
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    border-radius: 12px;
+  }
+
+  /* нижняя панель итого */
+  body.route-order .confirm-bar{
+    width: min(100vw, 900px);
+    max-width: 900px;
+    padding: .9rem 1.2rem;
+    border-radius: 0;
+  }
+  body.route-order #confirmBtn{
+    font-size: 1.05rem;
+    padding: .9rem 1.2rem;
+    border-radius: 14px;
+  }
+  body.route-order #totalVal{
+    font-size: 1.2rem;
+  }
 }
 
-body.route-order.kiosk-portrait .brand-strip .phone-shell{
-  width: min(100vw, 760px);
-  max-width: 760px;
-}
-
-body.route-order.kiosk-portrait .confirm-bar{
-  width: min(760px, 100%);
-  max-width: 760px;
-  border-radius: 0;
-  padding: .9rem 1.2rem;
-}
-
-/* шапка крупнее */
-body.route-order.kiosk-portrait .brand-title{ font-size: 30px; }
-body.route-order.kiosk-portrait .brand-sub{ font-size: 13px; margin-top:4px; }
-body.route-order.kiosk-portrait .sushi-icon{ width:44px; height:44px; }
-body.route-order.kiosk-portrait .sushi-icon svg{ width:30px; height:30px; }
-
-/* карточки крупнее */
-body.route-order.kiosk-portrait .menu-card{
-  border-radius: 1.6rem;
-  min-height: 128px;
-  padding: 1.1rem 1.2rem;
-}
-body.route-order.kiosk-portrait .menu-card-img{
-  width: 150px;
-  height: 100px;
-  border-radius: 1rem;
-}
-
-/* текст в карточке */
-body.route-order.kiosk-portrait .menu-card .font-medium{ font-size:18px; }
-body.route-order.kiosk-portrait .menu-card .text-xs{ font-size:14px; }
-
-/* кнопки */
-body.route-order.kiosk-portrait button[data-act]{
-  width:44px !important;
-  height:44px !important;
-  font-size:20px;
-  border-radius:14px !important;
-}
-body.route-order.kiosk-portrait [data-q]{
-  font-size:18px;
-  width:36px;
-}
-
-/* чипы категорий */
-body.route-order.kiosk-portrait #categoryBar button{
-  font-size:16px;
-  padding:.45rem .9rem;
-}
-
-/* нижняя кнопка */
-body.route-order.kiosk-portrait #confirmBtn{
-  font-size:18px;
-  padding:.9rem 1.2rem;
-  border-radius:16px;
-}
-body.route-order.kiosk-portrait #totalVal{ font-size:20px; }
     
     /* ===== Роут-правила для шапки/стрелок ===== */
 
@@ -327,7 +345,7 @@ body.route-terminal .header-ghost{
 
   <!-- Promo video modal -->
   <div id="promoModal" class="modal" aria-hidden="true">
- <video id="promoVideo" playsinline loop muted autoplay></video>
+ <video id="promoVideo" playsinline loop muted></video>
 </div>
 
     <!-- Thanks modal -->
@@ -383,6 +401,28 @@ const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
+  /* ===== Media unlock (чтобы отложенное видео потом играло со звуком) ===== */
+let MEDIA_UNLOCKED = false;
+
+function unlockMediaOnce(){
+  if (MEDIA_UNLOCKED) return;
+  MEDIA_UNLOCKED = true;
+
+  // Самый надёжный способ: коротко "потрогать" любой аудио-элемент после тапа
+  try{
+    const a = document.getElementById('orderDing');
+    if(a){
+      const prevVol = a.volume;
+      a.volume = 0;                 // чтобы пользователь не услышал "пик"
+      const p = a.play();
+      if(p && p.catch) p.catch(()=>{});
+      a.pause();
+      a.currentTime = 0;
+      a.volume = prevVol || 1;
+    }
+  }catch(e){}
+}
+
  /* ===== Idle promo trigger (только для #/order) ===== */
 let idleTimer = null;
 const IDLE_DELAY = 60000; // 1 минута
@@ -428,19 +468,28 @@ async function openPromoModal(){
   v.src = url;
   v.currentTime = 0;
 
-  v.muted = true;
-  v.setAttribute('autoplay','');
-  v.load();
+  v.muted = !MEDIA_UNLOCKED;   // если разлочили — сразу со звуком
+v.volume = 1;
+v.setAttribute('autoplay','');
+v.load();
 
   m.classList.add('open');
   setBodyScrollLock(true);
 
-  const p = v.play();
-  if(p && p.catch){
-    p.catch(()=>console.warn('promo autoplay blocked'));
-  }
+ const p = v.play();
+if(p && p.catch){
+  p.catch(()=>{
+    // Если звук ещё не был "разблокирован" пользователем — тогда fallback в muted
+    if(!MEDIA_UNLOCKED){
+      v.muted = true;
+      v.play().catch(()=>{});
+    }
+    // если MEDIA_UNLOCKED=true, то просто ничего не делаем:
+    // при первом же следующем касании звук пойдёт
+  });
 }
-
+}
+  
 function closePromoModal(){
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
@@ -460,7 +509,7 @@ function closePromoModal(){
 
 function schedulePromoAfterOrder(){
   if(promoTimer) clearTimeout(promoTimer);
-  promoTimer = setTimeout(openPromoModal, 17000); // 17 сек после заказа
+  promoTimer = setTimeout(openPromoModal, 30000); // 17 сек после заказа
 }
 
 /* закрыть видео по любому тапу */
@@ -469,6 +518,24 @@ document.getElementById('promoModal')?.addEventListener('click', (e)=>{
   closePromoModal();
 }, {passive:false});
 
+  /* ===== Разблокировка звука для промо (нужен первый жест пользователя) ===== */
+let promoAudioUnlocked = false;
+function unlockPromoAudioOnce(){
+  if(promoAudioUnlocked) return;
+  promoAudioUnlocked = true;
+  const v = document.getElementById('promoVideo');
+  if(!v) return;
+
+  // если ролик открыт и был muted — пробуем включить звук
+  if(v.muted){
+    v.muted = false;
+    v.volume = 1;
+    v.play().catch(()=>{});
+  }
+}
+['click','touchstart','pointerdown','keydown'].forEach(ev=>{
+  window.addEventListener(ev, unlockPromoAudioOnce, {once:true, passive:true});
+});
 
 /* ===== Thanks helpers ===== */
 let thanksTimer = null;
@@ -809,10 +876,10 @@ function OrderView(){
   resetIdlePromoTimer();
 
   // любая активность на экране заказа = сброс простоя
-  const onActivity = ()=> resetIdlePromoTimer();
+const onActivity = ()=> resetIdlePromoTimer();
   ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
-    root.addEventListener(ev, onActivity, {passive:true});
-  });
+  root.addEventListener(ev, onActivity, {passive:true});
+});
 
 
   let activeIdx   = 0;
@@ -1107,6 +1174,7 @@ function OrderView(){
 
     const onOk=async (e)=>{
       e&&e.preventDefault(); e&&e.stopPropagation();
+      unlockMediaOnce(); // <-- разлочили звук именно по кнопке ОК
       const cfg=loadConfig();
       const counts=window.__orderCounts||{};
       const itemsSel=[];
@@ -1632,6 +1700,21 @@ function BuilderView(){
   return root;
 }
 
+ // ===== kiosk portrait helper (14" вертикаль) =====
+function applyKioskPortraitClass(){
+  document.body.classList.remove('kiosk-portrait');
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // вертикаль + достаточно большой экран
+  if(h > w && w >= 520){ 
+    document.body.classList.add('kiosk-portrait');
+  }
+}
+applyKioskPortraitClass();
+window.addEventListener('resize', applyKioskPortraitClass);
+  
 /* ===== Router ===== */
 function mount(view){
   const app=document.getElementById('app');
@@ -1669,22 +1752,6 @@ if(backBtn){
 
 // ===== классы роутов для CSS =====
 document.body.classList.remove('route-order','route-dashboard','route-terminal','route-builder','route-landscape');
-
-  // ===== kiosk portrait helper (14" вертикаль) =====
-function applyKioskPortraitClass(){
-  document.body.classList.remove('kiosk-portrait');
-
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-
-  // вертикаль + достаточно большой экран
-  if(h > w && w >= 520){ 
-    document.body.classList.add('kiosk-portrait');
-  }
-}
-applyKioskPortraitClass();
-window.addEventListener('resize', applyKioskPortraitClass);
-
 
 if (h==='#/order' || h==='#/'){
   document.body.classList.add('route-order');
