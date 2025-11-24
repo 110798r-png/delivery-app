@@ -1650,62 +1650,85 @@ function DashboardView(){
 
 window.addEventListener('cloud:orders', onCloudOrders);
 
-root.cleanup = () => {
+ root.cleanup = () => {
   window.removeEventListener('cloud:orders', onCloudOrders);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+  if(pollTimer) clearInterval(pollTimer);
 };
-
-  root.cleanup = () => {
-    if(pollTimer) clearInterval(pollTimer);
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-  };
 
   return root;
 }
    
 /* ===== Терминал (две колонки "готовится/готово") ===== */
 function TerminalView(){
-  let orders=loadDash();
- const root=el(`
-  <div class="pb-10">
-    <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
-      
-      <!-- новая полоса терминала -->
-      <div class="relative col-span-2 grid grid-cols-2">
-        <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
-        <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
+  let orders = loadDash();
 
-        <!-- невидимая кнопка "назад" справа на новой полосе -->
-        <button id="terminalBackHot"
-                class="absolute top-0 right-0 h-full w-28 opacity-0"
-                aria-label="Назад"></button>
-      </div>
+  const root = el(`
+    <div class="pb-10">
+      <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
 
-      <div id="colCook" class="p-4 flex flex-col gap-4 bg-gray-50 min-h-[70vh] items-start"></div>
-<div id="colDone" class="p-4 flex flex-col gap-4 bg-gray-50 border-l min-h-[70vh] items-start"></div>
-    </div>
-  </div>
-`);
+        <div class="relative col-span-2 grid grid-cols-2">
+          <section class="bg-red-600 text-white p-4 text-3xl font-extrabold">Готовится</section>
+          <section class="bg-red-600 text-white p-4 text-3xl font-extrabold border-l border-red-700">Готово</section>
 
-  const colCook=root.querySelector('#colCook');
-  const colDone=root.querySelector('#colDone');
+          <button id="terminalBackHot"
+                  class="absolute top-0 right-0 h-full w-28 opacity-0"
+                  aria-label="Назад"></button>
+        </div>
 
-  const backHot = root.querySelector('#terminalBackHot');
-backHot?.addEventListener('click', (e)=>{
-  e.preventDefault(); e.stopPropagation();
-  sessionStorage.removeItem(TABLO_PIN_OK);
-  location.hash = '#/order';
-}, {passive:false});
-
- function orderCard(o){
-  return el(`
-    <div class="p-5 rounded-2xl border bg-white shadow-sm
-                flex items-center justify-center min-h-[150px]">
-      <div class="text-6xl font-extrabold tracking-tight">
-        #${o.id || '—'}
+        <div id="colCook" class="p-4 flex flex-col gap-4 bg-gray-50 min-h-[70vh] items-start"></div>
+        <div id="colDone" class="p-4 flex flex-col gap-4 bg-gray-50 border-l min-h-[70vh] items-start"></div>
       </div>
     </div>
   `);
+
+  const colCook = root.querySelector('#colCook');
+  const colDone = root.querySelector('#colDone');
+
+  root.querySelector('#terminalBackHot')?.addEventListener('click', (e)=>{
+    e.preventDefault(); e.stopPropagation();
+    sessionStorage.removeItem(TABLO_PIN_OK);
+    location.hash = '#/order';
+  }, {passive:false});
+
+  function orderCard(o){
+    return el(`
+      <div class="p-5 rounded-2xl border bg-white shadow-sm
+                  flex items-center justify-center min-h-[150px]">
+        <div class="text-6xl font-extrabold tracking-tight">
+          #${o.id || '—'}
+        </div>
+      </div>
+    `);
+  }
+
+  function render(){
+    colCook.innerHTML = '';
+    colDone.innerHTML = '';
+    orders.forEach(o=>{
+      const st = o.status || 'готовится';
+      const card = orderCard(o);
+      if(st === 'готово' || st === 'готов') colDone.appendChild(card);
+      else colCook.appendChild(card);
+    });
+  }
+
+  function onCloudOrders(e){
+    const serverList = e.detail || [];
+    orders = serverList.slice();
+    saveDash(orders);
+    render();
+  }
+
+  window.addEventListener('cloud:orders', onCloudOrders);
+
+  render(); // первый рендер из локалки
+
+   = () => {
+    window.removeEventListener('cloud:orders', onCloudOrders);
+  };
+
+  return root;
 }
 
     return el(`
