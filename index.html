@@ -920,31 +920,35 @@ function OrderView(){
     });
   }
 
-  catPager.addEventListener('click', (e) => {
-    const card = btn.closest('.menu-card');
-if(card){
-  card.classList.remove('pulse');
-  // reflow чтобы анимация перезапустилась
-  void card.offsetWidth;
-  card.classList.add('pulse');
-  setTimeout(()=>card.classList.remove('pulse'), 180);
-}
+ catPager.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn || btn.disabled) return;
 
-    const name  = btn.dataset.name;
-    const delta = btn.dataset.act === 'inc' ? 1 : -1;
-    const selector = `[data-q="${escAttr(name)}"]`;
+  const card = btn.closest('.menu-card');
+  if (card) {
+    card.classList.remove('pulse');
+    void card.offsetWidth; // reflow чтобы анимация перезапустилась
+    card.classList.add('pulse');
+    setTimeout(() => card.classList.remove('pulse'), 180);
+  }
 
-    const cur = parseInt(catPager.querySelector(selector)?.textContent || '0', 10) || 0;
-    const next = Math.max(0, cur + delta);
+  const name  = btn.dataset.name;
+  const delta = btn.dataset.act === 'inc' ? 1 : -1;
+  const selector = `[data-q="${escAttr(name)}"]`;
 
-    catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
-    window.__orderCounts = window.__orderCounts || {};
-    window.__orderCounts[name] = next;
-    recalcTotal();
-    totalEl.classList.remove('bump');
-void totalEl.offsetWidth;
-totalEl.classList.add('bump');
-  });
+  const cur = parseInt(catPager.querySelector(selector)?.textContent || '0', 10) || 0;
+  const next = Math.max(0, cur + delta);
+
+  catPager.querySelectorAll(selector).forEach(n => n.textContent = String(next));
+  window.__orderCounts = window.__orderCounts || {};
+  window.__orderCounts[name] = next;
+
+  recalcTotal();
+
+  totalEl.classList.remove('bump');
+  void totalEl.offsetWidth;
+  totalEl.classList.add('bump');
+});
 
   function applyHeights(){
     try {
