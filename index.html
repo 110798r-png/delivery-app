@@ -546,17 +546,18 @@ async function listOrdersOnce(){
 }
 
 // === WebSocket ===
-let ws = null;
-
 function connectWS() {
-  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.ws";
+  // БЕРЁМ ТОЧНО ТАКОЙ ЖЕ host, как в servers.url, но с wss и с /ws
+  const WS_URL = "wss://d5ddn3i9sig2fq3ect8g.y14tuxdu.apigw.yandexcloud.net/ws";
+  //                     ↑                ↑                      ↑
+  //                 wss://           тот же host           добавили /ws
 
-  // на всякий случай закрываем старое соединение
+  // На всякий случай закрываем старое соединение
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     try { ws.close(); } catch (e) {}
   }
 
-  ws = new WebSocket("wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.ws");
+  ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
     console.log("WS connected");
@@ -576,9 +577,14 @@ function connectWS() {
   };
 
   ws.onclose = () => {
-    console.warn("WS closed, reconnect in 1s");
+    // переподключаемся через секунду
     setTimeout(connectWS, 1000);
   };
+}
+
+// ОДИН раз вызываем при загрузке
+connectWS();
+
 
   ws.onerror = (e) => {
     console.warn("WS error", e);
@@ -890,7 +896,8 @@ const DEFAULT_CONFIG = {
   ]
 };
 
-    const PROFILE_LS_KEY     = 'client_profile_v1';
+// ===== Ключи для localStorage =====
+const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
 const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
 const CONFIG_LS_KEY      = 'app_config_v1';
@@ -899,7 +906,49 @@ const WANT_DASH          = 'WANT_DASH';
 const WANT_TERM          = 'WANT_TERM';
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
-    
+
+// ===== Хелперы =====
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+};
+
+const showToast = (msg) => {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 1800);
+};
+
+const money = (x) => `${x} руб.`;
+
+const setBodyScrollLock = (on) => {
+  document.body.style.overflow = on ? 'hidden' : '';
+};
+
+// безопасное чтение из localStorage
+function safeParse(k, fallback){
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return fallback;
+
+    const v = JSON.parse(raw);
+
+    if (Array.isArray(fallback)) {
+      return Array.isArray(v) ? v : fallback;
+    }
+    if (fallback && typeof fallback === 'object') {
+      return v && typeof v === 'object' ? v : fallback;
+    }
+    return (v === null || v === undefined) ? fallback : v;
+  } catch (e) {
+    console.warn('safeParse error for key', k, e);
+    return fallback;
+  }
+}
+
 // ===== Хелпер для чтения из localStorage =====
 function safeParse(k, fallback){
   try {
