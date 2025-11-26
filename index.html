@@ -544,15 +544,17 @@ async function listOrdersOnce(){
     LIST_IN_FLIGHT = false;
   }
 }
+  
+ let ws = null;
 
-// === WebSocket ===
+ // === WebSocket ===
+let ws = null;
+
 function connectWS() {
-  // БЕРЁМ ТОЧНО ТАКОЙ ЖЕ host, как в servers.url, но с wss и с /ws
-  const WS_URL = "wss://d5ddn3i9sig2fq3ect8g.y14tuxdu.apigw.yandexcloud.net/ws";
-  //                     ↑                ↑                      ↑
-  //                 wss://           тот же host           добавили /ws
+  // адрес ДОЛЖЕН совпадать с servers.url из yamamoto-ws-gateway, только wss + /ws
+  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net/ws";
 
-  // На всякий случай закрываем старое соединение
+  // на всякий случай закрываем старое соединение
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     try { ws.close(); } catch (e) {}
   }
@@ -576,23 +578,18 @@ function connectWS() {
     }
   };
 
+  ws.onerror = (e) => {
+    console.warn("WS error", e);
+  };
+
   ws.onclose = () => {
     // переподключаемся через секунду
     setTimeout(connectWS, 1000);
   };
 }
 
-// ОДИН раз вызываем при загрузке
-connectWS();
-
-
-  ws.onerror = (e) => {
-    console.warn("WS error", e);
-  };
-}
-
-// один вызов – дальше reconnect делает onclose
-connectWS();
+// один раз вызываем при загрузке
+connectWS();   
 
 // === HTTP API + промо/спасибо/пуши и т.д. ===
 
@@ -928,27 +925,6 @@ const setBodyScrollLock = (on) => {
   document.body.style.overflow = on ? 'hidden' : '';
 };
 
-// безопасное чтение из localStorage
-function safeParse(k, fallback){
-  try {
-    const raw = localStorage.getItem(k);
-    if (!raw) return fallback;
-
-    const v = JSON.parse(raw);
-
-    if (Array.isArray(fallback)) {
-      return Array.isArray(v) ? v : fallback;
-    }
-    if (fallback && typeof fallback === 'object') {
-      return v && typeof v === 'object' ? v : fallback;
-    }
-    return (v === null || v === undefined) ? fallback : v;
-  } catch (e) {
-    console.warn('safeParse error for key', k, e);
-    return fallback;
-  }
-}
-
 // ===== Хелпер для чтения из localStorage =====
 function safeParse(k, fallback){
   try {
@@ -1179,63 +1155,6 @@ function bindHeaderDots(){
       {passive:false}
     );
   });
-}
-
-/* ===== OrderView ===== */
-function OrderView(){
-  const cfg = loadConfig();
-  applyTheme(cfg.theme || {});
-  MENU_CATEGORIES = cfg.menu.slice();
-
-  const escAttr = (val) => (window.CSS && typeof CSS.escape === 'function')
-    ? CSS.escape(val)
-    : String(val).replace(/"/g, '\\"');
-
-  const root = el(`
-    <div class="relative">
-      <section class="sticky-top mb-2">
-        <div class="glass-panel rounded-2xl px-3 py-3">
-          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-        </div>
-      </section>
-
-      <section>
-        <div id="catPager" class="no-scrollbar"></div>
-      </section>
-
-      <div id="confirmBar" class="confirm-bar">
-        <div class="flex items-center justify-between gap-3">
-          <div class="text-base">
-            <span class="text-gray-600">Итого:</span>
-            <b id="totalVal">0 руб.</b>
-          </div>
-          <button id="confirmBtn"
-            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled>
-            Оформить заказ
-          </button>
-        </div>
-      </div>
-    </div>
-  `);
-
-  const categoryBar = root.querySelector('#categoryBar');
-  const catPager    = root.querySelector('#catPager');
-  const totalEl     = root.querySelector('#totalVal');
-  const confirmBtn  = root.querySelector('#confirmBtn');
-
-  setBodyScrollLock(true);
-  confirmBtn._busy = false;
-
-  resetIdlePromoTimer();
-
-  const onActivity = ()=> resetIdlePromoTimer();
-  ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
-    root.addEventListener(ev, onActivity, {passive:true});
-  });
-
-  // дальше у тебя идёт оставшийся код OrderView (рендер меню, обработчики и т.п.)
-  // его не трогай, оставляй как был.
 }
 
 /* ===== OrderView ===== */
