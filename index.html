@@ -545,25 +545,25 @@ async function listOrdersOnce(){
   }
 }
 
- // === WebSocket ===
-let ws = null;
+// === WebSocket ===
+let yamWs = null;
 
 function connectWS() {
   // адрес ДОЛЖЕН совпадать с servers.url из yamamoto-ws-gateway, только wss + /ws
   const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net/ws";
 
   // на всякий случай закрываем старое соединение
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-    try { ws.close(); } catch (e) {}
+  if (yamWs && (yamWs.readyState === WebSocket.OPEN || yamWs.readyState === WebSocket.CONNECTING)) {
+    try { yamWs.close(); } catch (e) {}
   }
 
-  ws = new WebSocket(WS_URL);
+  yamWs = new WebSocket(WS_URL);
 
-  ws.onopen = () => {
+  yamWs.onopen = () => {
     console.log("WS connected");
   };
 
-  ws.onmessage = (ev) => {
+  yamWs.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "orders") {
@@ -576,18 +576,18 @@ function connectWS() {
     }
   };
 
-  ws.onerror = (e) => {
+  yamWs.onerror = (e) => {
     console.warn("WS error", e);
   };
 
-  ws.onclose = () => {
+  yamWs.onclose = () => {
     // переподключаемся через секунду
     setTimeout(connectWS, 1000);
   };
 }
 
 // один раз вызываем при загрузке
-connectWS();   
+connectWS();
 
 // === HTTP API + промо/спасибо/пуши и т.д. ===
 
