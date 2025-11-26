@@ -890,28 +890,59 @@ const DEFAULT_CONFIG = {
   ]
 };
     
-function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
-function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
+// ===== Хелпер для чтения из localStorage =====
+function safeParse(k, fallback){
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return fallback;
+
+    const v = JSON.parse(raw);
+
+    if (Array.isArray(fallback)) {
+      return Array.isArray(v) ? v : fallback;
+    }
+    if (fallback && typeof fallback === 'object') {
+      return v && typeof v === 'object' ? v : fallback;
+    }
+    return (v === null || v === undefined) ? fallback : v;
+  } catch (e) {
+    console.warn('safeParse error for key', k, e);
+    return fallback;
+  }
+}
+
+// ===== Работа с конфигом приложения =====
+function loadConfig(){ 
+  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); 
+}
+
+function saveConfig(cfg){ 
+  localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg || DEFAULT_CONFIG)); 
+}
 
 function applyTheme(theme){
   const r = document.documentElement;
-  r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
-  r.style.setProperty('--img-radius',   (theme.imgRadius||12)+'px');
-  r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
-  r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
-  r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
+  r.style.setProperty('--card-radius',  (theme.cardRadius || 20) + 'px');
+  r.style.setProperty('--img-radius',   (theme.imgRadius  || 12) + 'px');
+  r.style.setProperty('--img-w',        (theme.imgW       || 110) + 'px');
+  r.style.setProperty('--img-h',        (theme.imgH       || 70) + 'px');
+  r.style.setProperty('--card-min-h',   (theme.cardMinH   || 104) + 'px');
 
-  // НОВОЕ:
-  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
-  r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
+  // новые параметры для кнопок
+  r.style.setProperty('--btn-size', (theme.btnSize || 42) + 'px');
+  r.style.setProperty('--btn-font', (theme.btnFont || 22) + 'px');
 
   document.getElementById('brandTitle').textContent =
     (loadConfig().brandTitle || 'ЯмаMoto');
 }
 
 function calcConfigVersion(cfg) {
-  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
-  catch { return 0; }
+  try {
+    return JSON.stringify((cfg && cfg.menu) || []).length +
+           String(cfg?.promoVideoUrl || '').length;
+  } catch {
+    return 0;
+  }
 }
 
 let MENU_CATEGORIES = loadConfig().menu.slice();
@@ -925,34 +956,47 @@ async function fetchRemoteConfig(){
         const json = await res.json();
         if(json && json.menu){
           saveConfig(json);
-          applyTheme(json.theme||{});
+          applyTheme(json.theme || {});
           MENU_CATEGORIES = json.menu.slice();
           return json;
         }
       }
-    }catch(e){ console.warn('fetchRemoteConfig URL', e); }
+    }catch(e){ 
+      console.warn('fetchRemoteConfig URL', e); 
+    }
   }
+
+  // если прямой URL не сработал — пробуем через RPC
   try{
     const res = await rpc({ op: 'config_get' });
     if (res && res.config && Array.isArray(res.config.menu)){
       saveConfig(res.config);
-      applyTheme(res.config.theme||{});
+      applyTheme(res.config.theme || {});
       MENU_CATEGORIES = res.config.menu.slice();
       return res.config;
     }
-  }catch(e){ console.warn('fetchRemoteConfig RPC', e); }
+  }catch(e){ 
+    console.warn('fetchRemoteConfig RPC', e); 
+  }
   return null;
 }
 
-function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
-function animateScrollX(el, to, {duration=280, onEnd}={}){
-  const from=el.scrollLeft; const diff=to-from;
-  if(!diff){ onEnd&&onEnd(); return; }
-  const start=performance.now();
+function easeInOutCubic(t){ 
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; 
+}
+
+function animateScrollX(el, to, {duration = 280, onEnd} = {}){
+  const from = el.scrollLeft; 
+  const diff = to - from;
+  if (!diff){ 
+    onEnd && onEnd(); 
+    return; 
+  }
+  const start = performance.now();
   function step(ts){
-    const t=Math.min(1,(ts-start)/duration);
-    el.scrollLeft=from+diff*easeInOutCubic(t);
-    if(t<1) requestAnimationFrame(step); else onEnd&&onEnd();
+    const t = Math.min(1, (ts - start) / duration);
+    el.scrollLeft = from + diff * easeInOutCubic(t);
+    if (t < 1) requestAnimationFrame(step); else onEnd && onEnd();
   }
   requestAnimationFrame(step);
 }
@@ -961,7 +1005,7 @@ function syncOrderStatus(id, status){
   let hist = loadHistory();
   let changed = false;
 
-  for (let i=0;i<hist.length;i++){
+  for (let i = 0; i < hist.length; i++){
     if (String(hist[i].id) === String(id)){
       if (hist[i].status !== status){
         hist[i] = { ...hist[i], status };
@@ -980,13 +1024,13 @@ function syncOrderStatus(id, status){
 async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
-    if(!cloud || !Array.isArray(cloud.orders)) return;
+    if (!cloud || !Array.isArray(cloud.orders)) return;
 
     const byId = new Map(cloud.orders.map(o => [String(o.id), o]));
     const hist = loadHistory();
     let changed = false;
 
-    for (let i=0;i<hist.length;i++){
+    for (let i = 0; i < hist.length; i++){
       const id = String(hist[i].id);
       const fromCloud = byId.get(id);
       if (!fromCloud) continue;
@@ -1004,7 +1048,7 @@ async function pullAndMergeStatuses(){
       }
     }
 
-    if(changed){
+    if (changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     }
@@ -1016,7 +1060,7 @@ async function pullAndMergeStatuses(){
 function bindHeaderDots(){
   const termDot = document.getElementById('termDot');
   const dashDot = document.getElementById('dashDot');
-  if(!termDot || !dashDot || termDot._bound) return;
+  if (!termDot || !dashDot || termDot._bound) return;
   termDot._bound = dashDot._bound = true;
 
   function makeTapHandler(onDone){
@@ -1025,43 +1069,114 @@ function bindHeaderDots(){
 
     const reset = ()=>{
       taps = 0; first = 0;
-      if(timer){ clearTimeout(timer); timer = null; }
+      if (timer){ clearTimeout(timer); timer = null; }
     };
 
     return function(){
       const now = Date.now();
-      if(!first) first = now;
+      if (!first) first = now;
       taps++;
 
-      if(now - first > windowMs){
+      if (now - first > windowMs){
         reset();
         taps = 1; first = now;
       }
 
-      if(taps >= 8){
+      if (taps >= 8){
         reset();
         onDone();
       } else {
-        if(timer) clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         timer = setTimeout(reset, windowMs);
       }
     };
   }
 
   const goDashTap = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/dashboard';
-    else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal')?.classList.add('open'); }
+    if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/dashboard';
+    else {
+      sessionStorage.setItem(WANT_DASH,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
   });
 
   const goTermTap = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/terminal';
-    else { sessionStorage.setItem(WANT_TERM,'1'); document.getElementById('pinModal')?.classList.add('open'); }
+    if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/terminal';
+    else {
+      sessionStorage.setItem(WANT_TERM,'1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
   });
 
   ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTermTap(); }, {passive:false});
-    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDashTap(); }, {passive:false});
+    termDot.addEventListener(
+      ev, 
+      e => { e.preventDefault(); e.stopPropagation(); goTermTap(); }, 
+      {passive:false}
+    );
+    dashDot.addEventListener(
+      ev, 
+      e => { e.preventDefault(); e.stopPropagation(); goDashTap(); }, 
+      {passive:false}
+    );
   });
+}
+
+/* ===== OrderView ===== */
+function OrderView(){
+  const cfg = loadConfig();
+  applyTheme(cfg.theme || {});
+  MENU_CATEGORIES = cfg.menu.slice();
+
+  const escAttr = (val) => (window.CSS && typeof CSS.escape === 'function')
+    ? CSS.escape(val)
+    : String(val).replace(/"/g, '\\"');
+
+  const root = el(`
+    <div class="relative">
+      <section class="sticky-top mb-2">
+        <div class="glass-panel rounded-2xl px-3 py-3">
+          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+        </div>
+      </section>
+
+      <section>
+        <div id="catPager" class="no-scrollbar"></div>
+      </section>
+
+      <div id="confirmBar" class="confirm-bar">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-base">
+            <span class="text-gray-600">Итого:</span>
+            <b id="totalVal">0 руб.</b>
+          </div>
+          <button id="confirmBtn"
+            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled>
+            Оформить заказ
+          </button>
+        </div>
+      </div>
+    </div>
+  `);
+
+  const categoryBar = root.querySelector('#categoryBar');
+  const catPager    = root.querySelector('#catPager');
+  const totalEl     = root.querySelector('#totalVal');
+  const confirmBtn  = root.querySelector('#confirmBtn');
+
+  setBodyScrollLock(true);
+  confirmBtn._busy = false;
+
+  resetIdlePromoTimer();
+
+  const onActivity = ()=> resetIdlePromoTimer();
+  ['pointerdown','touchstart','click','scroll'].forEach(ev=>{
+    root.addEventListener(ev, onActivity, {passive:true});
+  });
+
+  // дальше у тебя идёт оставшийся код OrderView (рендер меню, обработчики и т.п.)
+  // его не трогай, оставляй как был.
 }
 
 /* ===== OrderView ===== */
