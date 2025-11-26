@@ -545,49 +545,36 @@ async function listOrdersOnce(){
   }
 }
 
-    let ws = null;
+// === WebSocket ===
+let ws = null;
 
 function connectWS() {
   const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.net/ws";
-  const ws = new WebSocket(WS_URL);
+  ws = new WebSocket(WS_URL);
 
   ws.onopen = () => console.log("WS connected");
+
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "orders") {
-        window.dispatchEvent(new CustomEvent("cloud:orders", { detail: msg.orders }));
+        window.dispatchEvent(
+          new CustomEvent("cloud:orders", { detail: msg.orders })
+        );
       }
     } catch (e) {
       console.warn("ws msg error", e);
     }
   };
-  ws.onclose = () => setTimeout(connectWS, 1000);
-}
-
-  ws.onopen = () => console.log("WS connected");
-  // остальной код как был
-}
-
-  ws.onopen = () => console.log("WS connected");
-
-  ws.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === "orders") {
-        window.dispatchEvent(new CustomEvent("cloud:orders", { detail: msg.orders }));
-      }
-    } catch(e){
-      console.warn("ws msg error", e);
-    }
-  };
 
   ws.onclose = () => setTimeout(connectWS, 1000);
 }
 
-connectWS();
-
-    
+connectWS(); // один вызов – и всё
+// дальше уже твои:
+const API_URL = "...";
+const CFG_REMOTE_URL = "...";
+// и т.д.
   
 const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
 const CONFIG_REMOTE_URL = '';
