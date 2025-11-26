@@ -548,8 +548,22 @@ async function listOrdersOnce(){
     let ws = null;
 
 function connectWS() {
-  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.apigw.yandexcloud.net/ws"; // <-- без .ws.
+  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.net/ws";
   const ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => console.log("WS connected");
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "orders") {
+        window.dispatchEvent(new CustomEvent("cloud:orders", { detail: msg.orders }));
+      }
+    } catch (e) {
+      console.warn("ws msg error", e);
+    }
+  };
+  ws.onclose = () => setTimeout(connectWS, 1000);
+}
 
   ws.onopen = () => console.log("WS connected");
   // остальной код как был
