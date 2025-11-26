@@ -374,6 +374,9 @@
 }
     
   </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>  
+  
 </head>
     
 <body>
@@ -813,7 +816,7 @@ async function rpc(payload) {
     return { ok: true };
   }
 
-  // удалить заказ
+    // удалить заказ из дашборда (историю НЕ трогаем, чтобы не ломать учёт)
   if (op === 'delete') {
     const id = payload.data?.id || payload.id;
     if (!id) return { ok: false, error: 'no id' };
@@ -821,9 +824,7 @@ async function rpc(payload) {
     const dash = loadDash().filter(o => String(o.id) !== String(id));
     saveDash(dash);
 
-    const hist = loadHistory().filter(o => String(o.id) !== String(id));
-    saveHistory(hist);
-
+    // history оставляем как есть
     return { ok: true };
   }
 
@@ -1485,7 +1486,7 @@ function OrderView(){
 
     let order = null;
 
-    try{
+        try{
       const res = await rpc({
         op: 'create',
         data: {
@@ -1505,19 +1506,14 @@ function OrderView(){
         status: 'готовится'
       };
 
-      const history = loadHistory();
-      history.unshift(order);
-      saveHistory(history.slice(0,50));
-
-      const dash = loadDash();
-      dash.unshift(order);
-      saveDash(dash.slice(0,200));
-
+      // только запоминаем способ оплаты в профиле
       const p = loadProfile();
       p.paymentMethod = sel.value || 'card';
       saveProfile(p);
 
     }catch(err){
+
+   
       console.warn('RPC create error', err);
       showToast('Не удалось отправить заказ, попробуйте ещё раз.');
       finalize();
@@ -1694,12 +1690,21 @@ function DashboardView(){
     const statusSel = card.querySelector('[data-k="status"]');
     const etaSelEl  = card.querySelector('[data-k="eta"]');
 
-    async function applyAndSync({ silent=false } = {}){
+        async function applyAndSync({ silent=false } = {}){
       const status = statusSel.value;
       const etaSel = etaSelEl.value;
       const etaMinutes = etaSel ? Number(etaSel) : null;
 
+      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+      const original = i >= 0 ? dashOrders[i] : o;
+
       const patch = { status };
+
+      // если переводим в "готово" первый раз — фиксируем момент готовности
+      if (status === 'готово' && !original.readyAt) {
+        patch.readyAt = Date.now();
+      }
+
       if (etaMinutes){
         patch.etaMinutes = etaMinutes;
         patch.etaUntil   = Date.now() + etaMinutes*60*1000;
@@ -1708,24 +1713,19 @@ function DashboardView(){
         patch.etaUntil   = null;
       }
 
-      const i = dashOrders.findIndex(x=>String(x.id)===String(o.id));
       if (i >= 0){
         dashOrders[i] = { ...dashOrders[i], ...patch };
         saveDash(dashOrders);
         syncOrderStatus(o.id, patch.status);
 
-        // ✅ сразу обновляем терминал (готовится/готово) без F5
         window.dispatchEvent(new CustomEvent('cloud:orders', {
           detail: dashOrders
         }));
 
         if(!silent) showToast(`Статус #${o.id} обновлён`);
-
-        // ✅ перерисовываем дашборд, чтобы кнопка "Выдать" появилась сразу
         renderOrders();
       }
 
-      // ✅ шлём на сервер
       try{
         await rpc({ op:'update', data:{ id:o.id, patch } });
       }catch(e1){
@@ -1979,21 +1979,117 @@ function TerminalView(){
   return root;
 }
 
+    function exportAccountingXLSX(){
+  const orders = loadHistory() || [];
+  if (!Array.isArray(orders) || !orders.length){
+    showToast('В истории пока нет заказов');
+    return;
+  }
+
+  const now = Date.now();
+  const periods = [
+    { key:'7d',  label:'7 дней',   ms: 7  * 24*60*60*1000 },
+    { key:'14d', label:'14 дней',  ms: 14 * 24*60*60*1000 },
+    { key:'30d', label:'30 дней',  ms: 30 * 24*60*60*1000 },
+  ];
+
+  // stats[periodKey][itemName] = { qty, revenue, cookSumMin, cookCount }
+  const stats = {};
+  periods.forEach(p => stats[p.key] = {});
+
+  for (const o of orders){
+    const createdAt = Number(o.createdAt || 0);
+    if (!createdAt || !Array.isArray(o.items)) continue;
+
+    const cookMs = (o.readyAt && o.readyAt > o.createdAt)
+      ? (o.readyAt - o.createdAt)
+      : null;
+    const cookMin = cookMs ? (cookMs / 60000) : null;
+
+    for (const p of periods){
+      if (now - createdAt > p.ms) continue;
+
+      for (const it of o.items){
+        const name  = it.name || '—';
+        const qty   = Number(it.qty || 0);
+        const price = Number(it.price || 0);
+        if (!qty) continue;
+
+        const bucket = stats[p.key];
+        if (!bucket[name]){
+          bucket[name] = { qty:0, revenue:0, cookSumMin:0, cookCount:0 };
+        }
+
+        bucket[name].qty     += qty;
+        bucket[name].revenue += qty * price;
+
+        if (cookMin){
+          bucket[name].cookSumMin += cookMin;
+          bucket[name].cookCount  += 1;
+        }
+      }
+    }
+  }
+
+  // формируем строки для XLSX
+  const rows = [];
+  rows.push(['Период', 'Блюдо', 'Кол-во', 'Выручка (руб)', 'Сред. время готовки (мин)']);
+
+  for (const p of periods){
+    const bucket = stats[p.key];
+    const items = Object.entries(bucket);
+
+    // сортируем по количеству (ранжирование)
+    items.sort((a,b) => b[1].qty - a[1].qty);
+
+    for (const [name, s] of items){
+      const avgCook = s.cookCount ? (s.cookSumMin / s.cookCount) : '';
+      rows.push([
+        p.label,
+        name,
+        s.qty,
+        s.revenue,
+        avgCook ? Number(avgCook.toFixed(1)) : ''
+      ]);
+    }
+  }
+
+  if (rows.length === 1){
+    showToast('Заказы за выбранные периоды не найдены');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined'){
+    alert('Библиотека XLSX не подключена');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Учёт');
+
+  XLSX.writeFile(wb, 'yamamoto_uchet.xlsx');
+}
+
+    
 /* ===== Builder ===== */
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-extrabold">Конструктор меню</h2>
-        <div class="flex gap-2">
-          <button id="exportBtn" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
-          <label class="px-3 py-2 rounded-xl border cursor-pointer">
-            Импорт JSON<input id="importInput" type="file" accept="application/json" class="hidden">
-          </label>
-          <button id="backBtn2" class="px-3 py-2 rounded-xl border">Назад</button>
-        </div>
-      </div>
+  <h2 class="text-2xl font-extrabold">Конструктор меню</h2>
+  <div class="flex gap-2 flex-wrap">
+    <button id="exportStatsBtn" class="px-3 py-2 rounded-xl border bg-green-50 text-green-700">
+      Выгрузка учёта XLSX
+    </button>
+    <button id="exportBtn" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
+    <label class="px-3 py-2 rounded-xl border cursor-pointer">
+      Импорт JSON<input id="importInput" type="file" accept="application/json" class="hidden">
+    </label>
+    <button id="backBtn2" class="px-3 py-2 rounded-xl border">Назад</button>
+  </div>
+</div>
 
       <section class="card p-4 grid gap-3">
         <h3 class="font-semibold text-lg">Промо-ролик</h3>
@@ -2021,6 +2117,12 @@ function BuilderView(){
 
   const catsBox = root.querySelector('#catsBox');
   const promoUrlInp = root.querySelector('#promoUrl');
+
+    // Кнопка выгрузки учёта
+  const exportStatsBtn = root.querySelector('#exportStatsBtn');
+  if (exportStatsBtn){
+    exportStatsBtn.onclick = exportAccountingXLSX;
+  }
 
   function render(){
     catsBox.innerHTML='';
