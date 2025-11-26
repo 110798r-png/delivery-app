@@ -549,7 +549,7 @@ async function listOrdersOnce(){
 let ws = null;
 
 function connectWS() {
-  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.net/ws";
+  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.ws";
 
   // на всякий случай закрываем старое соединение
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
