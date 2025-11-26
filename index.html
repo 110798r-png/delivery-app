@@ -1896,6 +1896,11 @@ function DashboardView(){
 function TerminalView(){
   let orders = loadDash();
 
+  let autoTimer = setInterval(() => {
+  orders = loadDash();
+  render();
+}, 1000);
+
   const root = el(`
     <div class="pb-10">
       <div class="grid grid-cols-2 gap-0 rounded-3xl overflow-hidden border bg-white shadow-sm">
@@ -1969,6 +1974,7 @@ function TerminalView(){
   render();
 
   root.cleanup = () => {
+    clearInterval(autoTimer);
     window.removeEventListener('cloud:orders', onCloudOrders);
   };
 
