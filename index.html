@@ -549,14 +549,14 @@ async function listOrdersOnce(){
 let ws = null;
 
 function connectWS() {
-  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net";
+  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.ws";
 
   // на всякий случай закрываем старое соединение
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     try { ws.close(); } catch (e) {}
   }
 
-  ws = new WebSocket("wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net");
+  ws = new WebSocket("wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.ws");
 
   ws.onopen = () => {
     console.log("WS connected");
