@@ -545,115 +545,51 @@ async function listOrdersOnce(){
   }
 }
 
-// === WebSocket ===
-let yamWs = null;
-
-function connectWS() {
-  // адрес ДОЛЖЕН совпадать с servers.url из yamamoto-ws-gateway, только wss + /ws
-  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net/ws";
-
-  // на всякий случай закрываем старое соединение
-  if (yamWs && (yamWs.readyState === WebSocket.OPEN || yamWs.readyState === WebSocket.CONNECTING)) {
-    try { yamWs.close(); } catch (e) {}
-  }
-
-  yamWs = new WebSocket(WS_URL);
-
-  yamWs.onopen = () => {
-    console.log("WS connected");
-  };
-
-  yamWs.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === "orders") {
-        window.dispatchEvent(
-          new CustomEvent("cloud:orders", { detail: msg.orders })
-        );
-      }
-    } catch (e) {
-      console.warn("ws msg error", e);
-    }
-  };
-
-  yamWs.onerror = (e) => {
-    console.warn("WS error", e);
-  };
-
-  yamWs.onclose = () => {
-    // переподключаемся через секунду
-    setTimeout(connectWS, 1000);
-  };
-}
-
-// один раз вызываем при загрузке
-connectWS();
-
-// === HTTP API + промо/спасибо/пуши и т.д. ===
-
-// URL функции orders-api (API Gateway HTTP /rpc)
-const API_URL = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc";
-
-// если позже будешь хранить конфиг на бекенде/сторейдже – сюда поставим URL, пока пусть будет пусто
-const CONFIG_REMOTE_URL = "";
-
-// публичный ключ для Web Push
-const VAPID_PUBLIC =
-  "BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg";
+setInterval(listOrdersOnce, 2500); // можно 2.5с, чуть живее
+  
+const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
+const CONFIG_REMOTE_URL = '';
+const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
 let MEDIA_UNLOCKED = false;
 
-function unlockMediaOnce() {
+function unlockMediaOnce(){
   if (MEDIA_UNLOCKED) return;
   MEDIA_UNLOCKED = true;
-  try {
-    const a = document.getElementById("orderDing");
-    if (a) {
+  try{
+    const a = document.getElementById('orderDing');
+    if(a){
       const prevVol = a.volume;
       a.volume = 0;
       const p = a.play();
-      if (p && p.catch) p.catch(() => {});
+      if(p && p.catch) p.catch(()=>{});
       a.pause();
       a.currentTime = 0;
       a.volume = prevVol || 1;
     }
-  } catch (e) {}
+  }catch(e){}
 }
 
 let idleTimer = null;
 const IDLE_DELAY = 60000;
 
-function clearIdlePromoTimer() {
-  if (idleTimer) {
-    clearTimeout(idleTimer);
-    idleTimer = null;
-  }
+function clearIdlePromoTimer(){
+  if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; }
 }
 
-function resetIdlePromoTimer() {
+function resetIdlePromoTimer(){
   clearIdlePromoTimer();
 
-  const h = location.hash.split("?")[0];
-  if (h !== "#/order" && h !== "#/") return;
+  const h = location.hash.split('?')[0];
+  if(h !== '#/order' && h !== '#/') return;
 
-  idleTimer = setTimeout(() => {
-    const h2 = location.hash.split("?")[0];
-    const promoOpen = document
-      .getElementById("promoModal")
-      ?.classList.contains("open");
-    const payOpen = document
-      .getElementById("payModal")
-      ?.classList.contains("open");
-    const thanksOpen = document
-      .getElementById("thanksModal")
-      ?.classList.contains("open");
+  idleTimer = setTimeout(()=>{
+    const h2 = location.hash.split('?')[0];
+    const promoOpen  = document.getElementById('promoModal')?.classList.contains('open');
+    const payOpen    = document.getElementById('payModal')?.classList.contains('open');
+    const thanksOpen = document.getElementById('thanksModal')?.classList.contains('open');
 
-    if (
-      (h2 === "#/order" || h2 === "#/") &&
-      !promoOpen &&
-      !payOpen &&
-      !thanksOpen
-    ) {
+    if((h2 === '#/order' || h2 === '#/') && !promoOpen && !payOpen && !thanksOpen){
       openPromoModal();
     }
   }, IDLE_DELAY);
@@ -661,19 +597,16 @@ function resetIdlePromoTimer() {
 
 let promoTimer = null;
 
-async function openPromoModal() {
-  await fetchRemoteConfig().catch(() => {});
+async function openPromoModal(){
+  await fetchRemoteConfig().catch(()=>{});
 
   const cfg = loadConfig();
-  const url = (cfg.promoVideoUrl || "").trim();
-  if (!url) {
-    showToast("Промо-ролик не задан в конструкторе");
-    return;
-  }
+  const url = (cfg.promoVideoUrl || '').trim();
+  if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
 
-  const m = document.getElementById("promoModal");
-  const v = document.getElementById("promoVideo");
-  if (!m || !v) return;
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if(!m || !v) return;
 
   v.pause();
   v.src = url;
@@ -681,152 +614,119 @@ async function openPromoModal() {
 
   v.muted = !MEDIA_UNLOCKED;
   v.volume = 1;
-  v.setAttribute("autoplay", "");
+  v.setAttribute('autoplay','');
   v.load();
 
-  m.classList.add("open");
+  m.classList.add('open');
   setBodyScrollLock(true);
 
   const p = v.play();
-  if (p && p.catch) {
-    p.catch(() => {
-      if (!MEDIA_UNLOCKED) {
+  if(p && p.catch){
+    p.catch(()=>{
+      if(!MEDIA_UNLOCKED){
         v.muted = true;
-        v.play().catch(() => {});
+        v.play().catch(()=>{});
       }
     });
   }
 }
-
-function closePromoModal() {
-  const m = document.getElementById("promoModal");
-  const v = document.getElementById("promoVideo");
-  if (v) {
+  
+function closePromoModal(){
+  const m = document.getElementById('promoModal');
+  const v = document.getElementById('promoVideo');
+  if(v){
     v.pause();
-    v.removeAttribute("src");
+    v.removeAttribute('src');
     v.load();
   }
-  m?.classList.remove("open");
+  m?.classList.remove('open');
   setBodyScrollLock(false);
-  location.hash = "#/order";
+  location.hash = '#/order';
   resetIdlePromoTimer();
 }
 
-function schedulePromoAfterOrder() {
-  if (promoTimer) clearTimeout(promoTimer);
+function schedulePromoAfterOrder(){
+  if(promoTimer) clearTimeout(promoTimer);
   promoTimer = setTimeout(openPromoModal, 30000);
 }
 
-document
-  .getElementById("promoModal")
-  ?.addEventListener(
-    "click",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      closePromoModal();
-    },
-    { passive: false }
-  );
+document.getElementById('promoModal')?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  closePromoModal();
+}, {passive:false});
 
 let promoAudioUnlocked = false;
-function unlockPromoAudioOnce() {
-  if (promoAudioUnlocked) return;
+function unlockPromoAudioOnce(){
+  if(promoAudioUnlocked) return;
   promoAudioUnlocked = true;
-  const v = document.getElementById("promoVideo");
-  if (!v) return;
+  const v = document.getElementById('promoVideo');
+  if(!v) return;
 
-  if (v.muted) {
+  if(v.muted){
     v.muted = false;
     v.volume = 1;
-    v.play().catch(() => {});
+    v.play().catch(()=>{});
   }
 }
-["click", "touchstart", "pointerdown", "keydown"].forEach((ev) => {
-  window.addEventListener(ev, unlockPromoAudioOnce, {
-    once: true,
-    passive: true,
-  });
+['click','touchstart','pointerdown','keydown'].forEach(ev=>{
+  window.addEventListener(ev, unlockPromoAudioOnce, {once:true, passive:true});
 });
 
 let thanksTimer = null;
 
-function openThanksModal() {
-  const m = document.getElementById("thanksModal");
-  if (!m) return;
-  m.classList.add("open");
-  if (thanksTimer) clearTimeout(thanksTimer);
+function openThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.add('open');
+  if(thanksTimer) clearTimeout(thanksTimer);
   thanksTimer = setTimeout(closeThanksModal, 10000);
 }
 
-function closeThanksModal() {
-  const m = document.getElementById("thanksModal");
-  if (!m) return;
-  m.classList.remove("open");
+function closeThanksModal(){
+  const m = document.getElementById('thanksModal');
+  if(!m) return;
+  m.classList.remove('open');
 
-  if (thanksTimer) {
-    clearTimeout(thanksTimer);
-    thanksTimer = null;
-  }
+  if(thanksTimer){ clearTimeout(thanksTimer); thanksTimer=null; }
   resetIdlePromoTimer();
 }
 
-document
-  .getElementById("thanksModal")
-  ?.addEventListener(
-    "click",
-    (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      closeThanksModal();
-    },
-    { passive: false }
-  );
+document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
+  e.preventDefault(); e.stopPropagation();
+  closeThanksModal();
+}, {passive:false});
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i)
-    outputArray[i] = rawData.charCodeAt(i);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
-
 async function initPushSubscription() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     try {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
       });
-    } catch (e) {
-      console.warn("Push subscribe error", e);
-      return;
-    }
+    } catch (e) { console.warn('Push subscribe error', e); return; }
   }
   try {
-    await rpc({
-      op: "push_subscribe",
-      clientId: getClientId(),
-      subscription: sub,
-    });
-  } catch (e) {
-    console.warn("push_subscribe RPC error", e);
-  }
+    await rpc({ op: 'push_subscribe', clientId: getClientId(), subscription: sub });
+  } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
-
-async function rpc(payload) {
-  if (!API_URL) throw new Error("API_URL empty");
+  
+async function rpc(payload){
+  if (!API_URL) throw new Error('API_URL empty');
   const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload || {}),
+    method: 'POST',
+    headers: { 'content-type':'application/json' },
+    body: JSON.stringify(payload || {})
   });
   if (!res.ok) {
     const t = await res.text().catch(() => res.statusText);
@@ -835,13 +735,48 @@ async function rpc(payload) {
   return res.json();
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-  if (!location.hash || location.hash === "#" || location.hash === "#/")
-    location.hash = "#/order";
+document.addEventListener('DOMContentLoaded', function(){
+  if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
 
-// дальше идёт const DEFAULT_CONFIG = { ... }
+const PROFILE_LS_KEY     = 'client_profile_v1';
+const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
+const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
+const CONFIG_LS_KEY      = 'app_config_v1';
+const TABLO_PIN_OK       = 'TABLO_PIN_OK';
+const WANT_DASH          = 'WANT_DASH';
+const WANT_TERM          = 'WANT_TERM';
+const SOUND_ON_KEY       = 'sound_on_v1';
+const CLIENT_ID_KEY      = 'client_id_v1';
 
+const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
+const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
+const money = (x)=> `${x} руб.`;
+const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
+function safeParse(k, f){
+  try{
+    const v=JSON.parse(localStorage.getItem(k)||'null');
+    if(v==null) return f;
+    if(Array.isArray(f)) return Array.isArray(v)?v:[];
+    if(typeof f==='object') return v&&typeof v==='object'?v:{};
+    return v;
+  }catch{ return f }
+}
+function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
+function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})); }
+function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
+function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
+function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
+function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
+function getClientId(){
+  let id = localStorage.getItem(CLIENT_ID_KEY);
+  if (id) return id;
+  const p = loadProfile();
+  if (p && p.phone) id = 'tel:' + p.phone.replace(/\s+/g,'');
+  else id = 'guest-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
+  localStorage.setItem(CLIENT_ID_KEY, id);
+  return id;
+}
 
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
@@ -890,92 +825,29 @@ const DEFAULT_CONFIG = {
     ]}
   ]
 };
-
-// ===== Ключи для localStorage =====
-const PROFILE_LS_KEY     = 'client_profile_v1';
-const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
-const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
-const CONFIG_LS_KEY      = 'app_config_v1';
-const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-const WANT_DASH          = 'WANT_DASH';
-const WANT_TERM          = 'WANT_TERM';
-const SOUND_ON_KEY       = 'sound_on_v1';
-const CLIENT_ID_KEY      = 'client_id_v1';
-
-// ===== Хелперы =====
-const el = (html) => {
-  const t = document.createElement('template');
-  t.innerHTML = html.trim();
-  return t.content.firstChild;
-};
-
-const showToast = (msg) => {
-  const t = document.getElementById('toast');
-  if (!t) return;
-  t.textContent = msg;
-  t.classList.remove('hidden');
-  setTimeout(() => t.classList.add('hidden'), 1800);
-};
-
-const money = (x) => `${x} руб.`;
-
-const setBodyScrollLock = (on) => {
-  document.body.style.overflow = on ? 'hidden' : '';
-};
-
-// ===== Хелпер для чтения из localStorage =====
-function safeParse(k, fallback){
-  try {
-    const raw = localStorage.getItem(k);
-    if (!raw) return fallback;
-
-    const v = JSON.parse(raw);
-
-    if (Array.isArray(fallback)) {
-      return Array.isArray(v) ? v : fallback;
-    }
-    if (fallback && typeof fallback === 'object') {
-      return v && typeof v === 'object' ? v : fallback;
-    }
-    return (v === null || v === undefined) ? fallback : v;
-  } catch (e) {
-    console.warn('safeParse error for key', k, e);
-    return fallback;
-  }
-}
-
-// ===== Работа с конфигом приложения =====
-function loadConfig(){ 
-  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); 
-}
-
-function saveConfig(cfg){ 
-  localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg || DEFAULT_CONFIG)); 
-}
+    
+function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
+function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
 function applyTheme(theme){
   const r = document.documentElement;
-  r.style.setProperty('--card-radius',  (theme.cardRadius || 20) + 'px');
-  r.style.setProperty('--img-radius',   (theme.imgRadius  || 12) + 'px');
-  r.style.setProperty('--img-w',        (theme.imgW       || 110) + 'px');
-  r.style.setProperty('--img-h',        (theme.imgH       || 70) + 'px');
-  r.style.setProperty('--card-min-h',   (theme.cardMinH   || 104) + 'px');
+  r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
+  r.style.setProperty('--img-radius',   (theme.imgRadius||12)+'px');
+  r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
+  r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
+  r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-  // новые параметры для кнопок
-  r.style.setProperty('--btn-size', (theme.btnSize || 42) + 'px');
-  r.style.setProperty('--btn-font', (theme.btnFont || 22) + 'px');
+  // НОВОЕ:
+  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
+  r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
 
   document.getElementById('brandTitle').textContent =
     (loadConfig().brandTitle || 'ЯмаMoto');
 }
 
 function calcConfigVersion(cfg) {
-  try {
-    return JSON.stringify((cfg && cfg.menu) || []).length +
-           String(cfg?.promoVideoUrl || '').length;
-  } catch {
-    return 0;
-  }
+  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
+  catch { return 0; }
 }
 
 let MENU_CATEGORIES = loadConfig().menu.slice();
@@ -989,47 +861,34 @@ async function fetchRemoteConfig(){
         const json = await res.json();
         if(json && json.menu){
           saveConfig(json);
-          applyTheme(json.theme || {});
+          applyTheme(json.theme||{});
           MENU_CATEGORIES = json.menu.slice();
           return json;
         }
       }
-    }catch(e){ 
-      console.warn('fetchRemoteConfig URL', e); 
-    }
+    }catch(e){ console.warn('fetchRemoteConfig URL', e); }
   }
-
-  // если прямой URL не сработал — пробуем через RPC
   try{
     const res = await rpc({ op: 'config_get' });
     if (res && res.config && Array.isArray(res.config.menu)){
       saveConfig(res.config);
-      applyTheme(res.config.theme || {});
+      applyTheme(res.config.theme||{});
       MENU_CATEGORIES = res.config.menu.slice();
       return res.config;
     }
-  }catch(e){ 
-    console.warn('fetchRemoteConfig RPC', e); 
-  }
+  }catch(e){ console.warn('fetchRemoteConfig RPC', e); }
   return null;
 }
 
-function easeInOutCubic(t){ 
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; 
-}
-
-function animateScrollX(el, to, {duration = 280, onEnd} = {}){
-  const from = el.scrollLeft; 
-  const diff = to - from;
-  if (!diff){ 
-    onEnd && onEnd(); 
-    return; 
-  }
-  const start = performance.now();
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
+function animateScrollX(el, to, {duration=280, onEnd}={}){
+  const from=el.scrollLeft; const diff=to-from;
+  if(!diff){ onEnd&&onEnd(); return; }
+  const start=performance.now();
   function step(ts){
-    const t = Math.min(1, (ts - start) / duration);
-    el.scrollLeft = from + diff * easeInOutCubic(t);
-    if (t < 1) requestAnimationFrame(step); else onEnd && onEnd();
+    const t=Math.min(1,(ts-start)/duration);
+    el.scrollLeft=from+diff*easeInOutCubic(t);
+    if(t<1) requestAnimationFrame(step); else onEnd&&onEnd();
   }
   requestAnimationFrame(step);
 }
@@ -1038,7 +897,7 @@ function syncOrderStatus(id, status){
   let hist = loadHistory();
   let changed = false;
 
-  for (let i = 0; i < hist.length; i++){
+  for (let i=0;i<hist.length;i++){
     if (String(hist[i].id) === String(id)){
       if (hist[i].status !== status){
         hist[i] = { ...hist[i], status };
@@ -1057,13 +916,13 @@ function syncOrderStatus(id, status){
 async function pullAndMergeStatuses(){
   try{
     const cloud = await rpc({ op:'list' });
-    if (!cloud || !Array.isArray(cloud.orders)) return;
+    if(!cloud || !Array.isArray(cloud.orders)) return;
 
     const byId = new Map(cloud.orders.map(o => [String(o.id), o]));
     const hist = loadHistory();
     let changed = false;
 
-    for (let i = 0; i < hist.length; i++){
+    for (let i=0;i<hist.length;i++){
       const id = String(hist[i].id);
       const fromCloud = byId.get(id);
       if (!fromCloud) continue;
@@ -1081,7 +940,7 @@ async function pullAndMergeStatuses(){
       }
     }
 
-    if (changed){
+    if(changed){
       saveHistory(hist);
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
     }
@@ -1093,7 +952,7 @@ async function pullAndMergeStatuses(){
 function bindHeaderDots(){
   const termDot = document.getElementById('termDot');
   const dashDot = document.getElementById('dashDot');
-  if (!termDot || !dashDot || termDot._bound) return;
+  if(!termDot || !dashDot || termDot._bound) return;
   termDot._bound = dashDot._bound = true;
 
   function makeTapHandler(onDone){
@@ -1102,56 +961,42 @@ function bindHeaderDots(){
 
     const reset = ()=>{
       taps = 0; first = 0;
-      if (timer){ clearTimeout(timer); timer = null; }
+      if(timer){ clearTimeout(timer); timer = null; }
     };
 
     return function(){
       const now = Date.now();
-      if (!first) first = now;
+      if(!first) first = now;
       taps++;
 
-      if (now - first > windowMs){
+      if(now - first > windowMs){
         reset();
         taps = 1; first = now;
       }
 
-      if (taps >= 8){
+      if(taps >= 8){
         reset();
         onDone();
       } else {
-        if (timer) clearTimeout(timer);
+        if(timer) clearTimeout(timer);
         timer = setTimeout(reset, windowMs);
       }
     };
   }
 
   const goDashTap = makeTapHandler(()=>{
-    if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/dashboard';
-    else {
-      sessionStorage.setItem(WANT_DASH,'1');
-      document.getElementById('pinModal')?.classList.add('open');
-    }
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/dashboard';
+    else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal')?.classList.add('open'); }
   });
 
   const goTermTap = makeTapHandler(()=>{
-    if (sessionStorage.getItem(TABLO_PIN_OK) === '1') location.hash = '#/terminal';
-    else {
-      sessionStorage.setItem(WANT_TERM,'1');
-      document.getElementById('pinModal')?.classList.add('open');
-    }
+    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/terminal';
+    else { sessionStorage.setItem(WANT_TERM,'1'); document.getElementById('pinModal')?.classList.add('open'); }
   });
 
   ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(
-      ev, 
-      e => { e.preventDefault(); e.stopPropagation(); goTermTap(); }, 
-      {passive:false}
-    );
-    dashDot.addEventListener(
-      ev, 
-      e => { e.preventDefault(); e.stopPropagation(); goDashTap(); }, 
-      {passive:false}
-    );
+    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTermTap(); }, {passive:false});
+    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDashTap(); }, {passive:false});
   });
 }
 
@@ -1500,23 +1345,22 @@ function OrderView(){
   };
 
   const onCancel = (e)=>{
-  e && e.preventDefault();
-  e && e.stopPropagation();
-  close();
-  finalize();
-};
+    e && e.preventDefault();
+    e && e.stopPropagation();
+    close();
+    finalize();
+  };
 
-const onOk = async (e)=>{
-  e && e.preventDefault();
-  e && e.stopPropagation();
+  const onOk = async (e)=>{
+    e && e.preventDefault();
+    e && e.stopPropagation();
 
-  unlockMediaOnce();
+    unlockMediaOnce();
 
-  const cfg    = loadConfig();
-  const counts = window.__orderCounts || {};
-  const itemsSel = [];
-  let total = 0;
-
+    const cfg    = loadConfig();
+    const counts = window.__orderCounts || {};
+    const itemsSel = [];
+    let total = 0;
 
     cfg.menu.forEach(cat => cat.items.forEach(it=>{
       const q = counts[it.name] || 0;
