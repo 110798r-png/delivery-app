@@ -550,9 +550,17 @@ let ws = null;
 
 function connectWS() {
   const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.net/ws";
+
+  // на всякий случай закрываем старое соединение
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    try { ws.close(); } catch (e) {}
+  }
+
   ws = new WebSocket(WS_URL);
 
-  ws.onopen = () => console.log("WS connected");
+  ws.onopen = () => {
+    console.log("WS connected");
+  };
 
   ws.onmessage = (ev) => {
     try {
@@ -567,55 +575,84 @@ function connectWS() {
     }
   };
 
-  ws.onclose = () => setTimeout(connectWS, 1000);
+  ws.onclose = () => {
+    console.warn("WS closed, reconnect in 1s");
+    setTimeout(connectWS, 1000);
+  };
+
+  ws.onerror = (e) => {
+    console.warn("WS error", e);
+  };
 }
 
-connectWS(); // один вызов – и всё
-// дальше уже твои:
-  
-const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
-const CONFIG_REMOTE_URL = '';
-const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
+// один вызов – дальше reconnect делает onclose
+connectWS();
+
+// === HTTP API + промо/спасибо/пуши и т.д. ===
+
+// URL функции orders-api (API Gateway HTTP /rpc)
+const API_URL = "https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc";
+
+// если позже будешь хранить конфиг на бекенде/сторейдже – сюда поставим URL, пока пусть будет пусто
+const CONFIG_REMOTE_URL = "";
+
+// публичный ключ для Web Push
+const VAPID_PUBLIC =
+  "BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg";
 
 let MEDIA_UNLOCKED = false;
 
-function unlockMediaOnce(){
+function unlockMediaOnce() {
   if (MEDIA_UNLOCKED) return;
   MEDIA_UNLOCKED = true;
-  try{
-    const a = document.getElementById('orderDing');
-    if(a){
+  try {
+    const a = document.getElementById("orderDing");
+    if (a) {
       const prevVol = a.volume;
       a.volume = 0;
       const p = a.play();
-      if(p && p.catch) p.catch(()=>{});
+      if (p && p.catch) p.catch(() => {});
       a.pause();
       a.currentTime = 0;
       a.volume = prevVol || 1;
     }
-  }catch(e){}
+  } catch (e) {}
 }
 
 let idleTimer = null;
 const IDLE_DELAY = 60000;
 
-function clearIdlePromoTimer(){
-  if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; }
+function clearIdlePromoTimer() {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
 }
 
-function resetIdlePromoTimer(){
+function resetIdlePromoTimer() {
   clearIdlePromoTimer();
 
-  const h = location.hash.split('?')[0];
-  if(h !== '#/order' && h !== '#/') return;
+  const h = location.hash.split("?")[0];
+  if (h !== "#/order" && h !== "#/") return;
 
-  idleTimer = setTimeout(()=>{
-    const h2 = location.hash.split('?')[0];
-    const promoOpen  = document.getElementById('promoModal')?.classList.contains('open');
-    const payOpen    = document.getElementById('payModal')?.classList.contains('open');
-    const thanksOpen = document.getElementById('thanksModal')?.classList.contains('open');
+  idleTimer = setTimeout(() => {
+    const h2 = location.hash.split("?")[0];
+    const promoOpen = document
+      .getElementById("promoModal")
+      ?.classList.contains("open");
+    const payOpen = document
+      .getElementById("payModal")
+      ?.classList.contains("open");
+    const thanksOpen = document
+      .getElementById("thanksModal")
+      ?.classList.contains("open");
 
-    if((h2 === '#/order' || h2 === '#/') && !promoOpen && !payOpen && !thanksOpen){
+    if (
+      (h2 === "#/order" || h2 === "#/") &&
+      !promoOpen &&
+      !payOpen &&
+      !thanksOpen
+    ) {
       openPromoModal();
     }
   }, IDLE_DELAY);
@@ -623,16 +660,19 @@ function resetIdlePromoTimer(){
 
 let promoTimer = null;
 
-async function openPromoModal(){
-  await fetchRemoteConfig().catch(()=>{});
+async function openPromoModal() {
+  await fetchRemoteConfig().catch(() => {});
 
   const cfg = loadConfig();
-  const url = (cfg.promoVideoUrl || '').trim();
-  if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
+  const url = (cfg.promoVideoUrl || "").trim();
+  if (!url) {
+    showToast("Промо-ролик не задан в конструкторе");
+    return;
+  }
 
-  const m = document.getElementById('promoModal');
-  const v = document.getElementById('promoVideo');
-  if(!m || !v) return;
+  const m = document.getElementById("promoModal");
+  const v = document.getElementById("promoVideo");
+  if (!m || !v) return;
 
   v.pause();
   v.src = url;
@@ -640,119 +680,152 @@ async function openPromoModal(){
 
   v.muted = !MEDIA_UNLOCKED;
   v.volume = 1;
-  v.setAttribute('autoplay','');
+  v.setAttribute("autoplay", "");
   v.load();
 
-  m.classList.add('open');
+  m.classList.add("open");
   setBodyScrollLock(true);
 
   const p = v.play();
-  if(p && p.catch){
-    p.catch(()=>{
-      if(!MEDIA_UNLOCKED){
+  if (p && p.catch) {
+    p.catch(() => {
+      if (!MEDIA_UNLOCKED) {
         v.muted = true;
-        v.play().catch(()=>{});
+        v.play().catch(() => {});
       }
     });
   }
 }
-  
-function closePromoModal(){
-  const m = document.getElementById('promoModal');
-  const v = document.getElementById('promoVideo');
-  if(v){
+
+function closePromoModal() {
+  const m = document.getElementById("promoModal");
+  const v = document.getElementById("promoVideo");
+  if (v) {
     v.pause();
-    v.removeAttribute('src');
+    v.removeAttribute("src");
     v.load();
   }
-  m?.classList.remove('open');
+  m?.classList.remove("open");
   setBodyScrollLock(false);
-  location.hash = '#/order';
+  location.hash = "#/order";
   resetIdlePromoTimer();
 }
 
-function schedulePromoAfterOrder(){
-  if(promoTimer) clearTimeout(promoTimer);
+function schedulePromoAfterOrder() {
+  if (promoTimer) clearTimeout(promoTimer);
   promoTimer = setTimeout(openPromoModal, 30000);
 }
 
-document.getElementById('promoModal')?.addEventListener('click', (e)=>{
-  e.preventDefault(); e.stopPropagation();
-  closePromoModal();
-}, {passive:false});
+document
+  .getElementById("promoModal")
+  ?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closePromoModal();
+    },
+    { passive: false }
+  );
 
 let promoAudioUnlocked = false;
-function unlockPromoAudioOnce(){
-  if(promoAudioUnlocked) return;
+function unlockPromoAudioOnce() {
+  if (promoAudioUnlocked) return;
   promoAudioUnlocked = true;
-  const v = document.getElementById('promoVideo');
-  if(!v) return;
+  const v = document.getElementById("promoVideo");
+  if (!v) return;
 
-  if(v.muted){
+  if (v.muted) {
     v.muted = false;
     v.volume = 1;
-    v.play().catch(()=>{});
+    v.play().catch(() => {});
   }
 }
-['click','touchstart','pointerdown','keydown'].forEach(ev=>{
-  window.addEventListener(ev, unlockPromoAudioOnce, {once:true, passive:true});
+["click", "touchstart", "pointerdown", "keydown"].forEach((ev) => {
+  window.addEventListener(ev, unlockPromoAudioOnce, {
+    once: true,
+    passive: true,
+  });
 });
 
 let thanksTimer = null;
 
-function openThanksModal(){
-  const m = document.getElementById('thanksModal');
-  if(!m) return;
-  m.classList.add('open');
-  if(thanksTimer) clearTimeout(thanksTimer);
+function openThanksModal() {
+  const m = document.getElementById("thanksModal");
+  if (!m) return;
+  m.classList.add("open");
+  if (thanksTimer) clearTimeout(thanksTimer);
   thanksTimer = setTimeout(closeThanksModal, 10000);
 }
 
-function closeThanksModal(){
-  const m = document.getElementById('thanksModal');
-  if(!m) return;
-  m.classList.remove('open');
+function closeThanksModal() {
+  const m = document.getElementById("thanksModal");
+  if (!m) return;
+  m.classList.remove("open");
 
-  if(thanksTimer){ clearTimeout(thanksTimer); thanksTimer=null; }
+  if (thanksTimer) {
+    clearTimeout(thanksTimer);
+    thanksTimer = null;
+  }
   resetIdlePromoTimer();
 }
 
-document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
-  e.preventDefault(); e.stopPropagation();
-  closeThanksModal();
-}, {passive:false});
+document
+  .getElementById("thanksModal")
+  ?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeThanksModal();
+    },
+    { passive: false }
+  );
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
   const rawData = atob(base64);
   const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  for (let i = 0; i < rawData.length; ++i)
+    outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
+
 async function initPushSubscription() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     try {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
       });
-    } catch (e) { console.warn('Push subscribe error', e); return; }
+    } catch (e) {
+      console.warn("Push subscribe error", e);
+      return;
+    }
   }
   try {
-    await rpc({ op: 'push_subscribe', clientId: getClientId(), subscription: sub });
-  } catch (e) { console.warn('push_subscribe RPC error', e); }
+    await rpc({
+      op: "push_subscribe",
+      clientId: getClientId(),
+      subscription: sub,
+    });
+  } catch (e) {
+    console.warn("push_subscribe RPC error", e);
+  }
 }
-  
-async function rpc(payload){
-  if (!API_URL) throw new Error('API_URL empty');
+
+async function rpc(payload) {
+  if (!API_URL) throw new Error("API_URL empty");
   const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'content-type':'application/json' },
-    body: JSON.stringify(payload || {})
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload || {}),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => res.statusText);
@@ -761,48 +834,13 @@ async function rpc(payload){
   return res.json();
 }
 
-document.addEventListener('DOMContentLoaded', function(){
-  if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
+document.addEventListener("DOMContentLoaded", function () {
+  if (!location.hash || location.hash === "#" || location.hash === "#/")
+    location.hash = "#/order";
 });
 
-const PROFILE_LS_KEY     = 'client_profile_v1';
-const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
-const DASHBOARD_LS_KEY   = 'dashboard_orders_v1';
-const CONFIG_LS_KEY      = 'app_config_v1';
-const TABLO_PIN_OK       = 'TABLO_PIN_OK';
-const WANT_DASH          = 'WANT_DASH';
-const WANT_TERM          = 'WANT_TERM';
-const SOUND_ON_KEY       = 'sound_on_v1';
-const CLIENT_ID_KEY      = 'client_id_v1';
+// дальше идёт const DEFAULT_CONFIG = { ... }
 
-const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
-const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
-const money = (x)=> `${x} руб.`;
-const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
-function safeParse(k, f){
-  try{
-    const v=JSON.parse(localStorage.getItem(k)||'null');
-    if(v==null) return f;
-    if(Array.isArray(f)) return Array.isArray(v)?v:[];
-    if(typeof f==='object') return v&&typeof v==='object'?v:{};
-    return v;
-  }catch{ return f }
-}
-function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
-function saveProfile(p){ localStorage.setItem(PROFILE_LS_KEY, JSON.stringify(p||{})); }
-function loadHistory(){ return safeParse(CLIENT_HISTORY_KEY, []); }
-function saveHistory(list){ localStorage.setItem(CLIENT_HISTORY_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-function loadDash(){ return safeParse(DASHBOARD_LS_KEY, []); }
-function saveDash(list){ localStorage.setItem(DASHBOARD_LS_KEY, JSON.stringify(Array.isArray(list)?list:[])); }
-function getClientId(){
-  let id = localStorage.getItem(CLIENT_ID_KEY);
-  if (id) return id;
-  const p = loadProfile();
-  if (p && p.phone) id = 'tel:' + p.phone.replace(/\s+/g,'');
-  else id = 'guest-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
-  localStorage.setItem(CLIENT_ID_KEY, id);
-  return id;
-}
 
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
