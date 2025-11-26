@@ -500,6 +500,7 @@ if (typeof window.CSS.escape !== 'function') {
   </script>
 
   <script>
+    
 // ===== ЕДИНЫЙ ПУЛЛИНГ list() ДЛЯ ВСЕХ ЭКРАНОВ =====
 let LIST_IN_FLIGHT = false;
 let cloudOrdersCache = [];
@@ -546,8 +547,8 @@ async function listOrdersOnce(){
 }
 
 setInterval(listOrdersOnce, 2500); // можно 2.5с, чуть живее
-  
-const API_URL = 'https://d5d1ec44lv5uk5k7k9to.bixf7e87.apigw.yandexcloud.net/rpc';
+
+const API_URL = "";
 const CONFIG_REMOTE_URL = '';
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
@@ -721,18 +722,125 @@ async function initPushSubscription() {
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
   
-async function rpc(payload){
-  if (!API_URL) throw new Error('API_URL empty');
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'content-type':'application/json' },
-    body: JSON.stringify(payload || {})
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => res.statusText);
-    throw new Error(`RPC ${res.status}: ${t}`);
+// Локальный RPC — всё в localStorage, без интернета
+async function rpc(payload) {
+  payload = payload || {};
+  const op = payload.op;
+
+  // ===== КОНФИГ МЕНЮ =====
+  if (op === 'config_get') {
+    const cfg = loadConfig();
+    return { config: cfg };
   }
-  return res.json();
+
+  if (op === 'config_set') {
+    if (payload.config) {
+      saveConfig(payload.config);
+    }
+    return { ok: true };
+  }
+
+  // ===== ЗАКАЗЫ =====
+
+  // создать заказ
+  if (op === 'create') {
+    const data = payload.data || {};
+    const items = Array.isArray(data.items) ? data.items : [];
+    const total = Number(data.total || 0);
+    const pay   = data.pay || 'card';
+
+    const order = {
+      id: Date.now().toString().slice(-6),   // короткий номер
+      createdAt: Date.now(),
+      items,
+      total,
+      pay,
+      status: 'готовится',
+      etaMinutes: null,
+      etaUntil: null,
+      clientId: data.clientId || getClientId()
+    };
+
+    // в историю клиента
+    const hist = loadHistory();
+    hist.unshift(order);
+    // оставляем, например, последние 500 (можешь увеличить)
+    saveHistory(hist.slice(0, 500));
+
+    // в дэшборд / терминал
+    const dash = loadDash();
+    dash.unshift(order);
+    saveDash(dash.slice(0, 1000));
+
+    return { order };
+  }
+
+  // список заказов (для дэшборда, терминала)
+  if (op === 'list') {
+    const orders = loadDash();
+    return { orders };
+  }
+
+  // обновить заказ (статус, время готовности)
+  if (op === 'update') {
+    const id    = payload.data?.id || payload.id;
+    const patch = payload.data?.patch || payload.patch || {};
+
+    if (!id) return { ok: false, error: 'no id' };
+
+    let dash = loadDash();
+    let changed = false;
+
+    dash = dash.map(o => {
+      if (String(o.id) === String(id)) {
+        changed = true;
+        return { ...o, ...patch };
+      }
+      return o;
+    });
+
+    if (changed) {
+      saveDash(dash);
+
+      // синхронизируем статус в истории клиента
+      const hist = loadHistory();
+      const hist2 = hist.map(o =>
+        String(o.id) === String(id) ? { ...o, ...patch } : o
+      );
+      saveHistory(hist2);
+    }
+
+    return { ok: true };
+  }
+
+  // удалить заказ
+  if (op === 'delete') {
+    const id = payload.data?.id || payload.id;
+    if (!id) return { ok: false, error: 'no id' };
+
+    const dash = loadDash().filter(o => String(o.id) !== String(id));
+    saveDash(dash);
+
+    const hist = loadHistory().filter(o => String(o.id) !== String(id));
+    saveHistory(hist);
+
+    return { ok: true };
+  }
+
+  // очистить все заказы
+  if (op === 'clear') {
+    saveDash([]);
+    // историю клиента можно не трогать — это "архив"
+    return { ok: true };
+  }
+
+  // подписка на пуши — в локальном режиме просто игнорим
+  if (op === 'push_subscribe') {
+    return { ok: true };
+  }
+
+  // дефолт — ничего не делаем
+  return { ok: true };
 }
 
 document.addEventListener('DOMContentLoaded', function(){
