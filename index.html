@@ -1583,22 +1583,23 @@ function OrderView(){
   };
 
   const onCancel = (e)=>{
-    e && e.preventDefault();
-    e && e.stopPropagation();
-    close();
-    finalize();
-  };
+  e && e.preventDefault();
+  e && e.stopPropagation();
+  close();
+  finalize();
+};
 
-  const onOk = async (e)=>
-    e && e.preventDefault();
-    e && e.stopPropagation();
+const onOk = async (e)=>{
+  e && e.preventDefault();
+  e && e.stopPropagation();
 
-    unlockMediaOnce();
+  unlockMediaOnce();
 
-    const cfg    = loadConfig();
-    const counts = window.__orderCounts || {};
-    const itemsSel = [];
-    let total = 0;
+  const cfg    = loadConfig();
+  const counts = window.__orderCounts || {};
+  const itemsSel = [];
+  let total = 0;
+
 
     cfg.menu.forEach(cat => cat.items.forEach(it=>{
       const q = counts[it.name] || 0;
