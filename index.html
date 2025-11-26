@@ -548,7 +548,9 @@ async function listOrdersOnce(){
     let ws = null;
 
 function connectWS(){
-  ws = new WebSocket("wss://d5ddn3i9sig2fq30ct8g.yl4tuxdu.apigw.yandexcloud.net");
+  const WS_URL = "wss://d5ddn3i9sig2fq30ct8g.y14tuxdu.apigw.yandexcloud.net/ws";
+const ws = new WebSocket(WS_URL);
+
 
   ws.onopen = () => console.log("WS connected");
 
