@@ -995,17 +995,17 @@ function getClientId(){
 
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
-    brandSubtitle: 'суши • роллы • фастфуд',   // новый параметр подзаголовка
-  showBrandHeader: true,                    // показывать/скрывать всю шапку
+  brandSubtitle: 'суши • роллы • фастфуд',
+  showBrandHeader: true,
   promoVideoUrl: "",
-    qrUrl: '',            // <--- ДОБАВИЛИ
-   theme: {
-    cardRadius:20,
-    imgRadius:12,
-    imgW:110,
-    imgH:70,
-    cardMinH:104,
-    showPrice:true,
+  qrUrl: '',
+  theme: {
+    cardRadius: 20,
+    imgRadius: 12,
+    imgW: 110,
+    imgH: 70,
+    cardMinH: 104,
+    showPrice: true,
 
     // размер кнопок +/-
     btnSize: 42,   // px
@@ -1047,7 +1047,17 @@ const DEFAULT_CONFIG = {
     ]}
   ]
 };
-    
+
+// ===== Работа с конфигом =====
+function loadConfig(){
+  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG);
+}
+
+function saveConfig(cfg){
+  localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg || DEFAULT_CONFIG));
+}
+
+// Применить тему к CSS-переменным + обновить шапку
 function applyTheme(theme){
   const r = document.documentElement;
   theme = theme || {};
@@ -1059,7 +1069,7 @@ function applyTheme(theme){
   r.style.setProperty('--img-h',        (theme.imgH       || 70) + 'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH   || 104) + 'px');
 
-  // кнопки +/- берут размер из theme
+  // размер кнопок +/-
   r.style.setProperty('--btn-size', (theme.btnSize || 42) + 'px');
   r.style.setProperty('--btn-font', (theme.btnFont || 22) + 'px');
 
@@ -1067,7 +1077,7 @@ function applyTheme(theme){
   r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
   r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
-  // Обновляем шапку бренда (если элементы есть в DOM)
+  // Обновляем шапку бренда, если элементы есть
   const cfg = loadConfig();
 
   const titleEl = document.getElementById('brandTitle');
@@ -1082,27 +1092,35 @@ function applyTheme(theme){
 
   const wrap = document.querySelector('.brand-wrap');
   if (wrap) {
-    // если showBrandHeader === false — скрываем, иначе показываем
     wrap.style.display = (cfg.showBrandHeader === false) ? 'none' : '';
   }
 }
 
-// ===== Версия конфига, меню и удалённая загрузка =====
+// считаем "версию" конфига, чтобы понять, что он поменялся
 function calcConfigVersion(cfg) {
   try {
-    return JSON.stringify((cfg && cfg.menu) || []).length
-      + String((cfg && cfg.promoVideoUrl) || '').length
-      + String((cfg && cfg.qrUrl) || '').length;
+    return JSON.stringify((cfg && cfg.menu) || []).length +
+           String((cfg && cfg.promoVideoUrl) || '').length +
+           String((cfg && cfg.qrUrl) || '').length;
   } catch {
     return 0;
   }
 }
 
-let MENU_CATEGORIES = loadConfig().menu.slice();
-let lastConfigVersion = calcConfigVersion(loadConfig());
+let MENU_CATEGORIES = [];
+let lastConfigVersion = 0;
 
+// инициализация кеша при старте
+function initConfigCache(){
+  const cfg = loadConfig();
+  MENU_CATEGORIES = Array.isArray(cfg.menu) ? cfg.menu.slice() : [];
+  lastConfigVersion = calcConfigVersion(cfg);
+}
+initConfigCache();
+
+// загрузка конфига снаружи (если будет)
 async function fetchRemoteConfig(){
-  // сначала пробуем взять по прямому URL, если он задан
+  // 1) если задан CONFIG_REMOTE_URL — пробуем его
   if (CONFIG_REMOTE_URL){
     try{
       const res = await fetch(CONFIG_REMOTE_URL, { cache:'no-cache' });
@@ -1111,8 +1129,7 @@ async function fetchRemoteConfig(){
         if (json && Array.isArray(json.menu)){
           saveConfig(json);
           applyTheme(json.theme || {});
-          MENU_CATEGORIES = json.menu.slice();
-          lastConfigVersion = calcConfigVersion(json);
+          initConfigCache();
           return json;
         }
       }
@@ -1121,14 +1138,13 @@ async function fetchRemoteConfig(){
     }
   }
 
-  // затем пробуем через локальный rpc config_get
+  // 2) пробуем через локальный rpc config_get
   try{
     const res = await rpc({ op: 'config_get' });
     if (res && res.config && Array.isArray(res.config.menu)){
       saveConfig(res.config);
       applyTheme(res.config.theme || {});
-      MENU_CATEGORIES = res.config.menu.slice();
-      lastConfigVersion = calcConfigVersion(res.config);
+      initConfigCache();
       return res.config;
     }
   }catch(e){
