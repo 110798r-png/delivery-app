@@ -1048,72 +1048,93 @@ const DEFAULT_CONFIG = {
   ]
 };
     
-function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
-function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
-
 function applyTheme(theme){
   const r = document.documentElement;
-  r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
-  r.style.setProperty('--img-radius',   (theme.imgRadius||12)+'px');
-  r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
-  r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
-  r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
+  theme = theme || {};
 
-  // НОВОЕ:
-  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
-  r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
+  // базовые размеры карточек и картинок
+  r.style.setProperty('--card-radius',  (theme.cardRadius || 20) + 'px');
+  r.style.setProperty('--img-radius',   (theme.imgRadius  || 12) + 'px');
+  r.style.setProperty('--img-w',        (theme.imgW       || 110) + 'px');
+  r.style.setProperty('--img-h',        (theme.imgH       || 70) + 'px');
+  r.style.setProperty('--card-min-h',   (theme.cardMinH   || 104) + 'px');
+
+  // кнопки +/- берут размер из theme
+  r.style.setProperty('--btn-size', (theme.btnSize || 42) + 'px');
+  r.style.setProperty('--btn-font', (theme.btnFont || 22) + 'px');
+
+  // масштаб экрана заказа
   r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
   r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
- const cfg = loadConfig();
+  // Обновляем шапку бренда (если элементы есть в DOM)
+  const cfg = loadConfig();
 
-const titleEl = document.getElementById('brandTitle');
-if (titleEl) {
-  titleEl.textContent = cfg.brandTitle || 'ЯмаMoto';
+  const titleEl = document.getElementById('brandTitle');
+  if (titleEl) {
+    titleEl.textContent = cfg.brandTitle || 'ЯмаMoto';
+  }
+
+  const subEl = document.getElementById('brandSubtitle');
+  if (subEl) {
+    subEl.textContent = cfg.brandSubtitle || '';
+  }
+
+  const wrap = document.querySelector('.brand-wrap');
+  if (wrap) {
+    // если showBrandHeader === false — скрываем, иначе показываем
+    wrap.style.display = (cfg.showBrandHeader === false) ? 'none' : '';
+  }
 }
 
-const sub = document.getElementById('brandSubtitle');
-if (sub) {
-  sub.textContent = cfg.brandSubtitle || '';
-}
-
-const wrap = document.querySelector('.brand-wrap');
-if (wrap) {
-  wrap.style.display = cfg.showBrandHeader ? '' : 'none';
-}
-
+// ===== Версия конфига, меню и удалённая загрузка =====
 function calcConfigVersion(cfg) {
-  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
-  catch { return 0; }
+  try {
+    return JSON.stringify((cfg && cfg.menu) || []).length
+      + String((cfg && cfg.promoVideoUrl) || '').length
+      + String((cfg && cfg.qrUrl) || '').length;
+  } catch {
+    return 0;
+  }
 }
 
 let MENU_CATEGORIES = loadConfig().menu.slice();
 let lastConfigVersion = calcConfigVersion(loadConfig());
 
 async function fetchRemoteConfig(){
+  // сначала пробуем взять по прямому URL, если он задан
   if (CONFIG_REMOTE_URL){
     try{
       const res = await fetch(CONFIG_REMOTE_URL, { cache:'no-cache' });
-      if(res.ok){
+      if (res.ok){
         const json = await res.json();
-        if(json && json.menu){
+        if (json && Array.isArray(json.menu)){
           saveConfig(json);
-          applyTheme(json.theme||{});
+          applyTheme(json.theme || {});
           MENU_CATEGORIES = json.menu.slice();
+          lastConfigVersion = calcConfigVersion(json);
           return json;
         }
       }
-    }catch(e){ console.warn('fetchRemoteConfig URL', e); }
+    }catch(e){
+      console.warn('fetchRemoteConfig URL', e);
+    }
   }
+
+  // затем пробуем через локальный rpc config_get
   try{
     const res = await rpc({ op: 'config_get' });
     if (res && res.config && Array.isArray(res.config.menu)){
       saveConfig(res.config);
-      applyTheme(res.config.theme||{});
+      applyTheme(res.config.theme || {});
       MENU_CATEGORIES = res.config.menu.slice();
+      lastConfigVersion = calcConfigVersion(res.config);
       return res.config;
     }
-  }catch(e){ console.warn('fetchRemoteConfig RPC', e); }
+  }catch(e){
+    console.warn('fetchRemoteConfig RPC', e);
+  }
+
   return null;
 }
 
