@@ -392,6 +392,20 @@
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
+  <div class="sushi-icon" aria-hidden="true">
+    <!-- твоя SVG-иконка как была -->
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#fff"/>
+      <circle cx="12" cy="12" r="7" fill="#e50000"/>
+      <circle cx="12" cy="12" r="4" fill="#000"/>
+    </svg>
+  </div>
+  <!-- НОВЫЙ БЛОК С ТЕКСТОМ -->
+  <div class="leading-tight ml-3">
+    <div id="brandTitle" class="brand-title">ЯмаMoto</div>
+    <div id="brandSubtitle" class="brand-sub">суши • роллы • фастфуд</div>
+  </div>
+</div>
           <div class="sushi-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" fill="#fff"/>
@@ -655,7 +669,7 @@ let promoTimer = null;
 async function openPromoModal(){
   await fetchRemoteConfig().catch(()=>{});
 
-  const cfg = loadConfig();
+  const cfg = ();
   const url = (cfg.promoVideoUrl || '').trim();
   if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
 
@@ -783,7 +797,7 @@ async function rpc(payload) {
 
   // ===== КОНФИГ МЕНЮ =====
   if (op === 'config_get') {
-    const cfg = loadConfig();
+    const cfg = ();
     return { config: cfg };
   }
 
@@ -997,7 +1011,9 @@ function getClientId(){
 }
 
 const DEFAULT_CONFIG = {
-  brandTitle: 'ЯмаMoto',
+   brandTitle: 'ЯмаMoto',                 // <--- НОВОЕ
+  brandSubtitle: 'суши • роллы • фастфуд', // <--- НОВОЕ
+  showBrandHeader: true,                 // <--- НОВОЕ
   promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
     qrUrl: '',            // <--- ДОБАВИЛИ
    theme: {
@@ -1052,6 +1068,27 @@ const DEFAULT_CONFIG = {
 function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
+    function applyBrandFromConfig(){
+  const cfg = loadConfig();
+
+  const titleEl = document.getElementById('brandTitle');
+  const subEl   = document.getElementById('brandSubtitle');
+  const wrap    = document.querySelector('.brand-wrap');
+
+  if (titleEl) {
+    titleEl.textContent = cfg.brandTitle || 'ЯмаMoto';
+  }
+
+  if (subEl) {
+    subEl.textContent = cfg.brandSubtitle || '';
+  }
+
+  // если галочка "Показывать шапку" выключена — прячем весь блок
+  if (wrap) {
+    wrap.style.display = (cfg.showBrandHeader === false) ? 'none' : '';
+  }
+}
+
 function applyTheme(theme){
   const r = document.documentElement;
   r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
@@ -1086,6 +1123,7 @@ async function fetchRemoteConfig(){
         const json = await res.json();
         if(json && json.menu){
           saveConfig(json);
+          applyBrandFromConfig(); // <--- ДОБАВИТЬ
           applyTheme(json.theme||{});
           MENU_CATEGORIES = json.menu.slice();
           return json;
@@ -1099,6 +1137,7 @@ async function fetchRemoteConfig(){
       saveConfig(res.config);
       applyTheme(res.config.theme||{});
       MENU_CATEGORIES = res.config.menu.slice();
+        applyBrandFromConfig(); // <--- ДОБАВИТЬ
       return res.config;
     }
   }catch(e){ console.warn('fetchRemoteConfig RPC', e); }
@@ -2398,6 +2437,22 @@ function exportAccountingXLSX(){
 function BuilderView(){
   const cfg = loadConfig();
   const root = el(`
+  const cfg = loadConfig();
+
+const brandTitleInput    = root.querySelector('#brandTitleInput');
+const brandSubtitleInput = root.querySelector('#brandSubtitleInput');
+const brandShowInput     = root.querySelector('#brandShowInput');
+
+// заполняем значениями из конфига
+if (brandTitleInput) {
+  brandTitleInput.value = cfg.brandTitle || 'ЯмаMoto';
+}
+if (brandSubtitleInput) {
+  brandSubtitleInput.value = cfg.brandSubtitle || '';
+}
+if (brandShowInput) {
+  brandShowInput.checked = cfg.showBrandHeader !== false; // по умолчанию true
+}
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
   <h2 class="text-2xl font-extrabold">Конструктор меню</h2>
@@ -2436,6 +2491,25 @@ function BuilderView(){
           QR должен быть обычной картинкой по прямой ссылке.
         </div>
       </section>
+
+      <section class="card p-4 grid gap-3">
+  <h3 class="font-semibold text-lg">Название и шапка</h3>
+
+  <label class="text-sm text-gray-600 block">Название бренда</label>
+  <input id="brandTitleInput"
+         class="border rounded-xl p-3"
+         placeholder="ЯмаMoto">
+
+  <label class="text-sm text-gray-600 block mt-2">Подзаголовок</label>
+  <input id="brandSubtitleInput"
+         class="border rounded-xl p-3"
+         placeholder="суши • роллы • фастфуд">
+
+  <div class="flex items-center gap-2 mt-3">
+    <input id="brandShowInput" type="checkbox">
+    <label for="brandShowInput">Показывать шапку</label>
+  </div>
+</section>
 
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
@@ -2619,6 +2693,16 @@ if (resetHistoryBtn){
     }
     cfg.theme = t;
 
+       if (brandTitleInput) {
+  cfg.brandTitle = brandTitleInput.value.trim() || 'ЯмаMoto';
+}
+if (brandSubtitleInput) {
+  cfg.brandSubtitle = brandSubtitleInput.value.trim();
+}
+if (brandShowInput) {
+  cfg.showBrandHeader = brandShowInput.checked;
+}
+       
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
@@ -2633,6 +2717,10 @@ if (resetHistoryBtn){
     history.length?history.back():(location.hash='#/dashboard');
   };
 
+  saveConfig(cfg);
+applyBrandFromConfig();        // подтянуть в шапку
+applyTheme(cfg.theme || {});   // если уже было - оставь
+MENU_CATEGORIES = cfg.menu.slice();
 
   root.querySelector('#backBtn2').onclick=()=> history.length?history.back():(location.hash='#/dashboard');
   return root;
@@ -2743,6 +2831,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
   await fetchRemoteConfig().catch(()=>{});
+  applyBrandFromConfig();   // <--- НОВАЯ СТРОКА
 
   const pinM=document.getElementById('pinModal');
   const pinOk=document.getElementById('pinOk');
