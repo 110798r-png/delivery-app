@@ -400,6 +400,9 @@
             </svg>
           </div>
           <div class="leading-tight">
+            <div class="brand-title" id="brandTitle">ЯмаMoto</div>
+            <div class="brand-sub">суши • роллы • фастфуд</div>
+          </div>
           <div class="flex items-center gap-2 ml-3">
             <button id="termDot" class="secret-dot" title="Терминал"></button>
             <button id="dashDot" class="secret-dot" title="Табло"></button>
@@ -995,17 +998,15 @@ function getClientId(){
 
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
-  brandSubtitle: 'суши • роллы • фастфуд',
-  showBrandHeader: true,
-  promoVideoUrl: "",
-  qrUrl: '',
-  theme: {
-    cardRadius: 20,
-    imgRadius: 12,
-    imgW: 110,
-    imgH: 70,
-    cardMinH: 104,
-    showPrice: true,
+  promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
+    qrUrl: '',            // <--- ДОБАВИЛИ
+   theme: {
+    cardRadius:20,
+    imgRadius:12,
+    imgW:110,
+    imgH:70,
+    cardMinH:104,
+    showPrice:true,
 
     // размер кнопок +/-
     btnSize: 42,   // px
@@ -1047,110 +1048,60 @@ const DEFAULT_CONFIG = {
     ]}
   ]
 };
+    
+function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
+function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
-// ===== Работа с конфигом =====
-function loadConfig(){
-  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG);
-}
-
-function saveConfig(cfg){
-  localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg || DEFAULT_CONFIG));
-}
-
-// Применить тему к CSS-переменным + обновить шапку
 function applyTheme(theme){
   const r = document.documentElement;
-  theme = theme || {};
+  r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
+  r.style.setProperty('--img-radius',   (theme.imgRadius||12)+'px');
+  r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
+  r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
+  r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-  // базовые размеры карточек и картинок
-  r.style.setProperty('--card-radius',  (theme.cardRadius || 20) + 'px');
-  r.style.setProperty('--img-radius',   (theme.imgRadius  || 12) + 'px');
-  r.style.setProperty('--img-w',        (theme.imgW       || 110) + 'px');
-  r.style.setProperty('--img-h',        (theme.imgH       || 70) + 'px');
-  r.style.setProperty('--card-min-h',   (theme.cardMinH   || 104) + 'px');
-
-  // размер кнопок +/-
-  r.style.setProperty('--btn-size', (theme.btnSize || 42) + 'px');
-  r.style.setProperty('--btn-font', (theme.btnFont || 22) + 'px');
-
-  // масштаб экрана заказа
+  // НОВОЕ:
+  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
+  r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
   r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
   r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
-  // Обновляем шапку бренда, если элементы есть
-  const cfg = loadConfig();
-
-  const titleEl = document.getElementById('brandTitle');
-  if (titleEl) {
-    titleEl.textContent = cfg.brandTitle || 'ЯмаMoto';
-  }
-
-  const subEl = document.getElementById('brandSubtitle');
-  if (subEl) {
-    subEl.textContent = cfg.brandSubtitle || '';
-  }
-
-  const wrap = document.querySelector('.brand-wrap');
-  if (wrap) {
-    wrap.style.display = (cfg.showBrandHeader === false) ? 'none' : '';
-  }
+  document.getElementById('brandTitle').textContent =
+    (loadConfig().brandTitle || 'ЯмаMoto');
 }
 
-// считаем "версию" конфига, чтобы понять, что он поменялся
 function calcConfigVersion(cfg) {
-  try {
-    return JSON.stringify((cfg && cfg.menu) || []).length +
-           String((cfg && cfg.promoVideoUrl) || '').length +
-           String((cfg && cfg.qrUrl) || '').length;
-  } catch {
-    return 0;
-  }
+  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
+  catch { return 0; }
 }
 
-let MENU_CATEGORIES = [];
-let lastConfigVersion = 0;
+let MENU_CATEGORIES = loadConfig().menu.slice();
+let lastConfigVersion = calcConfigVersion(loadConfig());
 
-// инициализация кеша при старте
-function initConfigCache(){
-  const cfg = loadConfig();
-  MENU_CATEGORIES = Array.isArray(cfg.menu) ? cfg.menu.slice() : [];
-  lastConfigVersion = calcConfigVersion(cfg);
-}
-initConfigCache();
-
-// загрузка конфига снаружи (если будет)
 async function fetchRemoteConfig(){
-  // 1) если задан CONFIG_REMOTE_URL — пробуем его
   if (CONFIG_REMOTE_URL){
     try{
       const res = await fetch(CONFIG_REMOTE_URL, { cache:'no-cache' });
-      if (res.ok){
+      if(res.ok){
         const json = await res.json();
-        if (json && Array.isArray(json.menu)){
+        if(json && json.menu){
           saveConfig(json);
-          applyTheme(json.theme || {});
-          initConfigCache();
+          applyTheme(json.theme||{});
+          MENU_CATEGORIES = json.menu.slice();
           return json;
         }
       }
-    }catch(e){
-      console.warn('fetchRemoteConfig URL', e);
-    }
+    }catch(e){ console.warn('fetchRemoteConfig URL', e); }
   }
-
-  // 2) пробуем через локальный rpc config_get
   try{
     const res = await rpc({ op: 'config_get' });
     if (res && res.config && Array.isArray(res.config.menu)){
       saveConfig(res.config);
-      applyTheme(res.config.theme || {});
-      initConfigCache();
+      applyTheme(res.config.theme||{});
+      MENU_CATEGORIES = res.config.menu.slice();
       return res.config;
     }
-  }catch(e){
-    console.warn('fetchRemoteConfig RPC', e);
-  }
-
+  }catch(e){ console.warn('fetchRemoteConfig RPC', e); }
   return null;
 }
 
@@ -2486,25 +2437,6 @@ function BuilderView(){
         </div>
       </section>
 
-      <section class="card p-4 grid gap-3">
-  <h3 class="font-semibold text-lg">Название и шапка</h3>
-
-  <label class="text-sm text-gray-600 block">Название бренда</label>
-  <input id="brandTitleInput"
-         class="border rounded-xl p-3"
-         placeholder="ЯмаMoto">
-
-  <label class="text-sm text-gray-600 block mt-2">Подзаголовок</label>
-  <input id="brandSubtitleInput"
-         class="border rounded-xl p-3"
-         placeholder="суши • роллы • фастфуд">
-
-  <div class="flex items-center gap-2 mt-3">
-    <input id="brandShowInput" type="checkbox">
-    <label for="brandShowInput">Показывать шапку</label>
-  </div>
-</section>
-
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-lg">Категории и товары</h3>
@@ -2550,20 +2482,6 @@ function BuilderView(){
   `);
 
    const catsBox = root.querySelector('#catsBox');
-
-const brandTitleInput    = root.querySelector('#brandTitleInput');
-const brandSubtitleInput = root.querySelector('#brandSubtitleInput');
-const brandShowInput     = root.querySelector('#brandShowInput');
-
-if (brandTitleInput) {
-  brandTitleInput.value = cfg.brandTitle || 'ЯмаMoto';
-}
-if (brandSubtitleInput) {
-  brandSubtitleInput.value = cfg.brandSubtitle || '';
-}
-if (brandShowInput) {
-  brandShowInput.checked = cfg.showBrandHeader !== false;
-}
   const promoUrlInp = root.querySelector('#promoUrl');
   const qrUrlInp   = root.querySelector('#qrUrl');
     const scaleXInput = root.querySelector('#scaleXInput');
@@ -2650,22 +2568,10 @@ if (resetHistoryBtn){
   render();
 
   root.querySelector('#promoTest').onclick = ()=>{
-  cfg.promoVideoUrl = promoUrlInp.value.trim();
-
-  if (brandTitleInput) {
-    cfg.brandTitle = brandTitleInput.value.trim() || 'ЯмаMoto';
-  }
-  if (brandSubtitleInput) {
-    cfg.brandSubtitle = brandSubtitleInput.value.trim() || '';
-  }
-  if (brandShowInput) {
-    cfg.showBrandHeader = brandShowInput.checked;
-  }
-
-  saveConfig(cfg);
-  applyTheme(cfg.theme || {}); // чтобы сразу обновилась шапка, если открыто
-  openPromoModal();
-};
+    cfg.promoVideoUrl = promoUrlInp.value.trim();
+    saveConfig(cfg);
+    openPromoModal();
+  };
   root.querySelector('#promoClear').onclick = ()=>{
     promoUrlInp.value = '';
   };
@@ -2694,39 +2600,38 @@ if (resetHistoryBtn){
     fr.readAsText(f);
   };
 
-     root.querySelector('#applyBtn').onclick = async ()=>{
-  cfg.promoVideoUrl = promoUrlInp.value.trim();
-  if (qrUrlInp) {
-    cfg.qrUrl = qrUrlInp.value.trim();
-  }
+     root.querySelector('#applyBtn').onclick=async ()=>{
+    cfg.promoVideoUrl = promoUrlInp.value.trim();
+    if (qrUrlInp) {
+      cfg.qrUrl = qrUrlInp.value.trim();
+    }
 
-  if (brandTitleInput) {
-    cfg.brandTitle = brandTitleInput.value.trim() || 'ЯмаMoto';
-  }
-  if (brandSubtitleInput) {
-    cfg.brandSubtitle = brandSubtitleInput.value.trim() || '';
-  }
-  if (brandShowInput) {
-    cfg.showBrandHeader = brandShowInput.checked;
-  }
+    const t = cfg.theme || {};
+    if (scaleXInput){
+      const raw = String(scaleXInput.value || '').replace(',', '.');
+      const num = parseFloat(raw);
+      t.orderScaleX = Number.isFinite(num) ? num : 1;
+    }
+    if (scaleYInput){
+      const raw = String(scaleYInput.value || '').replace(',', '.');
+      const num = parseFloat(raw);
+      t.orderScaleY = Number.isFinite(num) ? num : 1;
+    }
+    cfg.theme = t;
 
-  const t = cfg.theme || {};
-  if (scaleXInput){
-    const raw = String(scaleXInput.value || '').replace(',', '.');
-    const num = parseFloat(raw);
-    t.orderScaleX = Number.isFinite(num) ? num : 1;
-  }
-  if (scaleYInput){
-    const raw = String(scaleYInput.value || '').replace(',', '.');
-    const num = parseFloat(raw);
-    t.orderScaleY = Number.isFinite(num) ? num : 1;
-  }
-  cfg.theme = t;
-
-  saveConfig(cfg);
-  applyTheme(cfg.theme || {});
-  MENU_CATEGORIES = cfg.menu.slice();
-};
+    saveConfig(cfg);
+    applyTheme(cfg.theme);
+    MENU_CATEGORIES = cfg.menu.slice();
+    try{ await rpc({ op: 'config_set', config: cfg }); }
+    catch(e){
+      console.warn('config_set error', e);
+      showToast('Меню сохранено локально, но сервер недоступен');
+      history.length?history.back():(location.hash='#/dashboard');
+      return;
+    }
+    showToast('Меню сохранено (сервер)');
+    history.length?history.back():(location.hash='#/dashboard');
+  };
 
 
   root.querySelector('#backBtn2').onclick=()=> history.length?history.back():(location.hash='#/dashboard');
@@ -2908,3 +2813,4 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   </script>
 </body>
 </html>
+
