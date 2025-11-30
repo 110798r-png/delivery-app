@@ -1020,18 +1020,18 @@ function getClientId(){
 const DEFAULT_CONFIG = {
   brandTitle: 'ФудДжи',
   promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
-    qrUrl: '',            // <--- ДОБАВИЛИ
-   theme: {
+  qrUrl: '',
 
-       theme: {
-    cardRadius:20,
-    imgRadius:12,
-    imgW:110,
-    imgH:70,
-    cardMinH:104,
-    showPrice:true,
+  // все настройки внешнего вида – в ОДНОМ theme
+  theme: {
+    cardRadius: 20,
+    imgRadius: 12,
+    imgW: 110,
+    imgH: 70,
+    cardMinH: 104,
+    showPrice: true,
 
-    // размер кнопок +/-
+    // размер кнопок +/-:
     btnSize: 42,   // px
     btnFont: 22,   // px
 
@@ -1041,7 +1041,7 @@ const DEFAULT_CONFIG = {
     // large  = 28–45"
     screenPreset: 'medium'
   },
-     
+
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -1101,6 +1101,7 @@ function applyTheme(theme){
 
   document.getElementById('brandTitle').textContent =
     (loadConfig().brandTitle || 'ЯмаMoto');
+  } // <-- вот этой скобки не хватало
 
 function calcConfigVersion(cfg) {
   try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
@@ -2541,7 +2542,7 @@ function BuilderView(){
     </div>
   `);
 
-   c  const catsBox = root.querySelector('#catsBox');
+  const catsBox = root.querySelector('#catsBox');
   const promoUrlInp = root.querySelector('#promoUrl');
   const qrUrlInp   = root.querySelector('#qrUrl');
   const screenPresetSelect = root.querySelector('#screenPreset');
@@ -2623,15 +2624,6 @@ if (resetHistoryBtn){
 
       catsBox.appendChild(catCard);
     });
-  }
-  render();
-
-    render();
-
-  // выставляем выбранный пресет в селекте (small / medium / large)
-  if (screenPresetSelect){
-    screenPresetSelect.value =
-      (cfg.theme && cfg.theme.screenPreset) || 'medium';
   }
   render();
 
