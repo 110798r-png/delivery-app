@@ -505,6 +505,23 @@
     </div>
   </div>
 
+<!-- МОДАЛКА ДЛЯ ДОСТУПА К КОНСТРУКТОРУ -->
+<div id="builderPinModal" class="modal">
+  <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
+    <h3 class="text-lg font-semibold">Доступ к конструктору</h3>
+    <input id="builderPinInput"
+           type="password"
+           class="border rounded-2xl p-3 w-full text-center"
+           placeholder="PIN"
+           inputmode="numeric"
+           maxlength="6">
+    <div class="flex justify-end gap-2">
+      <button id="builderPinCancel" class="px-3 py-2 rounded-xl border">Отмена</button>
+      <button id="builderPinOk" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+    </div>
+  </div>
+</div>
+  
   <div id="promoModal" class="modal" aria-hidden="true">
     <video id="promoVideo" playsinline loop muted autoplay></video>
   </div>
@@ -1781,7 +1798,9 @@ function DashboardView(){
           <button id="soundToggle" class="px-3 py-2 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
         </div>
         <div class="flex items-center gap-2">
-          <a href="#/builder" class="px-4 py-2 rounded-xl border bg-white font-semibold" title="Конструктор">Конструктор</a>
+          <button id="builderOpenBtn" class="px-4 py-2 rounded-xl border bg-white font-semibold">
+  Конструктор
+</button>
           <button id="btnClearAll" class="px-4 py-2 rounded-xl border bg-red-50 text-red-700 font-semibold">Очистить всё</button>
         </div>
       </div>
@@ -1796,6 +1815,50 @@ function DashboardView(){
 
   const list = root.querySelector('#list');
   let dashOrders = loadDash();
+  // === PIN-модалка для входа в конструктор ===
+const builderBtn = root.querySelector('#builderOpenBtn');
+const builderModal = document.getElementById('builderPinModal');
+const builderInput = document.getElementById('builderPinInput');
+const builderOk = document.getElementById('builderPinOk');
+const builderCancel = document.getElementById('builderPinCancel');
+
+const BUILDER_PIN = "1107"; // <-- меняешь тут если нужно
+
+if (builderBtn) {
+  builderBtn.addEventListener('click', () => {
+    builderInput.value = "";
+    builderModal.classList.add('open');
+    setBodyScrollLock(true);
+    setTimeout(() => builderInput.focus(), 50);
+  });
+}
+
+if (builderCancel) {
+  builderCancel.onclick = () => {
+    builderModal.classList.remove('open');
+    setBodyScrollLock(false);
+  };
+}
+
+if (builderOk) {
+  builderOk.onclick = () => {
+    const val = (builderInput.value || "").trim();
+    if (val !== BUILDER_PIN) {
+      showToast("Неверный PIN");
+      return;
+    }
+    builderModal.classList.remove('open');
+    setBodyScrollLock(false);
+    location.hash = "#/builder";
+  };
+}
+
+builderModal.onclick = (e) => {
+  if (e.target === builderModal) {
+    builderModal.classList.remove('open');
+    setBodyScrollLock(false);
+  }
+};
   let knownIds = new Set(dashOrders.map(o => String(o.id)));
   const ding = document.getElementById('orderDing');
   const soundBtn = root.querySelector('#soundToggle');
@@ -2810,6 +2873,24 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     }
   }
 });
+    /* === Авто-маскирование всех PIN-полей === */
+function maskAllPinInputs() {
+  const pinInputs = document.querySelectorAll('input[inputmode="numeric"], input[type="password"]');
+  pinInputs.forEach(inp => {
+    inp.type = "password";
+    inp.autocomplete = "off";
+    inp.autocorrect = "off";
+    inp.autocapitalize = "off";
+    inp.spellcheck = false;
+  });
+}
+
+// запуск после каждой загрузки DOM
+document.addEventListener('DOMContentLoaded', maskAllPinInputs);
+
+// запуск при каждом открытии модалки (на случай динамического добавления)
+document.addEventListener('click', maskAllPinInputs);
+    
   </script>
 </body>
 </html>
