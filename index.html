@@ -143,10 +143,10 @@
 }
 
         /* Управляемый масштаб для экрана выбора товаров */
-    .order-scale-wrapper{
-      transform-origin: top left;
-      transform: scale(var(--order-scale-x, 1), var(--order-scale-y, 1));
-    }
+    /* Контейнер экрана заказа (масштаб теперь через font-size, а не transform) */
+.order-scale-wrapper{
+  transform-origin: top left;
+}
     
     /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
     @media (min-width: 1100px) and (orientation: portrait){
@@ -1022,6 +1022,8 @@ const DEFAULT_CONFIG = {
   promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
     qrUrl: '',            // <--- ДОБАВИЛИ
    theme: {
+
+       theme: {
     cardRadius:20,
     imgRadius:12,
     imgW:110,
@@ -1033,10 +1035,13 @@ const DEFAULT_CONFIG = {
     btnSize: 42,   // px
     btnFont: 22,   // px
 
-    // масштаб экрана заказа
-    orderScaleX: 1,
-    orderScaleY: 1
+    // пресет под диагональ экрана
+    // small  = 14–19"
+    // medium = 20–27"
+    // large  = 28–45"
+    screenPreset: 'medium'
   },
+     
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -1081,14 +1086,21 @@ function applyTheme(theme){
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-  // НОВОЕ:
-  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
+    r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
   r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
-  r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
-  r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
-  // ⚠️ БОЛЬШЕ НИЧЕГО НЕ ТРОГАЕМ, НИКАКОГО brandTitle ТУТ НЕТ
-}
+  // базовый размер шрифта в зависимости от диагонали
+  const preset = theme.screenPreset || 'medium';
+  let base = 16;          // дефолт
+  if (preset === 'small')  base = 15; // 14–19"
+  if (preset === 'medium') base = 17; // 20–27"
+  if (preset === 'large')  base = 19; // 28–45"
+
+  // сохраняем в CSS-переменную, а applyKioskClasses уже домножит под ориентацию
+  document.documentElement.style.setProperty('--app-base-font', base + 'px');
+
+  document.getElementById('brandTitle').textContent =
+    (loadConfig().brandTitle || 'ЯмаMoto');
 
 function calcConfigVersion(cfg) {
   try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
@@ -2511,34 +2523,16 @@ function BuilderView(){
         <div id="catsBox" class="grid gap-4"></div>
       </section>
 
-            <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Масштаб экрана заказа</h3>
+           <section class="card p-4 grid gap-3">
+        <h3 class="font-semibold text-lg">Масштаб под диагональ экрана</h3>
         <div class="text-sm text-gray-600">
-          Настрой ширину и высоту под конкретный монитор.
-          1.0 — базовый размер, меньше 1 — уменьшить, больше 1 — увеличить.
+          Выбери примерную диагональ монитора. Интерфейс сам подстроит размеры.
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label class="text-sm text-gray-700 block mb-1">Ширина (scale X)</label>
-            <input id="scaleXInput"
-                   type="number"
-                   step="0.05"
-                   min="0.5"
-                   max="2"
-                   class="border rounded-xl p-3 w-full"
-                   value="${(cfg.theme && cfg.theme.orderScaleX) || 1}">
-          </div>
-          <div>
-            <label class="text-sm text-gray-700 block mb-1">Высота (scale Y)</label>
-            <input id="scaleYInput"
-                   type="number"
-                   step="0.05"
-                   min="0.5"
-                   max="2"
-                   class="border rounded-xl p-3 w-full"
-                   value="${(cfg.theme && cfg.theme.orderScaleY) || 1}">
-          </div>
-        </div>
+        <select id="screenPreset" class="border rounded-xl p-3 max-w-xs">
+          <option value="small">14–19" (малый экран / ноутбук)</option>
+          <option value="medium">20–27" (обычный терминал)</option>
+          <option value="large">28–45" (большое табло)</option>
+        </select>
       </section>
 
       <div class="flex gap-2">
@@ -2547,11 +2541,10 @@ function BuilderView(){
     </div>
   `);
 
-   const catsBox = root.querySelector('#catsBox');
+   c  const catsBox = root.querySelector('#catsBox');
   const promoUrlInp = root.querySelector('#promoUrl');
   const qrUrlInp   = root.querySelector('#qrUrl');
-    const scaleXInput = root.querySelector('#scaleXInput');
-  const scaleYInput = root.querySelector('#scaleYInput');
+  const screenPresetSelect = root.querySelector('#screenPreset');
   
   const exportStatsBtn = root.querySelector('#exportStatsBtn');
 if (exportStatsBtn){
@@ -2633,6 +2626,22 @@ if (resetHistoryBtn){
   }
   render();
 
+    render();
+
+  // выставляем выбранный пресет в селекте (small / medium / large)
+  if (screenPresetSelect){
+    screenPresetSelect.value =
+      (cfg.theme && cfg.theme.screenPreset) || 'medium';
+  }
+  render();
+
+  // выставляем выбранный пресет в селекте (small / medium / large)
+  if (screenPresetSelect){
+    screenPresetSelect.value =
+      (cfg.theme && cfg.theme.screenPreset) || 'medium';
+  }
+
+
   root.querySelector('#promoTest').onclick = ()=>{
     cfg.promoVideoUrl = promoUrlInp.value.trim();
     saveConfig(cfg);
@@ -2648,6 +2657,8 @@ if (resetHistoryBtn){
     render();
   };
 
+  
+  
   root.querySelector('#exportBtn').onclick=()=>{
     cfg.promoVideoUrl = promoUrlInp.value.trim();
     const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
@@ -2666,39 +2677,40 @@ if (resetHistoryBtn){
     fr.readAsText(f);
   };
 
-     root.querySelector('#applyBtn').onclick=async ()=>{
+    root.querySelector('#applyBtn').onclick = async ()=>{
+    // сохраняем URL промо-ролика
     cfg.promoVideoUrl = promoUrlInp.value.trim();
+
+    // сохраняем URL QR-кода
     if (qrUrlInp) {
       cfg.qrUrl = qrUrlInp.value.trim();
     }
 
+    // обновляем тему (в том числе пресет экрана)
     const t = cfg.theme || {};
-    if (scaleXInput){
-      const raw = String(scaleXInput.value || '').replace(',', '.');
-      const num = parseFloat(raw);
-      t.orderScaleX = Number.isFinite(num) ? num : 1;
-    }
-    if (scaleYInput){
-      const raw = String(scaleYInput.value || '').replace(',', '.');
-      const num = parseFloat(raw);
-      t.orderScaleY = Number.isFinite(num) ? num : 1;
+    if (screenPresetSelect){
+      t.screenPreset = screenPresetSelect.value || 'medium';
     }
     cfg.theme = t;
 
+    // сохраняем конфиг локально и применяем
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
-    try{ await rpc({ op: 'config_set', config: cfg }); }
-    catch(e){
+
+    // пробуем отправить конфиг на сервер (если он есть)
+    try{
+      await rpc({ op: 'config_set', config: cfg });
+    }catch(e){
       console.warn('config_set error', e);
       showToast('Меню сохранено локально, но сервер недоступен');
-      history.length?history.back():(location.hash='#/dashboard');
+      history.length ? history.back() : (location.hash = '#/dashboard');
       return;
     }
-    showToast('Меню сохранено (сервер)');
-    history.length?history.back():(location.hash='#/dashboard');
-  };
 
+    showToast('Меню сохранено (сервер)');
+    history.length ? history.back() : (location.hash = '#/dashboard');
+  };
 
   root.querySelector('#backBtn2').onclick=()=> history.length?history.back():(location.hash='#/dashboard');
   return root;
@@ -2715,11 +2727,17 @@ function applyKioskClasses(){
   document.body.classList.toggle('kiosk-portrait', large && portrait);
   document.body.classList.toggle('kiosk-landscape', large && !portrait);
 
-  if(large){
+  // базовый размер, который задал конструктор (через screenPreset)
+  const baseStr = getComputedStyle(document.documentElement)
+    .getPropertyValue('--app-base-font')
+    .trim();
+  const base = parseFloat(baseStr) || 16;
+
+  if (large){
     const scale = portrait ? 1.18 : 1.10;
-    document.documentElement.style.fontSize = (16 * scale) + 'px';
-  }else{
-    document.documentElement.style.fontSize = '';
+    document.documentElement.style.fontSize = (base * scale) + 'px';
+  } else {
+    document.documentElement.style.fontSize = base + 'px';
   }
 }
 
