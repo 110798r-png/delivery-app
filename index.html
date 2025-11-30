@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>ЯмаMoto — локальный стенд</title>
+  <title>ФудДжи — локальный стенд</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <link rel="icon" href="data:,">
   <style>
@@ -400,7 +400,7 @@
             </svg>
           </div>
           <div class="leading-tight">
-            <div class="brand-title" id="brandTitle">ЯмаMoto</div>
+            <div class="brand-title" id="brandTitle">ФудДжи</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
           <div class="flex items-center gap-2 ml-3">
@@ -1018,7 +1018,7 @@ function getClientId(){
 }
 
 const DEFAULT_CONFIG = {
-  brandTitle: 'ЯмаMoto',
+  brandTitle: 'ФудДжи',
   promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
     qrUrl: '',            // <--- ДОБАВИЛИ
    theme: {
@@ -1087,8 +1087,7 @@ function applyTheme(theme){
   r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
   r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
-  document.getElementById('brandTitle').textContent =
-    (loadConfig().brandTitle || 'ЯмаMoto');
+  // ⚠️ БОЛЬШЕ НИЧЕГО НЕ ТРОГАЕМ, НИКАКОГО brandTitle ТУТ НЕТ
 }
 
 function calcConfigVersion(cfg) {
