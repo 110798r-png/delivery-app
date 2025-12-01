@@ -1100,9 +1100,8 @@ const DEFAULT_CONFIG = {
     ]}
   ]
 };
-    
-function loadConfig() {
-  return DEFAULT_CONFIG;
+function loadConfig(){ 
+  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG);
 }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
