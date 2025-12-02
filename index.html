@@ -20,6 +20,7 @@
     .menu-card-img{ width:var(--img-w,110px); height:var(--img-h,70px); border-radius:var(--img-radius,.75rem); background:#eee; object-fit:cover }
     
 /* Фикс-панель заказа строго внизу экрана, во всю ширину */
+/* Фикс-панель заказа по всему низу окна */
 .confirm-bar{
   position: fixed;
   left: 0;
@@ -36,6 +37,13 @@
 
   z-index: 50;
   box-shadow: 0 -10px 25px rgba(15,23,42,.06);
+}
+
+/* Внутри – контейнер по центру, как phone-shell */
+.confirm-inner{
+  width: min(100vw, 900px);   /* под твой 14" */
+  margin: 0 auto;
+  padding: 0 .9rem;
 }
 
 /* Внутри – центрируем по той же ширине, что и "телефон" */
@@ -172,8 +180,39 @@
         /* Управляемый масштаб для экрана выбора товаров */
     .order-scale-wrapper{
       transform-origin: top left;
-      transform: scale(var(--order-scale-x, 1), var(--order-scale-y, 1));
+      padding-bottom: 90px;  /* высота бара + небольшой запас */
     }
+
+/* Блок промо-карусели между товарами и панелью заказа */
+#promoCarouselWrapper{
+  margin-top: 1.2rem;       /* отступ от списка товаров */
+  margin-bottom: 0.8rem;    /* отступ до фикс-бара */
+
+  padding: 0.6rem 0.9rem;
+
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 25px rgba(15,23,42,.08);
+}
+
+/* Лента внутри карточки */
+#promoCarousel{
+  padding: 0.2rem 0;
+}
+
+/* Картинки в карусели – аккуратные */
+.promo-slide-card{
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.promo-slide-card img{
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
     
     /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
     @media (min-width: 1100px) and (orientation: portrait){
@@ -1297,7 +1336,7 @@ function OrderView(){
       </section>
 
       <!-- Нижняя панель "Итого" + Оформить -->
-      <div id="confirmBar" class="confirm-bar">
+     <div id="confirmBar" class="confirm-bar">
   <div class="confirm-inner flex items-center justify-between gap-3">
     <div class="text-base">
       <span class="text-gray-600">Итого:</span>
@@ -1310,7 +1349,6 @@ function OrderView(){
     </button>
   </div>
 </div>
-    </div>
   `);
 
   const categoryBar   = root.querySelector('#categoryBar');
@@ -1387,17 +1425,16 @@ function OrderView(){
     promoCarousel.innerHTML = '';
 
     slides.forEach((url, idx) => {
-      const slide = el(`
-        <div class="snap-start flex-shrink-0 w-full" data-idx="${idx}">
-          <div class="rounded-2xl overflow-hidden bg-black/5">
-            <img src="${url}"
-                 class="w-full h-40 object-cover"
-                 alt="Акция ${idx + 1}">
-          </div>
-        </div>
-      `);
-      promoCarousel.appendChild(slide);
-    });
+  const slide = el(`
+    <div class="snap-start flex-shrink-0 w-full" data-idx="${idx}">
+      <div class="promo-slide-card">
+        <img src="${url}"
+             alt="Акция ${idx + 1}">
+      </div>
+    </div>
+  `);
+  promoCarousel.appendChild(slide);
+});
 
     activePromoIdx = 0;
     promoCarousel.scrollLeft = 0;
