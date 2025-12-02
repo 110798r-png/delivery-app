@@ -1,32 +1,6 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <!-- Anti-cache headers -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-
-  <script>
-    // Полное отключение кэша всех ресурсов
-    (function() {
-      // Для JS/CSS добавляем уникальный параметр ?v=
-      const version = Date.now();
-
-      // Перебираем все <script> без inline-кода
-      document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll('script[src]').forEach(tag => {
-          tag.src = tag.src.split("?")[0] + "?v=" + version;
-        });
-
-        // Перебираем все <link rel="stylesheet">
-        document.querySelectorAll('link[rel="stylesheet"]').forEach(tag => {
-          tag.href = tag.href.split("?")[0] + "?v=" + version;
-        });
-      });
-    })();
-  </script>
-
-  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ФудДжи — локальный стенд</title>
@@ -169,10 +143,10 @@
 }
 
         /* Управляемый масштаб для экрана выбора товаров */
-    /* Контейнер экрана заказа (масштаб теперь через font-size, а не transform) */
-.order-scale-wrapper{
-  transform-origin: top left;
-}
+    .order-scale-wrapper{
+      transform-origin: top left;
+      transform: scale(var(--order-scale-x, 1), var(--order-scale-y, 1));
+    }
     
     /* ===== 14" портретный экран заказа (примерно 1440×2560 CSS px) ===== */
     @media (min-width: 1100px) and (orientation: portrait){
@@ -1046,29 +1020,23 @@ function getClientId(){
 const DEFAULT_CONFIG = {
   brandTitle: 'ФудДжи',
   promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
-  qrUrl: '',
-   promoSlides: [],
+    qrUrl: '',            // <--- ДОБАВИЛИ
+   theme: {
+    cardRadius:20,
+    imgRadius:12,
+    imgW:110,
+    imgH:70,
+    cardMinH:104,
+    showPrice:true,
 
-  // все настройки внешнего вида – в ОДНОМ theme
-  theme: {
-    cardRadius: 20,
-    imgRadius: 12,
-    imgW: 110,
-    imgH: 70,
-    cardMinH: 104,
-    showPrice: true,
-
-    // размер кнопок +/-:
+    // размер кнопок +/-
     btnSize: 42,   // px
     btnFont: 22,   // px
 
-    // пресет под диагональ экрана
-    // small  = 14–19"
-    // medium = 20–27"
-    // large  = 28–45"
-    screenPreset: 'medium'
+    // масштаб экрана заказа
+    orderScaleX: 1,
+    orderScaleY: 1
   },
-
   menu: [
     { key:'burgers', title:'Бургеры', items:[
       { name:'Говяжий бургер', price:280, img:'https://images.unsplash.com/photo-1603064752734-4c48eff53d05?w=400&auto=format&fit=crop' },
@@ -1101,9 +1069,8 @@ const DEFAULT_CONFIG = {
     ]}
   ]
 };
-function loadConfig(){ 
-  return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG);
-}
+    
+function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
 
 function applyTheme(theme){
@@ -1114,30 +1081,17 @@ function applyTheme(theme){
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-    r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
+  // НОВОЕ:
+  r.style.setProperty('--btn-size', (theme.btnSize||42)+'px');
   r.style.setProperty('--btn-font', (theme.btnFont||22)+'px');
+  r.style.setProperty('--order-scale-x', (theme.orderScaleX ?? 1));
+  r.style.setProperty('--order-scale-y', (theme.orderScaleY ?? 1));
 
-  // базовый размер шрифта в зависимости от диагонали
-  const preset = theme.screenPreset || 'medium';
-  let base = 16;          // дефолт
-  if (preset === 'small')  base = 15; // 14–19"
-  if (preset === 'medium') base = 17; // 20–27"
-  if (preset === 'large')  base = 19; // 28–45"
-
-  // сохраняем в CSS-переменную, а applyKioskClasses уже домножит под ориентацию
-  document.documentElement.style.setProperty('--app-base-font', base + 'px');
-
-  document.getElementById('brandTitle').textContent =
-    (loadConfig().brandTitle || 'ФудДжи');
-  } // <-- вот этой скобки не хватало
+  // ⚠️ БОЛЬШЕ НИЧЕГО НЕ ТРОГАЕМ, НИКАКОГО brandTitle ТУТ НЕТ
+}
 
 function calcConfigVersion(cfg) {
-  try {
-    const menuLen   = JSON.stringify((cfg && cfg.menu) || []).length;
-    const promoLen  = String(cfg?.promoVideoUrl || '').length;
-    const slidesLen = JSON.stringify(cfg?.promoSlides || []).length;
-    return menuLen + promoLen + slidesLen;
-  }
+  try { return JSON.stringify((cfg && cfg.menu) || []).length + String(cfg?.promoVideoUrl||'').length; }
   catch { return 0; }
 }
 
@@ -1313,28 +1267,6 @@ function OrderView(){
         <div id="catPager" class="no-scrollbar"></div>
       </section>
 
-         const root = el(`
-    <div class="relative order-scale-wrapper">
-      <section class="sticky-top mb-2">
-        <div class="glass-panel rounded-2xl px-3 py-3">
-          <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-        </div>
-      </section>
-
-      <section>
-        <div id="catPager" class="no-scrollbar"></div>
-      </section>
-
-      <!-- 🔹 КАРУСЕЛЬ АКЦИЙ СНИЗУ -->
-      <section class="mt-3">
-        <div id="promoCarouselWrapper" class="overflow-hidden rounded-2xl border bg-white/60 hidden">
-          <div id="promoCarousel"
-               class="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory">
-          </div>
-        </div>
-      </section>
-      <!-- 🔹 КОНЕЦ КАРУСЕЛИ -->
-
       <div id="confirmBar" class="confirm-bar">
         <div class="flex items-center justify-between gap-3">
           <div class="text-base">
@@ -1355,12 +1287,6 @@ function OrderView(){
   const catPager    = root.querySelector('#catPager');
   const totalEl     = root.querySelector('#totalVal');
   const confirmBtn  = root.querySelector('#confirmBtn');
-  const promoWrapper  = root.querySelector('#promoCarouselWrapper');
-  const promoCarousel = root.querySelector('#promoCarousel');
-
-  let promoSlides = [];
-  let promoAutoTimer = null;
-  let activePromoIdx = 0;
 
   setBodyScrollLock(true);
   confirmBtn._busy = false;
@@ -1595,109 +1521,6 @@ function OrderView(){
     }, 80);
   });
 
-    function stopPromoAutoplay(){
-    if (promoAutoTimer){
-      clearInterval(promoAutoTimer);
-      promoAutoTimer = null;
-    }
-  }
-
-  function startPromoAutoplay(){
-    stopPromoAutoplay();
-
-    if (!promoCarousel || !promoSlides.length) return;
-
-    promoAutoTimer = setInterval(() => {
-      if (!promoSlides.length) return;
-      activePromoIdx = (activePromoIdx + 1) % promoSlides.length;
-      const slide = promoCarousel.querySelector(`[data-idx="${activePromoIdx}"]`);
-      if (slide){
-        slide.scrollIntoView({
-          behavior: 'smooth',
-          inline: 'center',
-          block: 'nearest'
-        });
-      }
-    }, 5000); // интервал автопереключения (5 секунд)
-  }
-
-  function buildPromoCarousel(){
-    if (!promoCarousel || !promoWrapper) return;
-
-    const cfg = loadConfig();
-    const slides = Array.isArray(cfg.promoSlides)
-      ? cfg.promoSlides.filter(u => u && u.trim())
-      : [];
-
-    promoSlides = slides;
-
-    if (!slides.length){
-      promoWrapper.classList.add('hidden');
-      promoCarousel.innerHTML = '';
-      stopPromoAutoplay();
-      return;
-    }
-
-    promoWrapper.classList.remove('hidden');
-    promoCarousel.innerHTML = '';
-
-    slides.forEach((url, idx) => {
-      const slide = el(`
-        <div class="snap-start flex-shrink-0 w-full" data-idx="${idx}">
-          <div class="rounded-2xl overflow-hidden bg-black/5">
-            <img src="${url}"
-                 class="w-full h-40 object-cover"
-                 alt="Акция ${idx + 1}">
-          </div>
-        </div>
-      `);
-      promoCarousel.appendChild(slide);
-    });
-
-    activePromoIdx = 0;
-    promoCarousel.scrollLeft = 0;
-  }
-
-    if (promoCarousel){
-    let promoTouching = false;
-    let promoScrollTimer = null;
-
-    // Любое касание/прокрутка — считаем ручным управлением
-    const onUserInteract = () => {
-      stopPromoAutoplay();
-      resetIdlePromoTimer();
-      if (promoScrollTimer) clearTimeout(promoScrollTimer);
-      // Через небольшую паузу узнаём, на каком слайде остановились,
-      // и с этого слайда снова запускаем автопрокрутку
-      promoScrollTimer = setTimeout(() => {
-        if (!promoSlides.length) return;
-        const rectWrap = promoCarousel.getBoundingClientRect();
-        const centerX = rectWrap.left + rectWrap.width / 2;
-
-        let bestIdx = activePromoIdx;
-        let bestDist = Infinity;
-
-        promoCarousel.querySelectorAll('[data-idx]').forEach(slide => {
-          const r = slide.getBoundingClientRect();
-          const slideCenter = r.left + r.width / 2;
-          const d = Math.abs(slideCenter - centerX);
-          if (d < bestDist){
-            bestDist = d;
-            bestIdx = Number(slide.dataset.idx || 0);
-          }
-        });
-
-        activePromoIdx = bestIdx;
-        startPromoAutoplay();
-      }, 400); // ждём, пока инерционная прокрутка закончится
-    };
-
-    promoCarousel.addEventListener('pointerdown', onUserInteract, { passive:true });
-    promoCarousel.addEventListener('pointerup',   onUserInteract, { passive:true });
-    promoCarousel.addEventListener('pointercancel', onUserInteract, { passive:true });
-    promoCarousel.addEventListener('scroll', onUserInteract, { passive:true });
-  }
-  
   function recalcTotal(){
     const cfg = loadConfig();
     const counts = window.__orderCounts || {};
@@ -1925,15 +1748,12 @@ function OrderView(){
 
 
   rebuildMenu();
-    buildPromoCarousel();  // 🔹 строим карусель сразу
-  
   requestAnimationFrame(()=>{
     highlightChip(0);
     goToIndex(0,{animate:false});
     recalcTotal();
     applyHeights();
     applyRepeatOrder();
-        startPromoAutoplay();   // 🔹 запускаем автопрокрутку
   });
 
   let syncInFlight = false;
@@ -1950,8 +1770,6 @@ function OrderView(){
           rebuildMenu();
           recalcTotal();
           applyHeights();
-          buildPromoCarousel();
-          startPromoAutoplay();
         }
       }
     } finally {
@@ -1962,7 +1780,6 @@ function OrderView(){
   root.cleanup=()=>{
     setBodyScrollLock(false);
     clearInterval(syncTimer);
-    stopPromoAutoplay();             // <--- ДОБАВИЛИ
     window.removeEventListener('resize', applyHeights);
     clearIdlePromoTimer();
 
@@ -2686,19 +2503,6 @@ function BuilderView(){
         </div>
       </section>
 
-            <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Акции / промо-слайды</h3>
-        <div class="text-sm text-gray-600">
-          До 5 картинок (желательно одинакового размера). Они будут снизу на экране заказа,
-          листаться автоматически и по свайпу.
-        </div>
-        <div id="promoSlidesBox" class="grid gap-2"></div>
-        <button id="addPromoSlideBtn"
-                class="px-3 py-2 rounded-xl border self-start">
-          + Добавить картинку
-        </button>
-      </section>
-
       <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-lg">Категории и товары</h3>
@@ -2707,16 +2511,34 @@ function BuilderView(){
         <div id="catsBox" class="grid gap-4"></div>
       </section>
 
-           <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Масштаб под диагональ экрана</h3>
+            <section class="card p-4 grid gap-3">
+        <h3 class="font-semibold text-lg">Масштаб экрана заказа</h3>
         <div class="text-sm text-gray-600">
-          Выбери примерную диагональ монитора. Интерфейс сам подстроит размеры.
+          Настрой ширину и высоту под конкретный монитор.
+          1.0 — базовый размер, меньше 1 — уменьшить, больше 1 — увеличить.
         </div>
-        <select id="screenPreset" class="border rounded-xl p-3 max-w-xs">
-          <option value="small">14–19" (малый экран / ноутбук)</option>
-          <option value="medium">20–27" (обычный терминал)</option>
-          <option value="large">28–45" (большое табло)</option>
-        </select>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm text-gray-700 block mb-1">Ширина (scale X)</label>
+            <input id="scaleXInput"
+                   type="number"
+                   step="0.05"
+                   min="0.5"
+                   max="2"
+                   class="border rounded-xl p-3 w-full"
+                   value="${(cfg.theme && cfg.theme.orderScaleX) || 1}">
+          </div>
+          <div>
+            <label class="text-sm text-gray-700 block mb-1">Высота (scale Y)</label>
+            <input id="scaleYInput"
+                   type="number"
+                   step="0.05"
+                   min="0.5"
+                   max="2"
+                   class="border rounded-xl p-3 w-full"
+                   value="${(cfg.theme && cfg.theme.orderScaleY) || 1}">
+          </div>
+        </div>
       </section>
 
       <div class="flex gap-2">
@@ -2725,14 +2547,12 @@ function BuilderView(){
     </div>
   `);
 
-  const catsBox = root.querySelector('#catsBox');
+   const catsBox = root.querySelector('#catsBox');
   const promoUrlInp = root.querySelector('#promoUrl');
   const qrUrlInp   = root.querySelector('#qrUrl');
-  const screenPresetSelect = root.querySelector('#screenPreset');
+    const scaleXInput = root.querySelector('#scaleXInput');
+  const scaleYInput = root.querySelector('#scaleYInput');
   
-    const promoSlidesBox    = root.querySelector('#promoSlidesBox');
-  const addPromoSlideBtn  = root.querySelector('#addPromoSlideBtn');
-
   const exportStatsBtn = root.querySelector('#exportStatsBtn');
 if (exportStatsBtn){
   exportStatsBtn.onclick = () => exportAccountingXLSX();
@@ -2744,11 +2564,9 @@ if (resetHistoryBtn){
   resetHistoryBtn.onclick = () => openAccountingPinModal();
 }
 
-   function render(){
-    catsBox.innerHTML = '';
-
-    // Рисуем категории и товары
-    cfg.menu.forEach((cat, cidx) => {
+  function render(){
+    catsBox.innerHTML='';
+    cfg.menu.forEach((cat, cidx)=>{
       const catCard = el(`
         <div class="border rounded-2xl p-3 bg-white">
           <div class="flex items-center justify-between">
@@ -2769,7 +2587,7 @@ if (resetHistoryBtn){
 
       const itemsBox = catCard.querySelector('[data-items]');
 
-      cat.items.forEach((it, iidx) => {
+      cat.items.forEach((it, iidx)=>{
         const row = el(`
           <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
             <input class="col-span-5 border rounded-lg p-2" placeholder="Название" value="${it.name||''}" data-k="name">
@@ -2782,242 +2600,38 @@ if (resetHistoryBtn){
             </div>
           </div>
         `);
-
-        row.addEventListener('input', (e) => {
-          const k = e.target.dataset.k;
-          if (k === 'price'){
+        row.addEventListener('input', (e)=>{
+          const k=e.target.dataset.k;
+          if(k==='price'){
             const raw = String(e.target.value||'').replace(',', '.');
             const num = Number(raw);
             cat.items[iidx][k] = Number.isFinite(num) ? num : 0;
           } else {
-            cat.items[iidx][k] = e.target.value;
+            cat.items[iidx][k]=e.target.value;
           }
         });
-
-        row.addEventListener('click', (e) => {
-          const act = e.target.dataset.act;
-          if (!act) return;
-
-          if (act === 'iDel') {
-            cat.items.splice(iidx, 1);
-            render();
-          }
-          if (act === 'iUp' && iidx > 0) {
-            const t = cat.items[iidx-1];
-            cat.items[iidx-1] = cat.items[iidx];
-            cat.items[iidx]   = t;
-            render();
-          }
-          if (act === 'iDown' && iidx < cat.items.length-1) {
-            const t = cat.items[iidx+1];
-            cat.items[iidx+1] = cat.items[iidx];
-            cat.items[iidx]   = t;
-            render();
-          }
+        row.addEventListener('click',(e)=>{
+          const act=e.target.dataset.act; if(!act) return;
+          if(act==='iDel'){ cat.items.splice(iidx,1); render(); }
+          if(act==='iUp' && iidx>0){ const t=cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
+          if(act==='iDown' && iidx<cat.items.length-1){ const t=cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
         });
-
         itemsBox.appendChild(row);
       });
 
-      catCard.addEventListener('input', (e) => {
-        if (e.target.dataset.k === 'title') cat.title = e.target.value;
-      });
-
-      catCard.addEventListener('click', (e) => {
-        const act = e.target.dataset.act;
-        if (!act) return;
-
-        if (act === 'del') {
-          if (confirm('Удалить категорию?')) {
-            cfg.menu.splice(cidx, 1);
-            render();
-          }
-        }
-        if (act === 'up' && cidx > 0) {
-          const t = cfg.menu[cidx-1];
-          cfg.menu[cidx-1] = cfg.menu[cidx];
-          cfg.menu[cidx]   = t;
-          render();
-        }
-        if (act === 'down' && cidx < cfg.menu.length-1) {
-          const t = cfg.menu[cidx+1];
-          cfg.menu[cidx+1] = cfg.menu[cidx];
-          cfg.menu[cidx]   = t;
-          render();
-        }
-        if (act === 'addItem') {
-          cat.items.push({ name:'Новый товар', price:0, img:'' });
-          render();
-        }
+      catCard.addEventListener('input',(e)=>{ if(e.target.dataset.k==='title') cat.title=e.target.value; });
+      catCard.addEventListener('click',(e)=>{
+        const act=e.target.dataset.act; if(!act) return;
+        if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
+        if(act==='up' && cidx>0){ const t=cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
+        if(act==='down' && cidx<cfg.menu.length-1){ const t=cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
+        if(act==='addItem'){ cat.items.push({name:'Новый товар', price:0, img:''}); render(); }
       });
 
       catsBox.appendChild(catCard);
-    }); // конец цикла по категориям
-
-    // ---- РЕНДЕР ПРОМО-СЛАЙДОВ ----
-    if (promoSlidesBox) {
-      promoSlidesBox.innerHTML = '';
-
-      const slides = Array.isArray(cfg.promoSlides) ? cfg.promoSlides : [];
-      slides.forEach((url, idx) => {
-        const row = el(`
-          <div class="flex gap-2 items-center" data-idx="${idx}">
-            <input
-              class="flex-1 border rounded-lg p-2 text-sm"
-              placeholder="https://..."
-              value="${url || ''}">
-            <button class="px-2 py-1 rounded-md border text-xs" data-act="up">↑</button>
-            <button class="px-2 py-1 rounded-md border text-xs" data-act="down">↓</button>
-            <button class="px-2 py-1 rounded-md border text-xs text-red-600" data-act="del">✕</button>
-          </div>
-        `);
-        promoSlidesBox.appendChild(row);
-      });
-    }
-
-    // выставляем выбранный пресет в селекте
-    if (screenPresetSelect){
-      screenPresetSelect.value =
-        (cfg.theme && cfg.theme.screenPreset) || 'medium';
-    }
-  }
-    render();  // один раз
-
-  // Кнопка "Добавить картинку"
-  if (addPromoSlideBtn) {
-    addPromoSlideBtn.onclick = () => {
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-      if (cfg.promoSlides.length >= 5) {
-        showToast('Максимум 5 картинок');
-        return;
-      }
-      cfg.promoSlides.push('');
-      render();
-    };
-  }
-
-  // Делегирование событий на promoSlidesBox
-  if (promoSlidesBox && !promoSlidesBox._bound) {
-    promoSlidesBox._bound = true;
-
-    promoSlidesBox.addEventListener('input', (e) => {
-      const row  = e.target.closest('[data-idx]');
-      if (!row) return;
-      const idx = Number(row.dataset.idx || 0);
-      const input = row.querySelector('input');
-      if (!input) return;
-
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-      cfg.promoSlides[idx] = input.value.trim();
-    });
-
-    promoSlidesBox.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-act]');
-      if (!btn) return;
-
-      const row = btn.closest('[data-idx]');
-      if (!row) return;
-      const idx = Number(row.dataset.idx || 0);
-
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-
-      const act = btn.dataset.act;
-      if (act === 'del') {
-        cfg.promoSlides.splice(idx, 1);
-        render();
-        return;
-      }
-
-      if (act === 'up' && idx > 0) {
-        const tmp = cfg.promoSlides[idx - 1];
-        cfg.promoSlides[idx - 1] = cfg.promoSlides[idx];
-        cfg.promoSlides[idx] = tmp;
-        render();
-        return;
-      }
-
-      if (act === 'down' && idx < cfg.promoSlides.length - 1) {
-        const tmp = cfg.promoSlides[idx + 1];
-        cfg.promoSlides[idx + 1] = cfg.promoSlides[idx];
-        cfg.promoSlides[idx] = tmp;
-        render();
-        return;
-      }
     });
   }
   render();
-
-   // Обработчик кнопки "Добавить картинку"
-  if (addPromoSlideBtn) {
-    addPromoSlideBtn.onclick = () => {
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-      if (cfg.promoSlides.length >= 5) {
-        showToast('Максимум 5 картинок');
-        return;
-      }
-      cfg.promoSlides.push('');
-      render();
-    };
-  }
-
-  // Делегируем события на promoSlidesBox (редактирование + перемещение + удаление)
-  if (promoSlidesBox && !promoSlidesBox._bound) {
-    promoSlidesBox._bound = true;
-
-    // Изменение URL
-    promoSlidesBox.addEventListener('input', (e) => {
-      const row  = e.target.closest('[data-idx]');
-      if (!row) return;
-      const idx = Number(row.dataset.idx || 0);
-      const input = row.querySelector('input');
-      if (!input) return;
-
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-      cfg.promoSlides[idx] = input.value.trim();
-    });
-
-    // Клики по кнопкам ↑ ↓ ✕
-    promoSlidesBox.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-act]');
-      if (!btn) return;
-
-      const row = btn.closest('[data-idx]');
-      if (!row) return;
-      const idx = Number(row.dataset.idx || 0);
-
-      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
-
-      const act = btn.dataset.act;
-      if (act === 'del') {
-        cfg.promoSlides.splice(idx, 1);
-        render();
-        return;
-      }
-
-      if (act === 'up' && idx > 0) {
-        const tmp = cfg.promoSlides[idx - 1];
-        cfg.promoSlides[idx - 1] = cfg.promoSlides[idx];
-        cfg.promoSlides[idx] = tmp;
-        render();
-        return;
-      }
-
-      if (act === 'down' && idx < cfg.promoSlides.length - 1) {
-        const tmp = cfg.promoSlides[idx + 1];
-        cfg.promoSlides[idx + 1] = cfg.promoSlides[idx];
-        cfg.promoSlides[idx] = tmp;
-        render();
-        return;
-      }
-    });
-  }    
-      
-  // выставляем выбранный пресет в селекте (small / medium / large)
-  if (screenPresetSelect){
-    screenPresetSelect.value =
-      (cfg.theme && cfg.theme.screenPreset) || 'medium';
-  }
-
 
   root.querySelector('#promoTest').onclick = ()=>{
     cfg.promoVideoUrl = promoUrlInp.value.trim();
@@ -3034,8 +2648,6 @@ if (resetHistoryBtn){
     render();
   };
 
-  
-  
   root.querySelector('#exportBtn').onclick=()=>{
     cfg.promoVideoUrl = promoUrlInp.value.trim();
     const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
@@ -3054,40 +2666,39 @@ if (resetHistoryBtn){
     fr.readAsText(f);
   };
 
-    root.querySelector('#applyBtn').onclick = async ()=>{
-    // сохраняем URL промо-ролика
+     root.querySelector('#applyBtn').onclick=async ()=>{
     cfg.promoVideoUrl = promoUrlInp.value.trim();
-
-    // сохраняем URL QR-кода
     if (qrUrlInp) {
       cfg.qrUrl = qrUrlInp.value.trim();
     }
 
-    // обновляем тему (в том числе пресет экрана)
     const t = cfg.theme || {};
-    if (screenPresetSelect){
-      t.screenPreset = screenPresetSelect.value || 'medium';
+    if (scaleXInput){
+      const raw = String(scaleXInput.value || '').replace(',', '.');
+      const num = parseFloat(raw);
+      t.orderScaleX = Number.isFinite(num) ? num : 1;
+    }
+    if (scaleYInput){
+      const raw = String(scaleYInput.value || '').replace(',', '.');
+      const num = parseFloat(raw);
+      t.orderScaleY = Number.isFinite(num) ? num : 1;
     }
     cfg.theme = t;
 
-    // сохраняем конфиг локально и применяем
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
-
-    // пробуем отправить конфиг на сервер (если он есть)
-    try{
-      await rpc({ op: 'config_set', config: cfg });
-    }catch(e){
+    try{ await rpc({ op: 'config_set', config: cfg }); }
+    catch(e){
       console.warn('config_set error', e);
       showToast('Меню сохранено локально, но сервер недоступен');
-      history.length ? history.back() : (location.hash = '#/dashboard');
+      history.length?history.back():(location.hash='#/dashboard');
       return;
     }
-
     showToast('Меню сохранено (сервер)');
-    history.length ? history.back() : (location.hash = '#/dashboard');
+    history.length?history.back():(location.hash='#/dashboard');
   };
+
 
   root.querySelector('#backBtn2').onclick=()=> history.length?history.back():(location.hash='#/dashboard');
   return root;
@@ -3104,17 +2715,11 @@ function applyKioskClasses(){
   document.body.classList.toggle('kiosk-portrait', large && portrait);
   document.body.classList.toggle('kiosk-landscape', large && !portrait);
 
-  // базовый размер, который задал конструктор (через screenPreset)
-  const baseStr = getComputedStyle(document.documentElement)
-    .getPropertyValue('--app-base-font')
-    .trim();
-  const base = parseFloat(baseStr) || 16;
-
-  if (large){
+  if(large){
     const scale = portrait ? 1.18 : 1.10;
-    document.documentElement.style.fontSize = (base * scale) + 'px';
-  } else {
-    document.documentElement.style.fontSize = base + 'px';
+    document.documentElement.style.fontSize = (16 * scale) + 'px';
+  }else{
+    document.documentElement.style.fontSize = '';
   }
 }
 
