@@ -1313,7 +1313,7 @@ function OrderView(){
         <div id="catPager" class="no-scrollbar"></div>
       </section>
 
-       const root = el(`
+         const root = el(`
     <div class="relative order-scale-wrapper">
       <section class="sticky-top mb-2">
         <div class="glass-panel rounded-2xl px-3 py-3">
@@ -1325,7 +1325,7 @@ function OrderView(){
         <div id="catPager" class="no-scrollbar"></div>
       </section>
 
-      <!-- 🔹 НОВАЯ КАРУСЕЛЬ АКЦИЙ СНИЗУ -->
+      <!-- 🔹 КАРУСЕЛЬ АКЦИЙ СНИЗУ -->
       <section class="mt-3">
         <div id="promoCarouselWrapper" class="overflow-hidden rounded-2xl border bg-white/60 hidden">
           <div id="promoCarousel"
@@ -1333,13 +1333,7 @@ function OrderView(){
           </div>
         </div>
       </section>
-      <!-- 🔹 КОНЕЦ НОВОЙ КАРУСЕЛИ -->
-
-      <div id="confirmBar" class="confirm-bar">
-        ...
-      </div>
-    </div>
-  `);
+      <!-- 🔹 КОНЕЦ КАРУСЕЛИ -->
 
       <div id="confirmBar" class="confirm-bar">
         <div class="flex items-center justify-between gap-3">
@@ -2750,9 +2744,11 @@ if (resetHistoryBtn){
   resetHistoryBtn.onclick = () => openAccountingPinModal();
 }
 
-  function render(){
-    catsBox.innerHTML='';
-    cfg.menu.forEach((cat, cidx)=>{
+   function render(){
+    catsBox.innerHTML = '';
+
+    // Рисуем категории и товары
+    cfg.menu.forEach((cat, cidx) => {
       const catCard = el(`
         <div class="border rounded-2xl p-3 bg-white">
           <div class="flex items-center justify-between">
@@ -2773,7 +2769,7 @@ if (resetHistoryBtn){
 
       const itemsBox = catCard.querySelector('[data-items]');
 
-      cat.items.forEach((it, iidx)=>{
+      cat.items.forEach((it, iidx) => {
         const row = el(`
           <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
             <input class="col-span-5 border rounded-lg p-2" placeholder="Название" value="${it.name||''}" data-k="name">
@@ -2786,37 +2782,79 @@ if (resetHistoryBtn){
             </div>
           </div>
         `);
-        row.addEventListener('input', (e)=>{
-          const k=e.target.dataset.k;
-          if(k==='price'){
+
+        row.addEventListener('input', (e) => {
+          const k = e.target.dataset.k;
+          if (k === 'price'){
             const raw = String(e.target.value||'').replace(',', '.');
             const num = Number(raw);
             cat.items[iidx][k] = Number.isFinite(num) ? num : 0;
           } else {
-            cat.items[iidx][k]=e.target.value;
+            cat.items[iidx][k] = e.target.value;
           }
         });
-        row.addEventListener('click',(e)=>{
-          const act=e.target.dataset.act; if(!act) return;
-          if(act==='iDel'){ cat.items.splice(iidx,1); render(); }
-          if(act==='iUp' && iidx>0){ const t=cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
-          if(act==='iDown' && iidx<cat.items.length-1){ const t=cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
+
+        row.addEventListener('click', (e) => {
+          const act = e.target.dataset.act;
+          if (!act) return;
+
+          if (act === 'iDel') {
+            cat.items.splice(iidx, 1);
+            render();
+          }
+          if (act === 'iUp' && iidx > 0) {
+            const t = cat.items[iidx-1];
+            cat.items[iidx-1] = cat.items[iidx];
+            cat.items[iidx]   = t;
+            render();
+          }
+          if (act === 'iDown' && iidx < cat.items.length-1) {
+            const t = cat.items[iidx+1];
+            cat.items[iidx+1] = cat.items[iidx];
+            cat.items[iidx]   = t;
+            render();
+          }
         });
+
         itemsBox.appendChild(row);
       });
 
-      catCard.addEventListener('input',(e)=>{ if(e.target.dataset.k==='title') cat.title=e.target.value; });
-      catCard.addEventListener('click',(e)=>{
-        const act=e.target.dataset.act; if(!act) return;
-        if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
-        if(act==='up' && cidx>0){ const t=cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
-        if(act==='down' && cidx<cfg.menu.length-1){ const t=cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
-        if(act==='addItem'){ cat.items.push({name:'Новый товар', price:0, img:''}); render(); }
+      catCard.addEventListener('input', (e) => {
+        if (e.target.dataset.k === 'title') cat.title = e.target.value;
+      });
+
+      catCard.addEventListener('click', (e) => {
+        const act = e.target.dataset.act;
+        if (!act) return;
+
+        if (act === 'del') {
+          if (confirm('Удалить категорию?')) {
+            cfg.menu.splice(cidx, 1);
+            render();
+          }
+        }
+        if (act === 'up' && cidx > 0) {
+          const t = cfg.menu[cidx-1];
+          cfg.menu[cidx-1] = cfg.menu[cidx];
+          cfg.menu[cidx]   = t;
+          render();
+        }
+        if (act === 'down' && cidx < cfg.menu.length-1) {
+          const t = cfg.menu[cidx+1];
+          cfg.menu[cidx+1] = cfg.menu[cidx];
+          cfg.menu[cidx]   = t;
+          render();
+        }
+        if (act === 'addItem') {
+          cat.items.push({ name:'Новый товар', price:0, img:'' });
+          render();
+        }
       });
 
       catsBox.appendChild(catCard);
+    }); // конец цикла по категориям
 
-          // ---- РЕНДЕР ПРОМО-СЛАЙДОВ ----
+    // ---- РЕНДЕР ПРОМО-СЛАЙДОВ ----
     if (promoSlidesBox) {
       promoSlidesBox.innerHTML = '';
 
@@ -2834,7 +2872,77 @@ if (resetHistoryBtn){
           </div>
         `);
         promoSlidesBox.appendChild(row);
-      
+      });
+    }
+
+    // выставляем выбранный пресет в селекте
+    if (screenPresetSelect){
+      screenPresetSelect.value =
+        (cfg.theme && cfg.theme.screenPreset) || 'medium';
+    }
+  }
+    render();  // один раз
+
+  // Кнопка "Добавить картинку"
+  if (addPromoSlideBtn) {
+    addPromoSlideBtn.onclick = () => {
+      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
+      if (cfg.promoSlides.length >= 5) {
+        showToast('Максимум 5 картинок');
+        return;
+      }
+      cfg.promoSlides.push('');
+      render();
+    };
+  }
+
+  // Делегирование событий на promoSlidesBox
+  if (promoSlidesBox && !promoSlidesBox._bound) {
+    promoSlidesBox._bound = true;
+
+    promoSlidesBox.addEventListener('input', (e) => {
+      const row  = e.target.closest('[data-idx]');
+      if (!row) return;
+      const idx = Number(row.dataset.idx || 0);
+      const input = row.querySelector('input');
+      if (!input) return;
+
+      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
+      cfg.promoSlides[idx] = input.value.trim();
+    });
+
+    promoSlidesBox.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+
+      const row = btn.closest('[data-idx]');
+      if (!row) return;
+      const idx = Number(row.dataset.idx || 0);
+
+      if (!Array.isArray(cfg.promoSlides)) cfg.promoSlides = [];
+
+      const act = btn.dataset.act;
+      if (act === 'del') {
+        cfg.promoSlides.splice(idx, 1);
+        render();
+        return;
+      }
+
+      if (act === 'up' && idx > 0) {
+        const tmp = cfg.promoSlides[idx - 1];
+        cfg.promoSlides[idx - 1] = cfg.promoSlides[idx];
+        cfg.promoSlides[idx] = tmp;
+        render();
+        return;
+      }
+
+      if (act === 'down' && idx < cfg.promoSlides.length - 1) {
+        const tmp = cfg.promoSlides[idx + 1];
+        cfg.promoSlides[idx + 1] = cfg.promoSlides[idx];
+        cfg.promoSlides[idx] = tmp;
+        render();
+        return;
+      }
     });
   }
   render();
