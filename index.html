@@ -18,7 +18,34 @@
     .sticky-top{ position:sticky; top:.5rem; z-index:30 }
     .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:var(--card-radius, 1.25rem); padding:1rem; min-height:var(--card-min-h, 6.4rem) }
     .menu-card-img{ width:var(--img-w,110px); height:var(--img-h,70px); border-radius:var(--img-radius,.75rem); background:#eee; object-fit:cover }
-    .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
+    
+/* Фикс-панель заказа строго внизу экрана, во всю ширину */
+.confirm-bar{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  transform: none;
+  width: 100%;
+  max-width: 100%;
+
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  padding: .6rem 0;
+
+  z-index: 50;
+  box-shadow: 0 -10px 25px rgba(15,23,42,.06);
+}
+
+/* Внутри – центрируем по той же ширине, что и "телефон" */
+.confirm-inner{
+  width: min(100vw, 900px);   /* под твой текущий phone-shell для 14" */
+  margin: 0 auto;
+  padding: 0 .9rem;
+}
+
+    
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
@@ -207,13 +234,7 @@
         font-size: 20px;
         border-radius: 12px;
       }
-
-      body.route-order .confirm-bar{
-        width: min(100vw, 900px);
-        max-width: 900px;
-        padding: .9rem 1.2rem;
-        border-radius: 0;
-      }
+      
       body.route-order #confirmBtn{
         font-size: 1.05rem;
         padding: .9rem 1.2rem;
@@ -316,12 +337,6 @@
       border-radius: 12px;
     }
 
-    body.kiosk-portrait.route-order .confirm-bar{
-      width: min(100vw, 900px);
-      max-width: 900px;
-      padding: 1rem 1.4rem;
-      border-radius: 0;
-    }
     body.kiosk-portrait.route-order #confirmBtn{
       font-size: 1.1rem;
       padding: 1rem 1.3rem;
@@ -1283,18 +1298,18 @@ function OrderView(){
 
       <!-- Нижняя панель "Итого" + Оформить -->
       <div id="confirmBar" class="confirm-bar">
-        <div class="flex items-center justify-between gap-3">
-          <div class="text-base">
-            <span class="text-gray-600">Итого:</span>
-            <b id="totalVal">0 руб.</b>
-          </div>
-          <button id="confirmBtn"
+  <div class="confirm-inner flex items-center justify-between gap-3">
+    <div class="text-base">
+      <span class="text-gray-600">Итого:</span>
+      <b id="totalVal">0 руб.</b>
+    </div>
+    <button id="confirmBtn"
             class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
             disabled>
-            Оформить заказ
-          </button>
-        </div>
-      </div>
+      Оформить заказ
+    </button>
+  </div>
+</div>
     </div>
   `);
 
