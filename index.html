@@ -1386,13 +1386,24 @@ function OrderView(){
     }
   }
 
-  function startPromoAutoplay(){
+    function startPromoAutoplay(){
     stopPromoAutoplay();
     if (!promoCarousel || !promoSlides.length) return;
 
     promoAutoTimer = setInterval(() => {
-      if (!promoSlides.length) return;
-      activePromoIdx = (activePromoIdx + 1) % promoSlides.length;
+      if (!promoSlides.length || !promoCarousel) return;
+
+      let next = activePromoIdx + 1;
+
+      // дошли до конца – мгновенно прыгаем в начало, БЕЗ анимации назад
+      if (next >= promoSlides.length){
+        activePromoIdx = 0;
+        promoCarousel.scrollLeft = 0;
+        return;
+      }
+
+      // обычный шаг вперёд
+      activePromoIdx = next;
       const slide = promoCarousel.querySelector(`[data-idx="${activePromoIdx}"]`);
       if (slide){
         slide.scrollIntoView({
@@ -1755,8 +1766,186 @@ function OrderView(){
     confirmBtn.disabled  = true;
   }
 
-  // --- биндим payModal (у тебя он уже описан ниже, я оставляю как есть) ---
-  // (Оставь твой существующий IIFE bindPayModal() — он уже в коде после OrderView.)
+    function resetCounts(){
+    window.__orderCounts = {};
+    catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
+    totalEl.textContent  = money(0);
+    confirmBtn.disabled  = true;
+  }
+
+  // ================== биндим payModal ==================
+  (function bindPayModal(){
+    const m        = document.getElementById('payModal');
+    const ok       = document.getElementById('payOk');
+    const cancel   = document.getElementById('payCancel');
+    const qrSection  = document.getElementById('qrSection');
+    const qrDone     = document.getElementById('qrDone');
+    const qrProgress = document.getElementById('qrProgress');
+    const qrImage    = document.getElementById('qrImage');
+
+    if(!m || !ok || !cancel || !qrSection || !qrDone || !qrProgress || !qrImage) return;
+
+    let qrTimer       = null;
+    let pendingItems  = null;
+    let pendingTotal  = 0;
+
+    function stopQrTimer(){
+      if (qrTimer){
+        clearInterval(qrTimer);
+        qrTimer = null;
+      }
+    }
+
+    function closeModal(){
+      stopQrTimer();
+      qrSection.classList.add('hidden');
+      m.classList.remove('open');
+      pendingItems = null;
+      pendingTotal = 0;
+      ok.disabled  = false;
+      ok.textContent = 'Оплатить';
+    }
+
+    // снимем "занято" с кнопки Оформить заказ
+    const finalize = ()=>{
+      confirmBtn._busy   = false;
+      confirmBtn.disabled = false;
+    };
+
+    function startQr(itemsSel, total){
+      pendingItems = itemsSel;
+      pendingTotal = total;
+
+      const cfg = loadConfig();
+      const url = (cfg.qrUrl || '').trim();
+      if (url){
+        qrImage.src = url;
+      } else {
+        qrImage.removeAttribute('src');
+        showToast('QR для оплаты не задан в конструкторе');
+      }
+
+      qrSection.classList.remove('hidden');
+      ok.disabled = true; // чтобы не жали второй раз
+
+      // полоска на 30 секунд
+      qrProgress.style.width = '100%';
+      let left = 30;
+      stopQrTimer();
+      qrTimer = setInterval(()=>{
+        left--;
+        if (left <= 0){
+          stopQrTimer();
+          qrProgress.style.width = '0%';
+          finishAfterQr();   // авто-завершение
+        } else {
+          qrProgress.style.width = (left / 30 * 100) + '%';
+        }
+      }, 1000);
+    }
+
+    async function finishAfterQr(){
+      if (!pendingItems || !pendingItems.length){
+        closeModal();
+        finalize();
+        return;
+      }
+
+      const itemsSel = pendingItems.slice();
+      const total    = pendingTotal;
+
+      let order = null;
+      try {
+        const res = await rpc({
+          op: 'create',
+          data: {
+            clientId: getClientId(),
+            items: itemsSel,
+            total,
+            pay: 'qr'
+          }
+        });
+
+        order = res?.order || {
+          id: Date.now().toString().slice(-6),
+          createdAt: Date.now(),
+          items: itemsSel,
+          total,
+          pay: 'qr',
+          status: 'готовится'
+        };
+      } catch (err){
+        console.warn('RPC create error', err);
+        showToast('Не удалось отправить заказ, попробуйте ещё раз.');
+        closeModal();
+        finalize();
+        return;
+      }
+
+      closeModal();
+      finalize();
+      resetCounts();
+      window.dispatchEvent(new CustomEvent('orders:history-updated'));
+
+      openThanksModal();
+      clearIdlePromoTimer();
+      schedulePromoAfterOrder();
+    }
+
+    const onCancel = (e)=>{
+      e && e.preventDefault();
+      e && e.stopPropagation();
+      // просто закрываем, НИЧЕГО не отправляем, корзину не трогаем
+      closeModal();
+      finalize();
+    };
+
+    const onOk = (e)=>{
+      e && e.preventDefault();
+      e && e.stopPropagation();
+
+      unlockMediaOnce();
+
+      // если QR уже показан — не даём второй раз
+      if (!qrSection.classList.contains('hidden')){
+        return;
+      }
+
+      const cfg    = loadConfig();
+      const counts = window.__orderCounts || {};
+      const itemsSel = [];
+      let total   = 0;
+
+      cfg.menu.forEach(cat => cat.items.forEach(it=>{
+        const q = counts[it.name] || 0;
+        if (q > 0){
+          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
+          total += q * (it.price || 0);
+        }
+      }));
+
+      if (!itemsSel.length){
+        closeModal();
+        finalize();
+        return;
+      }
+
+      // сначала показываем QR, заказ пока НЕ летит
+      startQr(itemsSel, total);
+    };
+
+    ok.onclick     = onOk;
+    cancel.onclick = onCancel;
+    m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
+
+    qrDone.onclick = (e)=>{
+      e && e.preventDefault();
+      e && e.stopPropagation();
+      stopQrTimer();
+      finishAfterQr();   // вручную после оплаты
+    };
+  })();
+  // =============== конец bindPayModal ===============
 
   rebuildMenu();
   buildPromoCarousel();
