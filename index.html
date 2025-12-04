@@ -2272,189 +2272,207 @@ builderModal.onclick = (e) => {
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
   function orderCard(o){
-    const clientTotal = (o.items || []).reduce((s, i) => s + (i.price || 0) * (i.qty || 0), 0);
-    const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
-    const created = o.createdAt ? new Date(o.createdAt) : new Date();
+  const clientTotal = (o.items || []).reduce((s, i) => s + (i.price || 0) * (i.qty || 0), 0);
+  const total = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
+  const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
-    const tableLabel = o.tableId ? `Столик: ${o.tableId}` : '';  // ← добавили
+  // подпись столика
+  const tableLabel = o.tableId ? `Столик: ${o.tableId}` : '';
 
-    const colorMap = {
+  const colorMap = {
+    'готовится': 'bg-blue-50 border-blue-300',
+    'готово'   : 'bg-green-50 border-green-300',
+    'готов'    : 'bg-green-50 border-green-300',
+    'новый'    : 'bg-blue-50 border-blue-300'
+  };
+  const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-    const colorMap = {
-      'готовится': 'bg-blue-50 border-blue-300',
-      'готово':    'bg-green-50 border-green-300',
-      'готов':     'bg-green-50 border-green-300',
-      'новый':     'bg-blue-50 border-blue-300'
-    };
-    const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+  const itemsHtml = (o.items || []).map(i => `
+    <div class="flex justify-between text-base">
+      <div class="truncate">${i.name}</div>
+      <div class="font-semibold ml-2">${i.qty} × ${i.price}</div>
+    </div>
+  `).join('');
 
-    const itemsHtml = (o.items || []).map(i => `
-      <div class="flex justify-between text-base">
-        <div class="truncate">${i.name}</div>
-        <div class="font-semibold ml-2">${i.qty} × ${i.price}</div>
-      </div>`).join('');
+  const etaBlock = o.etaUntil
+    ? `<div class="text-sm text-gray-700 mt-1">
+         Готово ~ ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+       </div>`
+    : '';
 
-    const etaBlock = o.etaUntil
-      ? `<div class="text-sm text-gray-700 mt-1">
-           Готово ~ ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-         </div>`
-      : '';
-
- const tableLabel = o.tableId ? `Стол: ${o.tableId}` : '';
-
-    const card = el(`
-      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${tableLabel ? `<div class="text-sm text-gray-700 mt-1">${tableLabel}</div>` : ''}
-          </div>
-          <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
+  const card = el(`
+    <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          ${tableLabel ? `<div class="text-sm text-gray-600 mt-1">${tableLabel}</div>` : ''}
         </div>
-        <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
-        ${etaBlock}
-        <div class="mt-2 grid gap-1">${itemsHtml || '—'}</div>
-        <div class="mt-2 flex items-center justify-between text-xl font-bold">
-          <div>Итого:</div><div>${total} ₽</div>
-        </div>
-        <div class="mt-1 flex flex-wrap gap-2 items-center">
-          <label class="text-sm">Статус:</label>
-          <select class="border rounded-xl p-2 text-sm" data-k="status">
-            ${['готовится','готово'].map(s=>`<option ${s===(o.status||'готовится')?'selected':''}>${s}</option>`).join('')}
-          </select>
-          <label class="text-sm ml-2">Время:</label>
-          <select class="border rounded-xl p-2 text-sm" data-k="eta">
-            <option value="">—</option>
-            ${[5,10,15,20,25,30].map(m=>`<option value="${m}" ${Number(o.etaMinutes)===m?'selected':''}>${m} мин</option>`).join('')}
-          </select>
-          ${(o.status==='готово' || o.status==='готов') ? `
-            <button type="button"
-                    class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
-                    data-act="issue">Выдать</button>
-          ` : ''}
-          <button type="button" class="px-3 py-2 rounded-xl border bg-white" data-act="save">Сохранить</button>
-          <button type="button" class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto" data-act="delete">Удалить</button>
-        </div>
+        <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">
+          ${o.status || 'готовится'}
+        </span>
       </div>
-    `);
 
-    const statusSel = card.querySelector('[data-k="status"]');
-    const etaSelEl  = card.querySelector('[data-k="eta"]');
+      <div class="text-gray-600 text-sm">
+        ${created.toLocaleString()}
+      </div>
 
-        async function applyAndSync({ silent=false } = {}){
-      const status = statusSel.value;
-      const etaSel = etaSelEl.value;
-      const etaMinutes = etaSel ? Number(etaSel) : null;
+      ${etaBlock}
 
-      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-      const original = i >= 0 ? dashOrders[i] : o;
+      <div class="mt-2 grid gap-1">
+        ${itemsHtml || '—'}
+      </div>
 
-      const patch = { status };
+      <div class="mt-2 flex items-center justify-between text-xl font-bold">
+        <div>Итого:</div>
+        <div>${total} ₽</div>
+      </div>
 
-      // если переводим в "готово" первый раз — фиксируем момент готовности
-      if (status === 'готово' && !original.readyAt) {
-        patch.readyAt = Date.now();
-      }
+      <div class="mt-1 flex flex-wrap gap-2 items-center">
+        <label class="text-sm">Статус:</label>
+        <select class="border rounded-xl p-2 text-sm" data-k="status">
+          ${['готовится','готово'].map(s => `
+            <option ${s === (o.status || 'готовится') ? 'selected' : ''}>${s}</option>
+          `).join('')}
+        </select>
 
-      if (etaMinutes){
-        patch.etaMinutes = etaMinutes;
-        patch.etaUntil   = Date.now() + etaMinutes*60*1000;
-      } else {
-        patch.etaMinutes = null;
-        patch.etaUntil   = null;
-      }
+        <label class="text-sm ml-2">Время:</label>
+        <select class="border rounded-xl p-2 text-sm" data-k="eta">
+          <option value="">—</option>
+          ${[5,10,15,20,25,30].map(m => `
+            <option value="${m}" ${Number(o.etaMinutes) === m ? 'selected' : ''}>${m} мин</option>
+          `).join('')}
+        </select>
 
-      if (i >= 0){
-        dashOrders[i] = { ...dashOrders[i], ...patch };
-        saveDash(dashOrders);
-        syncOrderStatus(o.id, patch.status);
+        ${(o.status === 'готово' || o.status === 'готов') ? `
+          <button type="button"
+                  class="px-3 py-2 rounded-xl bg-green-600 text-white font-semibold"
+                  data-act="issue">Выдать</button>
+        ` : ''}
 
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
+        <button type="button"
+                class="px-3 py-2 rounded-xl border bg-white"
+                data-act="save">Сохранить</button>
 
-        if(!silent) showToast(`Статус #${o.id} обновлён`);
-        renderOrders();
-      }
+        <button type="button"
+                class="px-3 py-2 rounded-xl border bg-red-50 text-red-600 ml-auto"
+                data-act="delete">Удалить</button>
+      </div>
+    </div>
+  `);
 
-      try{
-        await rpc({ op:'update', data:{ id:o.id, patch } });
-      }catch(e1){
-        try{ await rpc({ op:'update', id:o.id, patch }); }
-        catch(e2){ console.warn('update failed', e1, e2); }
-      }
+  // дальше остаётся твой существующий код applyAndSync, слушатели и т.д.
+  // (он уже был ниже в этой же функции, его НЕ трогаем)
+  const statusSel = card.querySelector('[data-k="status"]');
+  const etaSelEl  = card.querySelector('[data-k="eta"]');
+
+  async function applyAndSync({ silent=false } = {}){
+    const status = statusSel.value;
+    const etaSel = etaSelEl.value;
+    const etaMinutes = etaSel ? Number(etaSel) : null;
+
+    const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+    const original = i >= 0 ? dashOrders[i] : o;
+
+    const patch = { status };
+
+    if (status === 'готово' && !original.readyAt) {
+      patch.readyAt = Date.now();
     }
 
-    // ✅ Автосейв при смене статуса/времени (без кнопки "Сохранить")
-    statusSel.addEventListener('change', ()=> applyAndSync({ silent:true }));
-    etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
+    if (etaMinutes){
+      patch.etaMinutes = etaMinutes;
+      patch.etaUntil   = Date.now() + etaMinutes*60*1000;
+    } else {
+      patch.etaMinutes = null;
+      patch.etaUntil   = null;
+    }
 
-    card.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button[data-act]');
-      if(!btn) return;
-      const act = btn.dataset.act;
+    if (i >= 0){
+      dashOrders[i] = { ...dashOrders[i], ...patch };
+      saveDash(dashOrders);
+      syncOrderStatus(o.id, patch.status);
 
-      if(act === 'save'){
-        return applyAndSync();
+      window.dispatchEvent(new CustomEvent('cloud:orders', {
+        detail: dashOrders
+      }));
+
+      if(!silent) showToast(`Статус #${o.id} обновлён`);
+      renderOrders();
+    }
+
+    try{
+      await rpc({ op:'update', data:{ id:o.id, patch } });
+    }catch(e1){
+      try{ await rpc({ op:'update', id:o.id, patch }); }
+      catch(e2){ console.warn('update failed', e1, e2); }
+    }
+  }
+
+  statusSel.addEventListener('change', ()=> applyAndSync({ silent:true }));
+  etaSelEl.addEventListener('change',  ()=> applyAndSync({ silent:true }));
+
+  card.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    const act = btn.dataset.act;
+
+    if(act === 'save') return applyAndSync();
+
+    if(act === 'issue'){
+      dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+      saveDash(dashOrders);
+
+      window.dispatchEvent(new CustomEvent('cloud:orders', {
+        detail: dashOrders
+      }));
+
+      card.remove();
+      showToast(`Заказ #${o.id} выдан`);
+
+      try{
+        await rpc({ op:'delete', data:{ id:o.id } });
+      }catch(e1){
+        try{ await rpc({ op:'delete', id:o.id }); }
+        catch(e2){ console.warn('delete failed', e1, e2); }
       }
+      return;
+    }
 
-      if(act === 'issue'){
-        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders);
-
-        // ✅ сразу обновляем терминал
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
-
-        card.remove();
-        showToast(`Заказ #${o.id} выдан`);
-
-        try{
-          await rpc({ op:'delete', data:{ id:o.id } });
-        }catch(e1){
-          try{ await rpc({ op:'delete', id:o.id }); }
-          catch(e2){ console.warn('delete failed', e1, e2); }
-        }
+    if(act === 'delete'){
+      if(!card.dataset.confirm){
+        card.dataset.confirm='1';
+        btn.textContent='Точно удалить?';
+        setTimeout(()=>{
+          if(card.dataset.confirm==='1'){
+            delete card.dataset.confirm;
+            btn.textContent='Удалить';
+          }
+        },3000);
         return;
       }
 
-      if(act === 'delete'){
-        if(!card.dataset.confirm){
-          card.dataset.confirm='1';
-          btn.textContent='Точно удалить?';
-          setTimeout(()=>{ 
-            if(card.dataset.confirm==='1'){ 
-              delete card.dataset.confirm; 
-              btn.textContent='Удалить'; 
-            } 
-          },3000);
-          return;
-        }
+      dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
+      saveDash(dashOrders);
 
-        dashOrders = dashOrders.filter(x=>String(x.id)!==String(o.id));
-        saveDash(dashOrders);
+      window.dispatchEvent(new CustomEvent('cloud:orders', {
+        detail: dashOrders
+      }));
 
-        // ✅ сразу обновляем терминал
-        window.dispatchEvent(new CustomEvent('cloud:orders', {
-          detail: dashOrders
-        }));
+      card.remove();
+      showToast(`Заказ #${o.id} удалён`);
 
-        card.remove();
-        showToast(`Заказ #${o.id} удалён`);
-
-        try{
-          await rpc({ op:'delete', data:{ id:o.id } });
-        }catch(e1){
-          try{ await rpc({ op:'delete', id:o.id }); }
-          catch(e2){ console.warn('delete failed', e1, e2); }
-        }
+      try{
+        await rpc({ op:'delete', data:{ id:o.id } });
+      }catch(e1){
+        try{ await rpc({ op:'delete', id:o.id }); }
+        catch(e2){ console.warn('delete failed', e1, e2); }
       }
-    });
+    }
+  });
 
-    return card;
-
-      } // <-- ЗАКРЫЛИ orderCard
+  return card;
+}
+  // <-- ЗАКРЫЛИ orderCard
 
   function renderOrders(){
     const unique=new Map();
