@@ -259,7 +259,7 @@ async function rpc(payload){
 
 
 /* ===== маршрутизация по умолчанию ===== */
-document.addEventListener('DOMContentLoaded', function(){
+document.addEventListener('DOMContentLoaded', async () => {
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
 });
 
