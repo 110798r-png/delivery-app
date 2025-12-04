@@ -1727,7 +1727,16 @@ function bindTabloTapZone(){
 }
 
 /* ===== Router ===== */
-function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
+function mount(view){
+  const app = document.getElementById('app');
+  if (app.firstChild && typeof app.firstChild.cleanup === 'function') {
+    try { app.firstChild.cleanup(); } catch {}
+  }
+  app.innerHTML = '';
+  app.classList.add('phone-shell');
+  app.appendChild(view);
+}
+
 function realRouter(){
   const h = location.hash.split('?')[0];
   if (h === '#/profile-edit') mount(ProfileEditView());
@@ -1736,51 +1745,100 @@ function realRouter(){
   else if (h === '#/builder') mount(BuilderView());
   else mount(OrderView());
 }
-function router(){
-  const h=location.hash.split('?')[0];
-  const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack = (h === '#/history' || h === '#/profile-edit' || h === '#/builder');
-  if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
 
-  if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
-    sessionStorage.setItem(WANT_DASH,'1');
+// просто решает, какой хедер показывать и можно ли идти на табло
+function router(){
+  const h = location.hash.split('?')[0];
+  const profileBtn = document.getElementById('profileBtn');
+  const backBtn    = document.getElementById('backBtn');
+
+  const showBack =
+    h === '#/history' ||
+    h === '#/profile-edit' ||
+    h === '#/builder';
+
+  if (showBack) {
+    profileBtn.classList.add('hidden');
+    backBtn.classList.remove('hidden');
+  } else {
+    backBtn.classList.add('hidden');
+    profileBtn.classList.remove('hidden');
+  }
+
+  // защищаем табло PIN-ом
+  if (h === '#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK) !== '1') {
+    sessionStorage.setItem(WANT_DASH, '1');
     document.getElementById('pinModal').classList.add('open');
-    const app=document.getElementById('app'); if(app) app.innerHTML='';
+    const app = document.getElementById('app');
+    if (app) app.innerHTML = '';
     return;
   }
-window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
-try{ router(); }catch(e){ console.error(e); }
-  
- const goOrder = (e) => {
-  if (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  location.hash = '#/order';
-};
-  ['click','pointerup','touchend'].forEach(ev=> backBtn.addEventListener(ev, goOrder, {passive:false}));
 
+  realRouter();
+}
+
+// реагируем на смену hash
+window.addEventListener('hashchange', () => {
+  try { router(); } catch (e) { console.error(e); }
+});
+
+// === общий старт приложения ===
+document.addEventListener('DOMContentLoaded', async () => {
+  try { router(); } catch (e) { console.error(e); }
+
+  // кнопка "Назад" в шапке идёт всегда на /order
+  const backButton = document.getElementById('backBtn');
+  const goOrder = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    location.hash = '#/order';
+  };
+  ['click', 'pointerup', 'touchend'].forEach(ev =>
+    backButton.addEventListener(ev, goOrder, { passive: false })
+  );
+
+  // скрытый вход на табло по 4-тапу
   bindTabloTapZone();
 
-  await fetchRemoteConfig().catch(()=>{});
-  
-    // Подтягиваем актуальный список "нет в наличии" с сервера
-  await fetchUnavailableRemote().catch(()=>{});
+  // тянем конфиг меню и список "нет в наличии" с сервера
+  await fetchRemoteConfig().catch(() => {});
+  await fetchUnavailableRemote().catch(() => {});
 
+  // --- PIN-модалка ---
+  const pinM     = document.getElementById('pinModal');
+  const pinOk    = document.getElementById('pinOk');
+  const pinCancel= document.getElementById('pinCancel');
+  const pinInput = document.getElementById('pinInput');
 
-  const pinM=document.getElementById('pinModal'); const pinOk=document.getElementById('pinOk'); const pinCancel=document.getElementById('pinCancel'); const pinInput=document.getElementById('pinInput');
-  pinOk.onclick=(e)=>{
-    e&&e.preventDefault();
-    if((pinInput.value||'').length>0){
-      sessionStorage.setItem(TABLO_PIN_OK,'1');
+  pinOk.onclick = (e) => {
+    e && e.preventDefault();
+    if ((pinInput.value || '').length > 0) {
+      sessionStorage.setItem(TABLO_PIN_OK, '1');
       pinM.classList.remove('open');
-      if (sessionStorage.getItem(WANT_DASH)==='1'){ sessionStorage.removeItem(WANT_DASH); location.hash='#/dashboard'; }
-      else { router(); }
-    } else { showToast('Введите ключ'); }
+      if (sessionStorage.getItem(WANT_DASH) === '1') {
+        sessionStorage.removeItem(WANT_DASH);
+        location.hash = '#/dashboard';
+      } else {
+        router();
+      }
+    } else {
+      showToast('Введите ключ');
+    }
   };
-  pinCancel.onclick=()=>{ pinM.classList.remove('open'); sessionStorage.removeItem(WANT_DASH); location.hash='#/order'; };
-  pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
- // --- Регистрация service worker ---
+
+  pinCancel.onclick = () => {
+    pinM.classList.remove('open');
+    sessionStorage.removeItem(WANT_DASH);
+    location.hash = '#/order';
+  };
+
+  pinM.onclick = (e) => {
+    if (e.target === pinM) pinCancel.onclick();
+  };
+
+  // --- Service worker ---
   if ('serviceWorker' in navigator) {
     try {
       await navigator.serviceWorker.register('/sw.js');
@@ -1790,19 +1848,19 @@ try{ router(); }catch(e){ console.error(e); }
     }
   }
 
-  // --- Запрос разрешения и подписка ---
+  // --- WebPush ---
   if ('Notification' in window) {
     if (Notification.permission === 'default') {
       try {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
-          initPushSubscription().catch(()=>{});
+          initPushSubscription().catch(() => {});
         }
       } catch (e) {
         console.warn('Notification permission error', e);
       }
     } else if (Notification.permission === 'granted') {
-      initPushSubscription().catch(()=>{});
+      initPushSubscription().catch(() => {});
     }
   }
 });
