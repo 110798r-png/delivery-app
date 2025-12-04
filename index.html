@@ -852,6 +852,8 @@ async function initPushSubscription() {
 }
   
 // Локальный RPC — всё в localStorage, без интернета
+// Локальный RPC — всё в localStorage, без интернета
+// ЭТО ТВОЯ СТАРАЯ ЛОГИКА, Я ЕЁ НЕ МЕНЯЮ — только переименовали функцию
 async function localRpc(payload) {
   payload = payload || {};
   const op = payload.op;
@@ -942,7 +944,7 @@ async function localRpc(payload) {
     return { ok: true };
   }
 
-    // удалить заказ из дашборда (историю НЕ трогаем, чтобы не ломать учёт)
+  // удалить заказ из дашборда (историю НЕ трогаем, чтобы не ломать учёт)
   if (op === 'delete') {
     const id = payload.data?.id || payload.id;
     if (!id) return { ok: false, error: 'no id' };
@@ -968,6 +970,159 @@ async function localRpc(payload) {
 
   // дефолт — ничего не делаем
   return { ok: true };
+}
+
+// Локальный RPC — всё в localStorage, без интернета
+// ЭТО ТВОЯ СТАРАЯ ЛОГИКА, Я ЕЁ НЕ МЕНЯЮ — только переименовали функцию
+async function localRpc(payload) {
+  payload = payload || {};
+  const op = payload.op;
+
+  // ===== КОНФИГ МЕНЮ =====
+  if (op === 'config_get') {
+    const cfg = loadConfig();
+    return { config: cfg };
+  }
+
+  if (op === 'config_set') {
+    if (payload.config) {
+      saveConfig(payload.config);
+    }
+    return { ok: true };
+  }
+
+  // ===== ЗАКАЗЫ =====
+
+  // создать заказ
+  if (op === 'create') {
+    const data = payload.data || {};
+    const items = Array.isArray(data.items) ? data.items : [];
+    const total = Number(data.total || 0);
+    const pay   = data.pay || 'card';
+
+    const order = {
+      id: Date.now().toString().slice(-6),   // короткий номер
+      createdAt: Date.now(),
+      items,
+      total,
+      pay,
+      status: 'готовится',
+      etaMinutes: null,
+      etaUntil: null,
+      clientId: data.clientId || getClientId()
+    };
+
+    // в историю клиента
+    const hist = loadHistory();
+    hist.unshift(order);
+    // оставляем, например, последние 500 (можешь увеличить)
+    saveHistory(hist.slice(0, 500));
+
+    // в дэшборд / терминал
+    const dash = loadDash();
+    dash.unshift(order);
+    saveDash(dash.slice(0, 1000));
+
+    return { order };
+  }
+
+  // список заказов (для дэшборда, терминала)
+  if (op === 'list') {
+    const orders = loadDash();
+    return { orders };
+  }
+
+  // обновить заказ (статус, время готовности)
+  if (op === 'update') {
+    const id    = payload.data?.id || payload.id;
+    const patch = payload.data?.patch || payload.patch || {};
+
+    if (!id) return { ok: false, error: 'no id' };
+
+    let dash = loadDash();
+    let changed = false;
+
+    dash = dash.map(o => {
+      if (String(o.id) === String(id)) {
+        changed = true;
+        return { ...o, ...patch };
+      }
+      return o;
+    });
+
+    if (changed) {
+      saveDash(dash);
+
+      // синхронизируем статус в истории клиента
+      const hist = loadHistory();
+      const hist2 = hist.map(o =>
+        String(o.id) === String(id) ? { ...o, ...patch } : o
+      );
+      saveHistory(hist2);
+    }
+
+    return { ok: true };
+  }
+
+  // удалить заказ из дашборда (историю НЕ трогаем, чтобы не ломать учёт)
+  if (op === 'delete') {
+    const id = payload.data?.id || payload.id;
+    if (!id) return { ok: false, error: 'no id' };
+
+    const dash = loadDash().filter(o => String(o.id) !== String(id));
+    saveDash(dash);
+
+    // history оставляем как есть
+    return { ok: true };
+  }
+
+  // очистить все заказы
+  if (op === 'clear') {
+    saveDash([]);
+    // историю клиента можно не трогать — это "архив"
+    return { ok: true };
+  }
+
+  // подписка на пуши — в локальном режиме просто игнорим
+  if (op === 'push_subscribe') {
+    return { ok: true };
+  }
+
+  // дефолт — ничего не делаем
+  return { ok: true };
+}
+
+// ==== ГЛАВНЫЙ RPC: сначала Yandex Cloud, если не работает — ЛОКАЛЬНЫЙ режим ====
+// Сейчас, пока API_URL = "", ВСЕ ВЫЗОВЫ пойдут в localRpc() и будут работать
+// ТОЧНО ТАК ЖЕ, как у тебя работало до изменений.
+async function rpc(payload) {
+  payload = payload || {};
+
+  // если API_URL не задан, сразу локальный режим
+  if (!API_URL) {
+    return localRpc(payload);
+  }
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      throw new Error('Bad status ' + res.status);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    console.warn('Remote RPC failed, fallback to local RPC', e);
+    // если облако недоступно — работаем локально, как сейчас
+    return localRpc(payload);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function(){
