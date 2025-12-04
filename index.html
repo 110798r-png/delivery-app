@@ -1503,6 +1503,7 @@ function OrderView(){
       Оформить заказ
     </button>
   </div>
+   </div>
 </div>
   `);
 
@@ -1876,14 +1877,19 @@ function OrderView(){
   }
 
   // --- подтверждение заказа / payModal ---
-  confirmBtn.addEventListener('click', () => {
+   confirmBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     const cfgNow = loadConfig();
     const counts = window.__orderCounts || {};
     const items = [];
+
     cfgNow.menu.forEach(cat => cat.items.forEach(it => {
       const q = counts[it.name] || 0;
       if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
     }));
+
     if (!items.length || confirmBtn._busy) return;
 
     confirmBtn._busy   = true;
@@ -1901,6 +1907,7 @@ function OrderView(){
         </div>
       `;
     }).join('');
+
     sumBox.insertAdjacentHTML(
       'beforeend',
       `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
@@ -1911,8 +1918,13 @@ function OrderView(){
     const qrSection = document.getElementById('qrSection');
     if (qrSection) qrSection.classList.add('hidden');
 
-    document.getElementById('payModal').classList.add('open');
+    const modal = document.getElementById('payModal');
+    if (modal) {
+      modal.classList.add('open');
+      setBodyScrollLock(true);
+    }
   });
+
 
   function resetCounts(){
     window.__orderCounts = {};
