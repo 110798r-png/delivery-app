@@ -2297,6 +2297,12 @@ builderModal.onclick = (e) => {
     const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
+        const created = o.createdAt ? new Date(o.createdAt) : new Date();
+
+    const tableLabel = o.tableId ? `Столик: ${o.tableId}` : '';  // ← добавили
+
+    const colorMap = {
+
     const colorMap = {
       'готовится': 'bg-blue-50 border-blue-300',
       'готово':    'bg-green-50 border-green-300',
@@ -2319,19 +2325,15 @@ builderModal.onclick = (e) => {
 
  const tableLabel = o.tableId ? `Стол: ${o.tableId}` : '';
 
-const card = el(`
-  <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
-    <div class="flex items-center justify-between">
-      <div>
-        <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-        ${tableLabel ? `<div class="text-sm text-gray-600 mt-1">${tableLabel}</div>` : ''}
-      </div>
-      <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
-    </div>
-    ...
-  </div>
-`);
-
+    const card = el(`
+      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+            ${tableLabel ? `<div class="text-sm text-gray-700 mt-1">${tableLabel}</div>` : ''}
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
+        </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         ${etaBlock}
         <div class="mt-2 grid gap-1">${itemsHtml || '—'}</div>
