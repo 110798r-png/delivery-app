@@ -144,14 +144,6 @@
 
     button:focus, a:focus { outline: none; box-shadow: none; }
 
-    /* --- Promo video fullscreen --- */
-    #promoModal{ z-index:200; }
-    #promoModal.modal.open{ background: rgba(0,0,0,0.9); }
-    #promoModal video{
-      width:100vw; height:100vh; object-fit:cover;
-      background:#000;
-    }
-
     /* --- Роут-адаптация под 14" --- */
     body.route-landscape .phone-shell{
       width:100vw; max-width:100vw; padding:0 1rem;
@@ -495,33 +487,6 @@
         <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
         <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">Ок</button>
       </div>
-
-      <!-- QR-блок, изначально скрыт -->
-      <div id="qrSection" class="hidden border-t pt-3 mt-2 space-y-3">
-        <p class="text-sm text-gray-700">
-          Отсканируйте этот QR-код приложением банка.
-          После оплаты нажмите «Закрыть» или дождитесь автозакрытия.
-        </p>
-
-        <div class="flex justify-center">
-          <img id="qrImage"
-               src=""
-               alt="QR-код для оплаты"
-               class="max-w-[260px] rounded-2xl border">
-        </div>
-
-        <!-- Полоска на 30 секунд -->
-        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div id="qrProgress" class="h-2 bg-green-500" style="width:100%"></div>
-        </div>
-
-        <div class="flex justify-end">
-          <button id="qrDone"
-                  class="px-3 py-2 rounded-xl bg-black text-white">
-            Закрыть
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -577,10 +542,6 @@
     </div>
   </div>
 </div>
-  
-  <div id="promoModal" class="modal" aria-hidden="true">
-    <video id="promoVideo" playsinline loop muted autoplay></video>
-  </div>
 
   <div id="thanksModal" class="modal" aria-hidden="true">
     <div class="bg-white rounded-3xl p-8 w-[min(520px,92vw)] text-center shadow-2xl">
@@ -698,16 +659,6 @@ function unlockMediaOnce(){
   }catch(e){}
 }
 
-let idleTimer = null;
-const IDLE_DELAY = 60000;
-
-function clearIdlePromoTimer(){
-  if(idleTimer){ clearTimeout(idleTimer); idleTimer=null; }
-}
-
-function resetIdlePromoTimer(){
-  clearIdlePromoTimer();
-
   const h = location.hash.split('?')[0];
   if(h !== '#/order' && h !== '#/') return;
 
@@ -722,10 +673,7 @@ function resetIdlePromoTimer(){
     }
   }, IDLE_DELAY);
 }
-
-let promoTimer = null;
-
-async function openPromoModal(){
+    
   await fetchRemoteConfig().catch(()=>{});
 
   const cfg = loadConfig();
@@ -759,7 +707,6 @@ async function openPromoModal(){
   }
 }
   
-function closePromoModal(){
   const m = document.getElementById('promoModal');
   const v = document.getElementById('promoVideo');
   if(v){
@@ -770,35 +717,7 @@ function closePromoModal(){
   m?.classList.remove('open');
   setBodyScrollLock(false);
   location.hash = '#/order';
-  resetIdlePromoTimer();
 }
-
-function schedulePromoAfterOrder(){
-  if(promoTimer) clearTimeout(promoTimer);
-  promoTimer = setTimeout(openPromoModal, 30000);
-}
-
-document.getElementById('promoModal')?.addEventListener('click', (e)=>{
-  e.preventDefault(); e.stopPropagation();
-  closePromoModal();
-}, {passive:false});
-
-let promoAudioUnlocked = false;
-function unlockPromoAudioOnce(){
-  if(promoAudioUnlocked) return;
-  promoAudioUnlocked = true;
-  const v = document.getElementById('promoVideo');
-  if(!v) return;
-
-  if(v.muted){
-    v.muted = false;
-    v.volume = 1;
-    v.play().catch(()=>{});
-  }
-}
-['click','touchstart','pointerdown','keydown'].forEach(ev=>{
-  window.addEventListener(ev, unlockPromoAudioOnce, {once:true, passive:true});
-});
 
 let thanksTimer = null;
 
@@ -814,10 +733,6 @@ function closeThanksModal(){
   const m = document.getElementById('thanksModal');
   if(!m) return;
   m.classList.remove('open');
-
-  if(thanksTimer){ clearTimeout(thanksTimer); thanksTimer=null; }
-  resetIdlePromoTimer();
-}
 
 document.getElementById('thanksModal')?.addEventListener('click', (e)=>{
   e.preventDefault(); e.stopPropagation();
@@ -848,24 +763,34 @@ async function initPushSubscription() {
     await rpc({ op: 'push_subscribe', clientId: getClientId(), subscription: sub });
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
-  
-// Локальный RPC — всё в localStorage, без интернета
+  заказы
 async function rpc(payload) {
   payload = payload || {};
-  const op = payload.op;
 
-  // ===== КОНФИГ МЕНЮ =====
-  if (op === 'config_get') {
-    const cfg = loadConfig();
-    return { config: cfg };
+  if (!API_URL) {
+    console.warn('API_URL не задан');
+    throw new Error('API_URL not configured');
   }
 
-  if (op === 'config_set') {
-    if (payload.config) {
-      saveConfig(payload.config);
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.warn('RPC HTTP error', res.status, await res.text().catch(()=>''));      
+      throw new Error('RPC HTTP ' + res.status);
     }
-    return { ok: true };
+
+    return await res.json();
+  } catch (e) {
+    console.error('RPC fetch error', e);
+    showToast('Нет связи с сервером');
+    return { ok: false, error: 'network_error' };
   }
+}
 
   // ===== ЗАКАЗЫ =====
 
@@ -1101,9 +1026,6 @@ function getClientId(){
 
 const DEFAULT_CONFIG = {
   brandTitle: 'Mokka Room',
-  promoVideoUrl: "https://storage.yandexcloud.net/audio123/%D0%98%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%20WhatsApp%202025-11-29%20%D0%B2%2011.59.05_41b5ce5a.jpg",
-    qrUrl: '', 
-  promoSlides: [],
    theme: {
     cardRadius:20,
     imgRadius:12,
@@ -1384,13 +1306,6 @@ function OrderView(){
   setBodyScrollLock(true);
   confirmBtn._busy = false;
 
-  resetIdlePromoTimer();
-
-  const onActivity = () => resetIdlePromoTimer();
-  ['pointerdown','touchstart','click','scroll'].forEach(ev => {
-    root.addEventListener(ev, onActivity, { passive:true });
-  });
-
   let activeIdx    = 0;
   let isAnimating  = false;
   const scrollMemory = new Map();
@@ -1475,7 +1390,6 @@ function OrderView(){
 
     const onUserInteract = () => {
       stopPromoAutoplay();
-      resetIdlePromoTimer();
 
       if (promoScrollTimer) clearTimeout(promoScrollTimer);
 
@@ -1771,12 +1685,6 @@ function OrderView(){
        </div>`
     );
 
-    const qrSection = document.getElementById('qrSection');
-    if (qrSection) qrSection.classList.add('hidden');
-
-    document.getElementById('payModal').classList.add('open');
-  });
-
   function resetCounts(){
     window.__orderCounts = {};
     catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
@@ -1792,12 +1700,6 @@ function OrderView(){
     const m        = document.getElementById('payModal');
     const ok       = document.getElementById('payOk');
     const cancel   = document.getElementById('payCancel');
-    const qrSection  = document.getElementById('qrSection');
-    const qrDone     = document.getElementById('qrDone');
-    const qrProgress = document.getElementById('qrProgress');
-    const qrImage    = document.getElementById('qrImage');
-
-    if(!m || !ok || !cancel || !qrSection || !qrDone || !qrProgress || !qrImage) return;
 
     let qrTimer       = null;
     let pendingItems  = null;
@@ -2897,73 +2799,6 @@ function BuilderView(){
         </div>
       </div>
 
-      <!-- Промо-ролик -->
-      <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Промо-ролик</h3>
-        <div class="text-sm text-gray-600">
-          URL видео (mp4 / webm). Будет показываться на весь экран через паузу простоя.
-        </div>
-        <input id="promoUrl"
-               class="border rounded-xl p-3"
-               placeholder="https://..."
-               value="${cfg.promoVideoUrl || ''}">
-        <div class="flex gap-2">
-          <button id="promoTest" class="px-3 py-2 rounded-xl border">Проверить показ</button>
-          <button id="promoClear" class="px-3 py-2 rounded-xl border text-red-600">Очистить URL</button>
-        </div>
-      </section>
-
-      <!-- QR для оплаты -->
-      <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">QR для оплаты</h3>
-        <div class="text-sm text-gray-600">
-          Вставь сюда URL QR-кода (картинка PNG/JPEG). Он будет показываться при оплате.
-        </div>
-        <input id="qrUrl"
-               class="border rounded-xl p-3"
-               placeholder="https://..."
-               value="${cfg.qrUrl || ''}">
-        <div class="text-xs text-gray-500">
-          QR должен быть обычной картинкой по прямой ссылке.
-        </div>
-      </section>
-
-      <!-- АКЦИИ / ПРОМО-СЛАЙДЫ -->
-      <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Акции / промо-слайды</h3>
-        <div class="text-sm text-gray-600">
-          До 5 картинок одинакового размера. Они будут снизу на экране заказа,
-          листаться автоматически и по свайпу.
-        </div>
-        <div id="promoSlidesBox" class="grid gap-2"></div>
-        <button id="addPromoSlideBtn"
-                class="px-3 py-2 rounded-xl border self-start">
-          + Добавить картинку
-        </button>
-      </section>
-
-      <!-- Категории и товары -->
-      <section class="card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold text-lg">Категории и товары</h3>
-          <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
-        </div>
-        <div id="catsBox" class="grid gap-4"></div>
-      </section>
-
-      <!-- Масштаб под экран -->
-      <section class="card p-4 grid gap-3">
-        <h3 class="font-semibold text-lg">Масштаб под диагональ экрана</h3>
-        <div class="text-sm text-gray-600">
-          Выбери примерную диагональ монитора. Интерфейс сам подстроит размеры.
-        </div>
-        <select id="screenPreset" class="border rounded-xl p-3 max-w-xs">
-          <option value="small">14–19" (малый экран / ноутбук)</option>
-          <option value="medium">20–27" (обычный терминал)</option>
-          <option value="large">28–45" (большое табло)</option>
-        </select>
-      </section>
-
       <div class="flex gap-2">
         <button id="applyBtn"
                 class="px-4 py-3 rounded-xl bg-black text-white font-semibold">
@@ -2975,8 +2810,6 @@ function BuilderView(){
 
   // DOM-ссылки
   const catsBox             = root.querySelector('#catsBox');
-  const promoUrlInp         = root.querySelector('#promoUrl');
-  const qrUrlInp            = root.querySelector('#qrUrl');
   const screenPresetSelect  = root.querySelector('#screenPreset');
   const promoSlidesBox      = root.querySelector('#promoSlidesBox');
   const addPromoSlideBtn    = root.querySelector('#addPromoSlideBtn');
@@ -3225,18 +3058,6 @@ function BuilderView(){
 
   // --- остальные кнопки конструктора ---
 
-  // тест промо-ролика
-  root.querySelector('#promoTest').onclick = () => {
-    cfg.promoVideoUrl = promoUrlInp.value.trim();
-    saveConfig(cfg);
-    openPromoModal();
-  };
-
-  // очистка URL промо
-  root.querySelector('#promoClear').onclick = () => {
-    promoUrlInp.value = '';
-  };
-
   // добавление категории
   root.querySelector('#addCatBtn').onclick = () => {
     const id = 'cat' + (Date.now().toString().slice(-5));
@@ -3281,12 +3102,8 @@ function BuilderView(){
       cfg.qrUrl = qrUrlInp.value.trim();
     }
 
-    const t = cfg.theme || {};
-    if (screenPresetSelect){
-      t.screenPreset = screenPresetSelect.value || 'medium';
-    }
-    cfg.theme = t;
-
+cfg.theme = cfg.theme || {};
+    
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
@@ -3381,12 +3198,6 @@ function router(){
     document.body.classList.add('route-terminal','route-landscape');
   } else {
     document.body.classList.add('route-order');
-  }
-
-  if (h==='#/order' || h==='#/'){
-    resetIdlePromoTimer();
-  } else {
-    clearIdlePromoTimer();
   }
 
   if((h==='#/dashboard'||h==='#/terminal') && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
