@@ -2276,8 +2276,6 @@ builderModal.onclick = (e) => {
     const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
     const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
-        const created = o.createdAt ? new Date(o.createdAt) : new Date();
-
     const tableLabel = o.tableId ? `Столик: ${o.tableId}` : '';  // ← добавили
 
     const colorMap = {
