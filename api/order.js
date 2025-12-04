@@ -1,6 +1,6 @@
 // api/order.js — proxy с Vercel к Яндекс API Gateway
 
-const YC_URL = 'https://d5d7caefb63stl1hpehg.y5sm01em.apigw.yandexcloud.net/rpc';
+const YC_URL = "https://d5d7caefb63stl1hpehg.y5sm01em.apigw.yandexcloud.net/rpc";
 
 module.exports = async function handler(req, res) {
   // Разрешим только POST, остальное — 405
