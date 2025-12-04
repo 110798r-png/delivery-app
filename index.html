@@ -849,56 +849,37 @@ async function initPushSubscription() {
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
   
-// === RPC через Yandex Cloud Function ===
-// ВАЖНО: сверху файла у тебя уже должно быть:
-// const API_URL = "https://functions.yandexcloud.net/ТВОЙ_ID";
-
+// Локальный RPC — всё в localStorage, без интернета
 async function rpc(payload) {
   payload = payload || {};
+  const op = payload.op;
 
-  if (!API_URL) {
-    console.warn('API_URL не задан');
-    throw new Error('API_URL not configured');
+  // ===== КОНФИГ МЕНЮ =====
+  if (op === 'config_get') {
+    const cfg = loadConfig();
+    return { config: cfg };
   }
 
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      console.warn('RPC HTTP error', res.status, await res.text().catch(()=>''));      
-      throw new Error('RPC HTTP ' + res.status);
+  if (op === 'config_set') {
+    if (payload.config) {
+      saveConfig(payload.config);
     }
-
-    const data = await res.json();
-    return data;
-  } catch (e) {
-    console.error('RPC fetch error', e);
-
-    // чтобы приложение не взрывалось — возвращаем заглушку
-    // (остальной код и так обёрнут в try/catch и просто не будет обновляться)
-    showToast('Нет связи с сервером');
-    return { ok: false, error: 'network_error' };
+    return { ok: true };
   }
-}
 
   // ===== ЗАКАЗЫ =====
 
   // создать заказ
   if (op === 'create') {
-    const data = payload.data || {};
+    const data  = payload.data || {};
     const items = Array.isArray(data.items) ? data.items : [];
     const total = Number(data.total || 0);
     const pay   = data.pay || 'card';
 
-      const tableId = data.tableId || getCurrentTableId() || null;
+    // столик: из data или из URL/localStorage
+    const tableId = data.tableId || getCurrentTableId() || null;
 
-     const order = {
+    const order = {
       id: Date.now().toString().slice(-6),   // короткий номер
       createdAt: Date.now(),
       items,
@@ -907,15 +888,14 @@ async function rpc(payload) {
       status: 'готовится',
       etaMinutes: null,
       etaUntil: null,
-      // новый столик
-      tableId: data.tableId || null,
+      tableId,                               // <- сохраняем столик
       clientId: data.clientId || getClientId()
     };
 
     // в историю клиента
     const hist = loadHistory();
     hist.unshift(order);
-    // оставляем, например, последние 500 (можешь увеличить)
+    // оставляем, например, последние 500
     saveHistory(hist.slice(0, 500));
 
     // в дэшборд / терминал
@@ -954,7 +934,7 @@ async function rpc(payload) {
       saveDash(dash);
 
       // синхронизируем статус в истории клиента
-      const hist = loadHistory();
+      const hist  = loadHistory();
       const hist2 = hist.map(o =>
         String(o.id) === String(id) ? { ...o, ...patch } : o
       );
@@ -964,7 +944,7 @@ async function rpc(payload) {
     return { ok: true };
   }
 
-    // удалить заказ из дашборда (историю НЕ трогаем, чтобы не ломать учёт)
+  // удалить заказ из дашборда (историю НЕ трогаем)
   if (op === 'delete') {
     const id = payload.data?.id || payload.id;
     if (!id) return { ok: false, error: 'no id' };
@@ -972,14 +952,12 @@ async function rpc(payload) {
     const dash = loadDash().filter(o => String(o.id) !== String(id));
     saveDash(dash);
 
-    // history оставляем как есть
     return { ok: true };
   }
 
-  // очистить все заказы
+  // очистить все заказы (для табло/дашборда)
   if (op === 'clear') {
     saveDash([]);
-    // историю клиента можно не трогать — это "архив"
     return { ok: true };
   }
 
@@ -988,9 +966,10 @@ async function rpc(payload) {
     return { ok: true };
   }
 
-  // дефолт — ничего не делаем
+  // дефолт — на всякий случай
   return { ok: true };
 }
+
 
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
