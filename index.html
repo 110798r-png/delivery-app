@@ -852,7 +852,7 @@ async function initPushSubscription() {
 }
   
 // Локальный RPC — всё в localStorage, без интернета
-async function rpc(payload) {
+async function localRpc(payload) {
   payload = payload || {};
   const op = payload.op;
 
