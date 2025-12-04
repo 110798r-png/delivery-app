@@ -1038,51 +1038,73 @@ async function pullAndMergeStatuses(){
 function bindHeaderDots(){
   const termDot = document.getElementById('termDot');
   const dashDot = document.getElementById('dashDot');
-  if(!termDot || !dashDot || termDot._bound) return;
+  if (!termDot || !dashDot || termDot._bound) return;
   termDot._bound = dashDot._bound = true;
 
   function makeTapHandler(onDone){
     let taps = 0, first = 0, timer = null;
     const windowMs = 1500;
 
-    const reset = ()=>{
-      taps = 0; first = 0;
-      if(timer){ clearTimeout(timer); timer = null; }
+    const reset = () => {
+      taps = 0;
+      first = 0;
+      if (timer){
+        clearTimeout(timer);
+        timer = null;
+      }
     };
 
     return function(){
       const now = Date.now();
-      if(!first) first = now;
+      if (!first) first = now;
       taps++;
 
-      if(now - first > windowMs){
+      if (now - first > windowMs){
         reset();
-        taps = 1; first = now;
+        taps = 1;
+        first = now;
       }
 
-      if(taps >= 8){
+      if (taps >= 8){
         reset();
         onDone();
       } else {
-        if(timer) clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         timer = setTimeout(reset, windowMs);
       }
     };
   }
 
-  const goDashTap = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/dashboard';
-    else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal')?.classList.add('open'); }
+  const goDashTap = makeTapHandler(() => {
+    if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
+      location.hash = '#/dashboard';
+    } else {
+      sessionStorage.setItem(WANT_DASH, '1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
   });
 
-  const goTermTap = makeTapHandler(()=>{
-    if(sessionStorage.getItem(TABLO_PIN_OK)==='1') location.hash = '#/terminal';
-    else { sessionStorage.setItem(WANT_TERM,'1'); document.getElementById('pinModal')?.classList.add('open'); }
+  const goTermTap = makeTapHandler(() => {
+    if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){
+      location.hash = '#/terminal';
+    } else {
+      sessionStorage.setItem(WANT_TERM, '1');
+      document.getElementById('pinModal')?.classList.add('open');
+    }
   });
 
-  ['click','pointerup','touchend'].forEach(ev=>{
-    termDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goTermTap(); }, {passive:false});
-    dashDot.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); goDashTap(); }, {passive:false});
+  ['click','pointerup','touchend'].forEach(ev => {
+    termDot.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      goTermTap();
+    }, { passive:false });
+
+    dashDot.addEventListener(ev, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      goDashTap();
+    }, { passive:false });
   });
 }
 
@@ -1112,154 +1134,37 @@ function OrderView(){
       </section>
 
       <!-- Нижняя панель "Итого" + Оформить -->
-     <div id="confirmBar" class="confirm-bar">
-  <div class="confirm-inner flex items-center justify-between gap-3">
-    <div class="text-base">
-      <span class="text-gray-600">Итого:</span>
-      <b id="totalVal">0 руб.</b>
+      <div id="confirmBar" class="confirm-bar">
+        <div class="confirm-inner flex items-center justify-between gap-3">
+          <div class="text-base">
+            <span class="text-gray-600">Итого:</span>
+            <b id="totalVal">0 руб.</b>
+          </div>
+          <button id="confirmBtn"
+                  class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled>
+            Подтвердить заказ
+          </button>
+        </div>
+      </div>
     </div>
-    <button id="confirmBtn"
-            class="px-4 py-2 rounded-xl bg-black text-white flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled>
-      Подтвердить заказ
-    </button>
-  </div>
-</div>
   `);
 
-  const categoryBar   = root.querySelector('#categoryBar');
-  const catPager      = root.querySelector('#catPager');
-  const totalEl       = root.querySelector('#totalVal');
-  const confirmBtn    = root.querySelector('#confirmBtn');
-  const promoWrapper  = root.querySelector('#promoCarouselWrapper');
-  const promoCarousel = root.querySelector('#promoCarousel');
-
-  // состояние для промо-карусели
-  let promoSlides    = [];
-  let promoAutoTimer = null;
-  let activePromoIdx = 0;
+  const categoryBar = root.querySelector('#categoryBar');
+  const catPager    = root.querySelector('#catPager');
+  const totalEl     = root.querySelector('#totalVal');
+  const confirmBtn  = root.querySelector('#confirmBtn');
 
   setBodyScrollLock(true);
   confirmBtn._busy = false;
 
-  let activeIdx    = 0;
-  let isAnimating  = false;
+  let activeIdx   = 0;
+  let isAnimating = false;
   const scrollMemory = new Map();
   const panelW = () => catPager.getBoundingClientRect().width || 1;
 
-  // --- построение карусели промо-слайдов ---
-  function stopPromoAutoplay(){
-    if (promoAutoTimer){
-      clearInterval(promoAutoTimer);
-      promoAutoTimer = null;
-    }
-  }
-
-    function startPromoAutoplay(){
-    stopPromoAutoplay();
-    if (!promoCarousel || !promoSlides.length) return;
-
-    promoAutoTimer = setInterval(() => {
-      if (!promoSlides.length || !promoCarousel) return;
-
-      let next = activePromoIdx + 1;
-
-      // дошли до конца – мгновенно прыгаем в начало, БЕЗ анимации назад
-      if (next >= promoSlides.length){
-        activePromoIdx = 0;
-        promoCarousel.scrollLeft = 0;
-        return;
-      }
-
-      // обычный шаг вперёд
-      activePromoIdx = next;
-      const slide = promoCarousel.querySelector(`[data-idx="${activePromoIdx}"]`);
-      if (slide){
-        slide.scrollIntoView({
-          behavior: 'smooth',
-          inline: 'center',
-          block: 'nearest'
-        });
-      }
-    }, 3000); // каждые 3 секунды
-  }
-
-  function buildPromoCarousel(){
-    if (!promoCarousel || !promoWrapper) return;
-
-    const cfgNow = loadConfig();
-    const slides = Array.isArray(cfgNow.promoSlides)
-      ? cfgNow.promoSlides.filter(u => u && u.trim())
-      : [];
-
-    promoSlides = slides;
-
-    if (!slides.length){
-      promoWrapper.classList.add('hidden');
-      promoCarousel.innerHTML = '';
-      stopPromoAutoplay();
-      return;
-    }
-
-    promoWrapper.classList.remove('hidden');
-    promoCarousel.innerHTML = '';
-
-    slides.forEach((url, idx) => {
-  const slide = el(`
-    <div class="snap-start flex-shrink-0 w-full" data-idx="${idx}">
-      <div class="promo-slide-card">
-        <img src="${url}"
-             alt="Акция ${idx + 1}">
-      </div>
-    </div>
-  `);
-  promoCarousel.appendChild(slide);
-});
-
-    activePromoIdx = 0;
-    promoCarousel.scrollLeft = 0;
-  }
-
-  // пауза автолистания, если пользователь листает сам
-  if (promoCarousel){
-    let promoScrollTimer = null;
-
-    const onUserInteract = () => {
-      stopPromoAutoplay();
-
-      if (promoScrollTimer) clearTimeout(promoScrollTimer);
-
-      promoScrollTimer = setTimeout(() => {
-        if (!promoSlides.length) return;
-        const rectWrap = promoCarousel.getBoundingClientRect();
-        const centerX  = rectWrap.left + rectWrap.width / 2;
-
-        let bestIdx  = activePromoIdx;
-        let bestDist = Infinity;
-
-        promoCarousel.querySelectorAll('[data-idx]').forEach(slide => {
-          const r = slide.getBoundingClientRect();
-          const slideCenter = r.left + r.width / 2;
-          const d = Math.abs(slideCenter - centerX);
-          if (d < bestDist){
-            bestDist = d;
-            bestIdx  = Number(slide.dataset.idx || 0);
-          }
-        });
-
-        activePromoIdx = bestIdx;
-        startPromoAutoplay();
-      }, 400); // ждём окончания инерции прокрутки
-    };
-
-    promoCarousel.addEventListener('pointerdown',   onUserInteract, { passive:true });
-    promoCarousel.addEventListener('pointerup',     onUserInteract, { passive:true });
-    promoCarousel.addEventListener('pointercancel', onUserInteract, { passive:true });
-    promoCarousel.addEventListener('scroll',        onUserInteract, { passive:true });
-  }
-
-  // --- категории чипы ---
-  loadConfig().menu.forEach((cat, idx) => {
+  // --- категории-чипы ---
+  cfg.menu.forEach((cat, idx) => {
     categoryBar.appendChild(el(`
       <button type="button"
         class="px-3 py-1.5 rounded-full border text-sm whitespace-nowrap ${
@@ -1272,20 +1177,25 @@ function OrderView(){
   });
 
   function highlightChip(idx){
-    const buttons = categoryBar.querySelectorAll('button');
+    const buttons = categoryBar.querySelectorAll('button[data-idx]');
     buttons.forEach((b, i) => {
       const on = i === idx;
       b.classList.toggle('bg-black', on);
       b.classList.toggle('text-white', on);
       b.classList.toggle('border-black', on);
-      if (on) b.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+      if (on) {
+        b.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+      }
     });
   }
 
   function goToIndex(idx, { animate = true } = {}){
     const cfgNow = loadConfig();
     idx = Math.max(0, Math.min(cfgNow.menu.length - 1, idx));
-    const target = Math.round(panelW() * idx);
+
+    const width = panelW();
+    const target = Math.round(width * idx);
+
     highlightChip(idx);
 
     const box = catPager.children[idx]?.querySelector('.v-scroll');
@@ -1293,8 +1203,10 @@ function OrderView(){
     if (!animate){
       const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
       if (old) scrollMemory.set(cfgNow.menu[activeIdx].key, old.scrollTop);
+
       catPager.scrollLeft = target;
       if (box) box.scrollTop = scrollMemory.get(cfgNow.menu[idx].key) || 0;
+
       activeIdx = idx;
       return;
     }
@@ -1312,6 +1224,7 @@ function OrderView(){
         const cfgNow2 = loadConfig();
         const box2 = catPager.children[idx]?.querySelector('.v-scroll');
         if (box2) box2.scrollTop = scrollMemory.get(cfgNow2.menu[idx].key) || 0;
+
         activeIdx = idx;
         isAnimating = false;
         catPager.style.scrollSnapType = prevSnap || 'x mandatory';
@@ -1325,7 +1238,7 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate:true });
   });
 
-  // --- построение списка блюд ---
+  // --- построение карточек блюд ---
   function rebuildMenu(){
     catPager.innerHTML = '';
     const cfgNow = loadConfig();
@@ -1336,14 +1249,15 @@ function OrderView(){
       const list  = el(`<div class="grid gap-3"></div>`);
 
       cat.items.forEach(it => {
-        const q = (window.__orderCounts?.[it.name] || 0);
+        const q = (window.__orderCounts || {})[it.name] || 0;
         const row = el(`
           <div class="menu-card">
             <div class="flex-1 min-w-0">
               <div class="font-medium text-sm flex items-center gap-2">${it.name}</div>
-              ${cfgNow.theme.showPrice
-                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
-                : ''
+              ${
+                cfgNow.theme.showPrice
+                  ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                  : ''
               }
               <div class="flex items-center gap-3 mt-3">
                 <button type="button"
@@ -1365,7 +1279,7 @@ function OrderView(){
         list.appendChild(row);
       });
 
-      // нижний отступ, чтобы не упиралось в панель
+      // отступ, чтобы не упиралось в нижнюю панель
       list.appendChild(el(`<div class="h-24"></div>`));
 
       vbox.appendChild(list);
@@ -1373,7 +1287,7 @@ function OrderView(){
       catPager.appendChild(panel);
 
       // свайпы между категориями
-      let down=false, used=false, sx=0, sy=0, locked=null;
+      let down = false, used = false, sx = 0, sy = 0, locked = null;
       const PIX_LOCK = 10;
       const THRESH   = () =>
         Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
@@ -1388,8 +1302,8 @@ function OrderView(){
         const dx = e.clientX - sx;
         const dy = e.clientY - sy;
         if (locked === null){
-          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) locked='x';
-          else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) locked='y';
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) locked = 'x';
+          else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) locked = 'y';
         }
         if (locked === 'x'){
           e.preventDefault();
@@ -1412,13 +1326,15 @@ function OrderView(){
     });
   }
 
-  // --- кнопки +/- ---
+  rebuildMenu();
+
+  // +/- по товарам
   catPager.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn || btn.disabled) return;
 
     const card = btn.closest('.menu-card');
-    if (card) {
+    if (card){
       card.classList.remove('pulse');
       void card.offsetWidth;
       card.classList.add('pulse');
@@ -1442,6 +1358,22 @@ function OrderView(){
     void totalEl.offsetWidth;
     totalEl.classList.add('bump');
   });
+
+  function recalcTotal(){
+    const cfgNow = loadConfig();
+    const counts = window.__orderCounts || {};
+    let sum = 0;
+    cfgNow.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        const qty = counts[it.name] || 0;
+        const price = Number.isFinite(Number(it.price)) ? Number(it.price) : 0;
+        sum += qty * price;
+      })
+    );
+    totalEl.textContent = money(sum);
+    confirmBtn.disabled = sum <= 0;
+    return sum;
+  }
 
   function applyHeights(){
     try {
@@ -1472,23 +1404,7 @@ function OrderView(){
     }, 80);
   });
 
-  function recalcTotal(){
-    const cfgNow = loadConfig();
-    const counts = window.__orderCounts || {};
-    let sum = 0;
-    cfgNow.menu.forEach(cat =>
-      cat.items.forEach(it => {
-        const qty = counts[it.name] || 0;
-        const price = Number.isFinite(Number(it.price)) ? Number(it.price) : 0;
-        sum += qty * price;
-      })
-    );
-    totalEl.textContent = money(sum);
-    confirmBtn.disabled = sum <= 0;
-    return sum;
-  }
-
-   // --- подтверждение заказа / payModal ---
+  // --- клик "Подтвердить заказ" — только открываем модалку и запоминаем заказ ---
   confirmBtn.addEventListener('click', () => {
     const cfgNow = loadConfig();
     const counts = window.__orderCounts || {};
@@ -1509,404 +1425,59 @@ function OrderView(){
     confirmBtn._busy   = true;
     confirmBtn.disabled = true;
 
-    // заполняем сводку
     const sumBox = document.getElementById('paySummary');
-    sumBox.innerHTML = items.map(i => {
-      const s = i.qty * (i.price || 0);
-      return `
-        <div class="flex items-center justify-between">
-          <div class="truncate">${i.name} ×${i.qty}</div>
-          <div class="ml-2 whitespace-nowrap">${money(s)}</div>
-        </div>
-      `;
-    }).join('');
+    if (sumBox){
+      sumBox.innerHTML = items.map(i => {
+        const s = i.qty * (i.price || 0);
+        return `
+          <div class="flex items-center justify-between">
+            <div class="truncate">${i.name} ×${i.qty}</div>
+            <div class="ml-2 whitespace-nowrap">${money(s)}</div>
+          </div>
+        `;
+      }).join('');
 
-    sumBox.insertAdjacentHTML(
-      'beforeend',
-      `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
-         <div>Итого</div><div>${money(total)}</div>
-       </div>`
-    );
+      sumBox.insertAdjacentHTML(
+        'beforeend',
+        `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
+           <div>Итого</div><div>${money(total)}</div>
+         </div>`
+      );
+    }
 
-    // открываем модалку
     const m = document.getElementById('payModal');
     if (m){
       m.classList.add('open');
       setBodyScrollLock(true);
     }
 
-    // сохраняем "ожидающий" заказ, чтобы payOk его отправил
     window.__pendingOrder = { items, total };
   });
 
-  // функция очищения корзины (остаётся внутри OrderView)
   function resetCounts(){
     window.__orderCounts = {};
     catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
     totalEl.textContent  = money(0);
     confirmBtn.disabled  = true;
   }
-
   window.__resetOrderCounts = resetCounts;
-
-    // даём доступ снаружи (payModal)
-  window.__resetOrderCounts = resetCounts;
-
-  // ================== биндим payModal ==================
-  (function bindPayModal(){
-    const m        = document.getElementById('payModal');
-    const ok       = document.getElementById('payOk');
-    const cancel   = document.getElementById('payCancel');
-
-    let qrTimer       = null;
-    let pendingItems  = null;
-    let pendingTotal  = 0;
-
-    function stopQrTimer(){
-      if (qrTimer){
-        clearInterval(qrTimer);
-        qrTimer = null;
-      }
-    }
-
-    function closeModal(){
-      stopQrTimer();
-      qrSection.classList.add('hidden');
-      m.classList.remove('open');
-      pendingItems = null;
-      pendingTotal = 0;
-      ok.disabled  = false;
-      ok.textContent = 'Оплатить';
-    }
-
-    // снимем "занято" с кнопки Оформить заказ
-    const finalize = ()=>{
-      confirmBtn._busy   = false;
-      confirmBtn.disabled = false;
-    };
-
-    function startQr(itemsSel, total){
-      pendingItems = itemsSel;
-      pendingTotal = total;
-
-      const cfg = loadConfig();
-      const url = (cfg.qrUrl || '').trim();
-      if (url){
-        qrImage.src = url;
-      } else {
-        qrImage.removeAttribute('src');
-        showToast('QR для оплаты не задан в конструкторе');
-      }
-
-      qrSection.classList.remove('hidden');
-      ok.disabled = true; // чтобы не жали второй раз
-
-      // полоска на 30 секунд
-      qrProgress.style.width = '100%';
-      let left = 30;
-      stopQrTimer();
-      qrTimer = setInterval(()=>{
-        left--;
-        if (left <= 0){
-          stopQrTimer();
-          qrProgress.style.width = '0%';
-          finishAfterQr();   // авто-завершение
-        } else {
-          qrProgress.style.width = (left / 30 * 100) + '%';
-        }
-      }, 1000);
-    }
-
-    async function finishAfterQr(){
-      if (!pendingItems || !pendingItems.length){
-        closeModal();
-        finalize();
-        return;
-      }
-
-      const itemsSel = pendingItems.slice();
-      const total    = pendingTotal;
-
-      let order = null;
-      try {
-        const res = await rpc({
-          op: 'create',
-          data: {
-            clientId: getClientId(),
-            items: itemsSel,
-            total,
-            pay: 'qr'
-          }
-        });
-
-        order = res?.order || {
-          id: Date.now().toString().slice(-6),
-          createdAt: Date.now(),
-          items: itemsSel,
-          total,
-          pay: 'qr',
-          status: 'готовится'
-        };
-      } catch (err){
-        console.warn('RPC create error', err);
-        showToast('Не удалось отправить заказ, попробуйте ещё раз.');
-        closeModal();
-        finalize();
-        return;
-      }
-
-      closeModal();
-      finalize();
-      resetCounts();
-      window.dispatchEvent(new CustomEvent('orders:history-updated'));
-
-      openThanksModal();
-      clearIdlePromoTimer();
-      schedulePromoAfterOrder();
-    }
-
-    const onCancel = (e)=>{
-      e && e.preventDefault();
-      e && e.stopPropagation();
-      // просто закрываем, НИЧЕГО не отправляем, корзину не трогаем
-      closeModal();
-      finalize();
-    };
-
-    const onOk = (e)=>{
-      e && e.preventDefault();
-      e && e.stopPropagation();
-
-      unlockMediaOnce();
-
-      // если QR уже показан — не даём второй раз
-      if (!qrSection.classList.contains('hidden')){
-        return;
-      }
-
-      const cfg    = loadConfig();
-      const counts = window.__orderCounts || {};
-      const itemsSel = [];
-      let total   = 0;
-
-      cfg.menu.forEach(cat => cat.items.forEach(it=>{
-        const q = counts[it.name] || 0;
-        if (q > 0){
-          itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
-          total += q * (it.price || 0);
-        }
-      }));
-
-      if (!itemsSel.length){
-        closeModal();
-        finalize();
-        return;
-      }
-
-      // сначала показываем QR, заказ пока НЕ летит
-      startQr(itemsSel, total);
-    };
-
-    ok.onclick     = onOk;
-    cancel.onclick = onCancel;
-    m.onclick = (e)=>{ if(e.target === m) onCancel(e); };
-
-    qrDone.onclick = (e)=>{
-      e && e.preventDefault();
-      e && e.stopPropagation();
-      stopQrTimer();
-      finishAfterQr();   // вручную после оплаты
-    };
-  })();
-  // =============== конец bindPayModal ===============
-
-  rebuildMenu();
-  buildPromoCarousel();
 
   requestAnimationFrame(() => {
     highlightChip(0);
     goToIndex(0, { animate:false });
     recalcTotal();
     applyHeights();
-    // applyRepeatOrder() если у тебя используется (оставь свою функцию)
-    if (typeof applyRepeatOrder === 'function') {
-      try { applyRepeatOrder(); } catch {}
-    }
-    startPromoAutoplay();
   });
-
-  // периодический синк конфига (если он у тебя есть)
-  let syncInFlight = false;
-  const syncTimer = setInterval(async () => {
-    if (syncInFlight) return;
-    syncInFlight = true;
-    try{
-      const cfgRemote = await fetchRemoteConfig();
-      if (cfgRemote) {
-        const v = calcConfigVersion(cfgRemote);
-        if (v !== lastConfigVersion) {
-          lastConfigVersion = v;
-          rebuildMenu();
-          recalcTotal();
-          applyHeights();
-          buildPromoCarousel();
-          startPromoAutoplay();
-        }
-      }
-    }finally{
-      syncInFlight = false;
-    }
-  }, 4000);
 
   root.cleanup = () => {
     setBodyScrollLock(false);
-    clearInterval(syncTimer);
-    stopPromoAutoplay();
     window.removeEventListener('resize', applyHeights);
-    clearIdlePromoTimer();
-    ['pointerdown','touchstart','click','scroll'].forEach(ev => {
-      root.removeEventListener(ev, onActivity);
-    });
   };
 
   return root;
 }
 
 
-  // ===== Привязка модалки оплаты (без QR) =====
-function bindPayModal(){
-  const modal     = document.getElementById('payModal');
-  const payOk     = document.getElementById('payOk');
-  const payCancel = document.getElementById('payCancel');
-
-  if (!modal || modal._bound) return;
-  modal._bound = true;
-
-  function releaseConfirmBtn(){
-    const btn = document.getElementById('confirmBtn');
-    if (btn){
-      btn._busy   = false;
-      btn.disabled = false;
-    }
-  }
-
-  function closePayModal(){
-    modal.classList.remove('open');
-    setBodyScrollLock(false);
-    releaseConfirmBtn();
-  }
-
-  // кнопка "изменить"
-  if (payCancel){
-    payCancel.addEventListener('click', (e)=>{
-      e.preventDefault();
-      closePayModal();
-    });
-  }
-
-  // клик по фону модалки
-  modal.addEventListener('click', (e)=>{
-    if (e.target === modal){
-      e.preventDefault();
-      closePayModal();
-    }
-  }, { passive:false });
-
-  // кнопка "Ок" — отправка заказа на сервер
-  if (payOk){
-    payOk.addEventListener('click', async (e)=>{
-      e.preventDefault();
-
-      const pending = window.__pendingOrder;
-      if (!pending || !Array.isArray(pending.items) || !pending.items.length){
-        closePayModal();
-        return;
-      }
-
-      const items = pending.items;
-      const total = pending.total || 0;
-
-      let tableId = null;
-      try{
-        if (typeof getCurrentTableId === 'function'){
-          tableId = getCurrentTableId();
-        }
-      }catch(e2){
-        console.warn('getCurrentTableId error', e2);
-      }
-
-      let order;
-      try{
-        const res = await rpc({
-          op: 'create',
-          data: {
-            items,
-            total,
-            pay: 'qr',              // можешь поменять на 'card' или 'cash'
-            tableId,
-            clientId: getClientId()
-          }
-        });
-
-        order = res && res.order
-          ? res.order
-          : {
-              id: Date.now().toString().slice(-6),
-              createdAt: Date.now(),
-              items,
-              total,
-              pay: 'qr',
-              status: 'готовится',
-              tableId,
-              clientId: getClientId()
-            };
-      } catch (err){
-        console.warn('create order error', err);
-        showToast('Не удалось отправить заказ, попробуйте ещё раз');
-        releaseConfirmBtn();
-        return;
-      }
-
-      // пишем в локальную историю клиента
-      try{
-        const hist = loadHistory();
-        hist.unshift(order);
-        saveHistory(hist.slice(0, 500));
-      }catch(e3){
-        console.warn('saveHistory error', e3);
-      }
-
-      // обновляем кеш заказов с сервера (дашборд и табло увидят через cloud:orders)
-      try{
-        await listOrdersOnce();
-      }catch(e4){
-        console.warn('listOrdersOnce error', e4);
-      }
-
-      // очищаем корзину (OrderView дал нам функцию)
-      if (typeof window.__resetOrderCounts === 'function'){
-        try{ window.__resetOrderCounts(); }catch{}
-      }
-
-      // закрываем модалку + "спасибо"
-      closePayModal();
-      if (typeof openThanksModal === 'function'){
-        openThanksModal();
-      }
-    });
-  }
-}
-
-  // Закрытие по клику на подложку вокруг модалки
-  modal.addEventListener('click', (e)=>{
-    if (e.target === modal){
-      e.preventDefault();
-      e.stopPropagation();
-      closePayModal();
-    }
-  }, { passive:false });
-}
-    
 /* ===== Dashboard ===== */
 function DashboardView(){
   const root = el(`
