@@ -62,6 +62,11 @@ button, a, svg, .brand-strip, .header-row {
   user-select: none;
 }
 
+    /* Делаем кнопку профиля невидимой, но оставляем активной */
+#profileBtn {
+  opacity: 0;
+}
+    
 /* Убираем рамку фокуса с кнопок/ссылок (чтобы не "залипала" после тапов) */
 button:focus, a:focus {
   outline: none;
@@ -1033,9 +1038,12 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
     m.onclick = (e) => { if (e.target === m) onCancel(e); };
   })();
 
-  rebuildMenu();
+   rebuildMenu();
 
   requestAnimationFrame(() => {
+    // выставляем высоты для внутреннего скролла
+    applyHeights();
+
     highlightChip(0);
     goToIndex(0, { animate:false });
     recalcTotal();
