@@ -659,66 +659,6 @@ function unlockMediaOnce(){
   }catch(e){}
 }
 
-  const h = location.hash.split('?')[0];
-  if(h !== '#/order' && h !== '#/') return;
-
-  idleTimer = setTimeout(()=>{
-    const h2 = location.hash.split('?')[0];
-    const promoOpen  = document.getElementById('promoModal')?.classList.contains('open');
-    const payOpen    = document.getElementById('payModal')?.classList.contains('open');
-    const thanksOpen = document.getElementById('thanksModal')?.classList.contains('open');
-
-    if((h2 === '#/order' || h2 === '#/') && !promoOpen && !payOpen && !thanksOpen){
-      openPromoModal();
-    }
-  }, IDLE_DELAY);
-}
-    
-  await fetchRemoteConfig().catch(()=>{});
-
-  const cfg = loadConfig();
-  const url = (cfg.promoVideoUrl || '').trim();
-  if(!url){ showToast('Промо-ролик не задан в конструкторе'); return; }
-
-  const m = document.getElementById('promoModal');
-  const v = document.getElementById('promoVideo');
-  if(!m || !v) return;
-
-  v.pause();
-  v.src = url;
-  v.currentTime = 0;
-
-  v.muted = !MEDIA_UNLOCKED;
-  v.volume = 1;
-  v.setAttribute('autoplay','');
-  v.load();
-
-  m.classList.add('open');
-  setBodyScrollLock(true);
-
-  const p = v.play();
-  if(p && p.catch){
-    p.catch(()=>{
-      if(!MEDIA_UNLOCKED){
-        v.muted = true;
-        v.play().catch(()=>{});
-      }
-    });
-  }
-}
-  
-  const m = document.getElementById('promoModal');
-  const v = document.getElementById('promoVideo');
-  if(v){
-    v.pause();
-    v.removeAttribute('src');
-    v.load();
-  }
-  m?.classList.remove('open');
-  setBodyScrollLock(false);
-  location.hash = '#/order';
-}
-
 let thanksTimer = null;
 
 function openThanksModal(){
@@ -763,7 +703,7 @@ async function initPushSubscription() {
     await rpc({ op: 'push_subscribe', clientId: getClientId(), subscription: sub });
   } catch (e) { console.warn('push_subscribe RPC error', e); }
 }
-  заказы
+  
 async function rpc(payload) {
   payload = payload || {};
 
@@ -791,110 +731,6 @@ async function rpc(payload) {
     return { ok: false, error: 'network_error' };
   }
 }
-
-  // ===== ЗАКАЗЫ =====
-
-  // создать заказ
-  if (op === 'create') {
-    const data  = payload.data || {};
-    const items = Array.isArray(data.items) ? data.items : [];
-    const total = Number(data.total || 0);
-    const pay   = data.pay || 'card';
-
-    // столик: из data или из URL/localStorage
-    const tableId = data.tableId || getCurrentTableId() || null;
-
-    const order = {
-      id: Date.now().toString().slice(-6),   // короткий номер
-      createdAt: Date.now(),
-      items,
-      total,
-      pay,
-      status: 'готовится',
-      etaMinutes: null,
-      etaUntil: null,
-      tableId,                               // <- сохраняем столик
-      clientId: data.clientId || getClientId()
-    };
-
-    // в историю клиента
-    const hist = loadHistory();
-    hist.unshift(order);
-    // оставляем, например, последние 500
-    saveHistory(hist.slice(0, 500));
-
-    // в дэшборд / терминал
-    const dash = loadDash();
-    dash.unshift(order);
-    saveDash(dash.slice(0, 1000));
-
-    return { order };
-  }
-
-  // список заказов (для дэшборда, терминала)
-  if (op === 'list') {
-    const orders = loadDash();
-    return { orders };
-  }
-
-  // обновить заказ (статус, время готовности)
-  if (op === 'update') {
-    const id    = payload.data?.id || payload.id;
-    const patch = payload.data?.patch || payload.patch || {};
-
-    if (!id) return { ok: false, error: 'no id' };
-
-    let dash = loadDash();
-    let changed = false;
-
-    dash = dash.map(o => {
-      if (String(o.id) === String(id)) {
-        changed = true;
-        return { ...o, ...patch };
-      }
-      return o;
-    });
-
-    if (changed) {
-      saveDash(dash);
-
-      // синхронизируем статус в истории клиента
-      const hist  = loadHistory();
-      const hist2 = hist.map(o =>
-        String(o.id) === String(id) ? { ...o, ...patch } : o
-      );
-      saveHistory(hist2);
-    }
-
-    return { ok: true };
-  }
-
-  // удалить заказ из дашборда (историю НЕ трогаем)
-  if (op === 'delete') {
-    const id = payload.data?.id || payload.id;
-    if (!id) return { ok: false, error: 'no id' };
-
-    const dash = loadDash().filter(o => String(o.id) !== String(id));
-    saveDash(dash);
-
-    return { ok: true };
-  }
-
-  // очистить все заказы (для табло/дашборда)
-  if (op === 'clear') {
-    saveDash([]);
-    return { ok: true };
-  }
-
-  // подписка на пуши — в локальном режиме просто игнорим
-  if (op === 'push_subscribe') {
-    return { ok: true };
-  }
-
-  // дефолт — на всякий случай
-  return { ok: true };
-}
-
 
 document.addEventListener('DOMContentLoaded', function(){
   if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
@@ -1652,25 +1488,31 @@ function OrderView(){
     return sum;
   }
 
-  // --- подтверждение заказа / payModal ---
+   // --- подтверждение заказа / payModal ---
   confirmBtn.addEventListener('click', () => {
     const cfgNow = loadConfig();
     const counts = window.__orderCounts || {};
-    const items = [];
+    const items  = [];
+    let total    = 0;
+
     cfgNow.menu.forEach(cat => cat.items.forEach(it => {
       const q = counts[it.name] || 0;
-      if (q > 0) items.push({ name: it.name, qty: q, price: it.price || 0 });
+      if (q > 0){
+        const price = it.price || 0;
+        items.push({ name: it.name, qty: q, price });
+        total += q * price;
+      }
     }));
+
     if (!items.length || confirmBtn._busy) return;
 
     confirmBtn._busy   = true;
     confirmBtn.disabled = true;
 
+    // заполняем сводку
     const sumBox = document.getElementById('paySummary');
-    let total    = 0;
     sumBox.innerHTML = items.map(i => {
       const s = i.qty * (i.price || 0);
-      total += s;
       return `
         <div class="flex items-center justify-between">
           <div class="truncate">${i.name} ×${i.qty}</div>
@@ -1678,6 +1520,7 @@ function OrderView(){
         </div>
       `;
     }).join('');
+
     sumBox.insertAdjacentHTML(
       'beforeend',
       `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
@@ -1685,12 +1528,26 @@ function OrderView(){
        </div>`
     );
 
+    // открываем модалку
+    const m = document.getElementById('payModal');
+    if (m){
+      m.classList.add('open');
+      setBodyScrollLock(true);
+    }
+
+    // сохраняем "ожидающий" заказ, чтобы payOk его отправил
+    window.__pendingOrder = { items, total };
+  });
+
+  // функция очищения корзины (остаётся внутри OrderView)
   function resetCounts(){
     window.__orderCounts = {};
     catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
     totalEl.textContent  = money(0);
     confirmBtn.disabled  = true;
   }
+
+  window.__resetOrderCounts = resetCounts;
 
     // даём доступ снаружи (payModal)
   window.__resetOrderCounts = resetCounts;
@@ -1915,35 +1772,17 @@ function OrderView(){
   return root;
 }
 
-// ===== Привязка кнопок в модалке оплаты =====
-function bindPayModal(){
-  const modal      = document.getElementById('payModal');
-  const payOk      = document.getElementById('payOk');
-  const payCancel  = document.getElementById('payCancel');
-  const qrSection  = document.getElementById('qrSection');
-  const qrImage    = document.getElementById('qrImage');
-  const qrProgress = document.getElementById('qrProgress');
-  const qrDone     = document.getElementById('qrDone');
 
-  if (!modal || modal._bound) return;   // чтобы не привязать дважды
+  // ===== Привязка модалки оплаты (без QR) =====
+function bindPayModal(){
+  const modal     = document.getElementById('payModal');
+  const payOk     = document.getElementById('payOk');
+  const payCancel = document.getElementById('payCancel');
+
+  if (!modal || modal._bound) return;
   modal._bound = true;
 
-  const QR_TIMEOUT = 30000; // 30 секунд
-  let qrTimer = null;
-
-  function closePayModal(){
-    modal.classList.remove('open');
-    setBodyScrollLock(false);
-
-    if (qrSection)  qrSection.classList.add('hidden');
-    if (qrImage)    qrImage.src = '';
-    if (qrProgress) qrProgress.style.width = '100%';
-
-    if (qrTimer){
-      clearInterval(qrTimer);
-      qrTimer = null;
-    }
-
+  function releaseConfirmBtn(){
     const btn = document.getElementById('confirmBtn');
     if (btn){
       btn._busy   = false;
@@ -1951,7 +1790,13 @@ function bindPayModal(){
     }
   }
 
-  // Кнопка "изменить" — просто закрываем модалку, корзина остаётся как есть
+  function closePayModal(){
+    modal.classList.remove('open');
+    setBodyScrollLock(false);
+    releaseConfirmBtn();
+  }
+
+  // кнопка "изменить"
   if (payCancel){
     payCancel.addEventListener('click', (e)=>{
       e.preventDefault();
@@ -1959,115 +1804,98 @@ function bindPayModal(){
     });
   }
 
-  // Кнопка "Закрыть" под QR
-  if (qrDone){
-    qrDone.addEventListener('click', (e)=>{
+  // клик по фону модалки
+  modal.addEventListener('click', (e)=>{
+    if (e.target === modal){
       e.preventDefault();
       closePayModal();
+    }
+  }, { passive:false });
 
-      // показываем "спасибо" и планируем промо-ролик
-      if (typeof openThanksModal === 'function')  openThanksModal();
-      if (typeof schedulePromoAfterOrder === 'function') schedulePromoAfterOrder();
-    });
-  }
-
-  // Основная кнопка "Оплатить"
+  // кнопка "Ок" — отправка заказа на сервер
   if (payOk){
     payOk.addEventListener('click', async (e)=>{
       e.preventDefault();
 
-      const cfgNow = loadConfig();
-      const counts = window.__orderCounts || {};
-      const items  = [];
-
-      cfgNow.menu.forEach(cat =>
-        cat.items.forEach(it => {
-          const q = counts[it.name] || 0;
-          if (q > 0){
-            items.push({
-              name: it.name,
-              qty:  q,
-              price: it.price || 0
-            });
-          }
-        })
-      );
-
-      if (!items.length){
-        showToast('Корзина пуста');
+      const pending = window.__pendingOrder;
+      if (!pending || !Array.isArray(pending.items) || !pending.items.length){
         closePayModal();
         return;
       }
 
-      let total = 0;
-      items.forEach(i => { total += i.qty * (i.price || 0); });
+      const items = pending.items;
+      const total = pending.total || 0;
 
-      // берём текущий столик (tableId), если функция есть
       let tableId = null;
       try{
         if (typeof getCurrentTableId === 'function'){
           tableId = getCurrentTableId();
         }
-      }catch(e){ console.warn('getCurrentTableId error', e); }
+      }catch(e2){
+        console.warn('getCurrentTableId error', e2);
+      }
 
-      // создаём заказ через локальный RPC
+      let order;
       try{
-        await rpc({
-          op:'create',
-          data:{
+        const res = await rpc({
+          op: 'create',
+          data: {
             items,
             total,
-            pay: 'qr',
+            pay: 'qr',              // можешь поменять на 'card' или 'cash'
             tableId,
             clientId: getClientId()
           }
         });
-      }catch(err){
+
+        order = res && res.order
+          ? res.order
+          : {
+              id: Date.now().toString().slice(-6),
+              createdAt: Date.now(),
+              items,
+              total,
+              pay: 'qr',
+              status: 'готовится',
+              tableId,
+              clientId: getClientId()
+            };
+      } catch (err){
         console.warn('create order error', err);
-        showToast('Не удалось сохранить заказ, попробуйте ещё раз');
+        showToast('Не удалось отправить заказ, попробуйте ещё раз');
+        releaseConfirmBtn();
         return;
       }
 
-      // очищаем корзину (снаружи OrderView)
+      // пишем в локальную историю клиента
+      try{
+        const hist = loadHistory();
+        hist.unshift(order);
+        saveHistory(hist.slice(0, 500));
+      }catch(e3){
+        console.warn('saveHistory error', e3);
+      }
+
+      // обновляем кеш заказов с сервера (дашборд и табло увидят через cloud:orders)
+      try{
+        await listOrdersOnce();
+      }catch(e4){
+        console.warn('listOrdersOnce error', e4);
+      }
+
+      // очищаем корзину (OrderView дал нам функцию)
       if (typeof window.__resetOrderCounts === 'function'){
-        window.__resetOrderCounts();
+        try{ window.__resetOrderCounts(); }catch{}
       }
 
-      // показываем QR
-      const cfgAfter = loadConfig();
-      if (qrImage){
-        const url = (cfgAfter.qrUrl || '').trim();
-        if (!url){
-          showToast('QR для оплаты не настроен в конструкторе');
-        }
-        qrImage.src = url || '';
-      }
-      if (qrSection) qrSection.classList.remove('hidden');
-
-      // запускаем прогресс-бар на 30 секунд
-      if (qrProgress){
-        let start = Date.now();
-        qrProgress.style.width = '100%';
-
-        if (qrTimer) clearInterval(qrTimer);
-        qrTimer = setInterval(()=>{
-          const elapsed = Date.now() - start;
-          const rest    = Math.max(0, QR_TIMEOUT - elapsed);
-          const percent = 100 * rest / QR_TIMEOUT;
-          qrProgress.style.width = percent + '%';
-
-          if (rest <= 0){
-            clearInterval(qrTimer);
-            qrTimer = null;
-            closePayModal();
-
-            if (typeof openThanksModal === 'function')  openThanksModal();
-            if (typeof schedulePromoAfterOrder === 'function') schedulePromoAfterOrder();
-          }
-        }, 200);
+      // закрываем модалку + "спасибо"
+      closePayModal();
+      if (typeof openThanksModal === 'function'){
+        openThanksModal();
       }
     });
   }
+}
 
   // Закрытие по клику на подложку вокруг модалки
   modal.addEventListener('click', (e)=>{
