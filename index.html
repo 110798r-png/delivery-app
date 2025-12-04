@@ -896,7 +896,9 @@ async function rpc(payload) {
     const total = Number(data.total || 0);
     const pay   = data.pay || 'card';
 
-    const order = {
+      const tableId = data.tableId || getCurrentTableId() || null;
+
+     const order = {
       id: Date.now().toString().slice(-6),   // короткий номер
       createdAt: Date.now(),
       items,
@@ -905,6 +907,8 @@ async function rpc(payload) {
       status: 'готовится',
       etaMinutes: null,
       etaUntil: null,
+      // новый столик
+      tableId: data.tableId || null,
       clientId: data.clientId || getClientId()
     };
 
@@ -1001,6 +1005,33 @@ const WANT_DASH          = 'WANT_DASH';
 const WANT_TERM          = 'WANT_TERM';
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
+
+    const TABLE_ID_KEY       = 'current_table_v1';
+
+function readTableIdFromUrl(){
+  const search = window.location.search || '';
+  // Ищем ?table=... или &table=...
+  const m = search.match(/[?&](table|t)=([^&]+)/i);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[2]);
+  } catch {
+    return m[2];
+  }
+}
+
+function getCurrentTableId(){
+  // 1) если есть в URL — считаем главным
+  const fromUrl = readTableIdFromUrl();
+  if (fromUrl){
+    localStorage.setItem(TABLE_ID_KEY, fromUrl);
+    return fromUrl;
+  }
+
+  // 2) иначе берём из localStorage (на случай обновления страницы)
+  const saved = localStorage.getItem(TABLE_ID_KEY);
+  return saved || null;
+}
 
     const ACCOUNTING_LAST_EXPORT_KEY = 'accounting_last_export_ts_v1';
 
@@ -1774,12 +1805,8 @@ function OrderView(){
     confirmBtn.disabled  = true;
   }
 
-    function resetCounts(){
-    window.__orderCounts = {};
-    catPager.querySelectorAll('[data-q]').forEach(n => n.textContent = '0');
-    totalEl.textContent  = money(0);
-    confirmBtn.disabled  = true;
-  }
+    // даём доступ снаружи (payModal)
+  window.__resetOrderCounts = resetCounts;
 
   // ================== биндим payModal ==================
   (function bindPayModal(){
@@ -2007,6 +2034,170 @@ function OrderView(){
   return root;
 }
 
+// ===== Привязка кнопок в модалке оплаты =====
+function bindPayModal(){
+  const modal      = document.getElementById('payModal');
+  const payOk      = document.getElementById('payOk');
+  const payCancel  = document.getElementById('payCancel');
+  const qrSection  = document.getElementById('qrSection');
+  const qrImage    = document.getElementById('qrImage');
+  const qrProgress = document.getElementById('qrProgress');
+  const qrDone     = document.getElementById('qrDone');
+
+  if (!modal || modal._bound) return;   // чтобы не привязать дважды
+  modal._bound = true;
+
+  const QR_TIMEOUT = 30000; // 30 секунд
+  let qrTimer = null;
+
+  function closePayModal(){
+    modal.classList.remove('open');
+    setBodyScrollLock(false);
+
+    if (qrSection)  qrSection.classList.add('hidden');
+    if (qrImage)    qrImage.src = '';
+    if (qrProgress) qrProgress.style.width = '100%';
+
+    if (qrTimer){
+      clearInterval(qrTimer);
+      qrTimer = null;
+    }
+
+    const btn = document.getElementById('confirmBtn');
+    if (btn){
+      btn._busy   = false;
+      btn.disabled = false;
+    }
+  }
+
+  // Кнопка "изменить" — просто закрываем модалку, корзина остаётся как есть
+  if (payCancel){
+    payCancel.addEventListener('click', (e)=>{
+      e.preventDefault();
+      closePayModal();
+    });
+  }
+
+  // Кнопка "Закрыть" под QR
+  if (qrDone){
+    qrDone.addEventListener('click', (e)=>{
+      e.preventDefault();
+      closePayModal();
+
+      // показываем "спасибо" и планируем промо-ролик
+      if (typeof openThanksModal === 'function')  openThanksModal();
+      if (typeof schedulePromoAfterOrder === 'function') schedulePromoAfterOrder();
+    });
+  }
+
+  // Основная кнопка "Оплатить"
+  if (payOk){
+    payOk.addEventListener('click', async (e)=>{
+      e.preventDefault();
+
+      const cfgNow = loadConfig();
+      const counts = window.__orderCounts || {};
+      const items  = [];
+
+      cfgNow.menu.forEach(cat =>
+        cat.items.forEach(it => {
+          const q = counts[it.name] || 0;
+          if (q > 0){
+            items.push({
+              name: it.name,
+              qty:  q,
+              price: it.price || 0
+            });
+          }
+        })
+      );
+
+      if (!items.length){
+        showToast('Корзина пуста');
+        closePayModal();
+        return;
+      }
+
+      let total = 0;
+      items.forEach(i => { total += i.qty * (i.price || 0); });
+
+      // берём текущий столик (tableId), если функция есть
+      let tableId = null;
+      try{
+        if (typeof getCurrentTableId === 'function'){
+          tableId = getCurrentTableId();
+        }
+      }catch(e){ console.warn('getCurrentTableId error', e); }
+
+      // создаём заказ через локальный RPC
+      try{
+        await rpc({
+          op:'create',
+          data:{
+            items,
+            total,
+            pay: 'qr',
+            tableId,
+            clientId: getClientId()
+          }
+        });
+      }catch(err){
+        console.warn('create order error', err);
+        showToast('Не удалось сохранить заказ, попробуйте ещё раз');
+        return;
+      }
+
+      // очищаем корзину (снаружи OrderView)
+      if (typeof window.__resetOrderCounts === 'function'){
+        window.__resetOrderCounts();
+      }
+
+      // показываем QR
+      const cfgAfter = loadConfig();
+      if (qrImage){
+        const url = (cfgAfter.qrUrl || '').trim();
+        if (!url){
+          showToast('QR для оплаты не настроен в конструкторе');
+        }
+        qrImage.src = url || '';
+      }
+      if (qrSection) qrSection.classList.remove('hidden');
+
+      // запускаем прогресс-бар на 30 секунд
+      if (qrProgress){
+        let start = Date.now();
+        qrProgress.style.width = '100%';
+
+        if (qrTimer) clearInterval(qrTimer);
+        qrTimer = setInterval(()=>{
+          const elapsed = Date.now() - start;
+          const rest    = Math.max(0, QR_TIMEOUT - elapsed);
+          const percent = 100 * rest / QR_TIMEOUT;
+          qrProgress.style.width = percent + '%';
+
+          if (rest <= 0){
+            clearInterval(qrTimer);
+            qrTimer = null;
+            closePayModal();
+
+            if (typeof openThanksModal === 'function')  openThanksModal();
+            if (typeof schedulePromoAfterOrder === 'function') schedulePromoAfterOrder();
+          }
+        }, 200);
+      }
+    });
+  }
+
+  // Закрытие по клику на подложку вокруг модалки
+  modal.addEventListener('click', (e)=>{
+    if (e.target === modal){
+      e.preventDefault();
+      e.stopPropagation();
+      closePayModal();
+    }
+  }, { passive:false });
+}
+    
 /* ===== Dashboard ===== */
 function DashboardView(){
   const root = el(`
@@ -2126,12 +2317,21 @@ builderModal.onclick = (e) => {
          </div>`
       : '';
 
-        const card = el(`
-      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
-        <div class="flex items-center justify-between">
-          <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-          <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
-        </div>
+ const tableLabel = o.tableId ? `Стол: ${o.tableId}` : '';
+
+const card = el(`
+  <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3" data-id="${o.id}">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-3xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+        ${tableLabel ? `<div class="text-sm text-gray-600 mt-1">${tableLabel}</div>` : ''}
+      </div>
+      <span class="px-3 py-1 rounded-full text-sm font-semibold border bg-white/70">${o.status || 'готовится'}</span>
+    </div>
+    ...
+  </div>
+`);
+
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
         ${etaBlock}
         <div class="mt-2 grid gap-1">${itemsHtml || '—'}</div>
@@ -2403,15 +2603,17 @@ function TerminalView(){
   }
 
   function orderCard(o){
-    return el(`
-      <div class="p-5 rounded-2xl border bg-white shadow-sm
-                  flex items-center justify-center min-h-[150px]">
-        <div class="text-6xl font-extrabold tracking-tight">
-          #${o.id || '—'}
-        </div>
+  const tableLine = o.tableId ? `<div class="text-xl mt-2">Стол: ${o.tableId}</div>` : '';
+  return el(`
+    <div class="p-5 rounded-2xl border bg-white shadow-sm
+                flex flex-col items-center justify-center min-h-[150px]">
+      <div class="text-6xl font-extrabold tracking-tight">
+        #${o.id || '—'}
       </div>
-    `);
-  }
+      ${tableLine}
+    </div>
+  `);
+}
 
   function render(){
     colCook.innerHTML = '';
@@ -3205,7 +3407,8 @@ try{ router(); }catch(e){ console.error(e); }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('profileBtn')?.classList.add('hidden');
-  bindHeaderDots();
+    bindHeaderDots();
+  bindPayModal();
 
   const backBtn=document.getElementById('backBtn');
   const goOrder=(e)=>{
