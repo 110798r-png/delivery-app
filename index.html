@@ -88,7 +88,7 @@ button:focus, a:focus {
           </div>
         </div>
         <!-- Профиль со стрелочкой -->
-        <a id="profileBtn" href="#/profile"
+        <a id="profileBtn" href="javascript:void(0)"
            class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
            aria-label="Профиль" role="button" title="Профиль">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -110,22 +110,23 @@ button:focus, a:focus {
     <main id="app" class="phone-shell"></main>
   </div>
 
-  <!-- Оплата -->
+    <!-- Спасибо за заказ -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
-      <h3 class="text-lg font-semibold">Подтверждение заказа</h3>
+      <h3 class="text-lg font-semibold">Спасибо за заказ!</h3>
+      <p class="text-sm text-gray-500">
+        Ниже краткое резюме заказа. Сообщите номер заказа сотруднику.
+      </p>
       <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
-      <div class="grid gap-1">
-        <label class="text-sm text-gray-600" for="paySelect">Способ оплаты</label>
-        <select id="paySelect" class="border rounded-xl p-3 w-full">
-          <option value="cash">Наличные</option>
-          <option value="card">Банковская карта</option>
-          <option value="transfer">Перевод</option>
-        </select>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">изменить</button>
-        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">ОК</button>
+
+      <!-- скрытый селект только для логики -->
+      <select id="paySelect" class="hidden">
+        <option value="cash" selected>Наличные</option>
+      </select>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button id="payCancel" type="button" class="px-3 py-2 rounded-xl border">Изменить</button>
+        <button id="payOk" type="button" class="px-3 py-2 rounded-xl bg-black text-white">Готово</button>
       </div>
     </div>
   </div>
@@ -921,9 +922,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
        </div>`
     );
 
-    const prof = loadProfile();
     const sel  = document.getElementById('paySelect');
-    sel.value  = prof.paymentMethod || 'cash';
+    sel.value  = 'cash';
     document.getElementById('payModal').classList.add('open');
   });
 
@@ -1008,10 +1008,6 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
         dash.unshift(order);
         saveDash(dash.slice(0, 200));
 
-        const p = loadProfile();
-        p.paymentMethod = sel.value || 'cash';
-        saveProfile(p);
-
       } catch (err) {
         console.warn('RPC create error', err);
         showToast('Не удалось отправить заказ, попробуйте ещё раз.');
@@ -1093,98 +1089,6 @@ if (Array.isArray(remote)){
   return root;
 }
 
-
-/* ===== Профиль / Хаб ===== */
-function ProfileHubView(){
-  const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
-  const root=el(`
-    <div class="grid gap-4 pb-28">
-      <section class="grid grid-cols-2 gap-3">
-        <button class="card card-tall p-4 text-left" id="profileEditBtn">
-          <div class="flex items-start justify-between">
-            <div class="min-w-0">
-              <div class="text-base font-semibold truncate">${p.name || 'Имя Фамилия'}</div>
-              <div class="text-xs text-gray-600 mt-2 truncate">${p.phone || '+7 ___ ___-__-__'}</div>
-            </div>
-            <svg width="22" height="22" viewBox="0 0 24 24" class="text-red-500"><circle cx="12" cy="12" r="10" fill="currentColor" opacity=".1"/></svg>
-          </div>
-        </button>
-        <button class="card card-tall p-4 text-left flex items-center justify-between" id="ordersBtn">
-          <div class="text-base font-semibold">Мои заказы</div>
-          <div class="flex items-center gap-3">
-            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M7 4h10l1 4H6l1-4Zm-1 6h12l-1.2 8.4A3 3 0 0 1 13.84 21h-3.68A3 3 0 0 1 7.2 18.4L6 10Z" fill="#ff6f00"/></svg>
-            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-        </button>
-      </section>
-
-      <!-- Лайв-камера -->
-      <section class="card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold">Лайв-камера</h3>
-          <button id="camRefresh" class="px-3 py-2 rounded-xl border">Обновить</button>
-        </div>
-        <img id="camImg" class="rounded-xl border" src="https://placehold.co/800x450?text=Live+camera" alt="Лайв-камера">
-      </section>
-
-      <!-- Юридическая информация -->
-      <section class="card p-5 grid gap-2">
-        <h3 class="font-semibold">Юридическая информация</h3>
-        <div class="text-sm text-gray-700">ООО «ЯмаМото» • ОГРН 1234567890123</div>
-        <div class="text-sm text-gray-700">Адрес: г. Махачкала, ул. Примерная, 1</div>
-        <div class="text-sm text-gray-700">Режим работы: 10:00–23:00 ежедневно</div>
-      </section>
-
-      <!-- Отзывы -->
-      <section class="grid gap-2">
-        <button class="rowlink text-left flex items-center justify-between" id="reviewsBtn">
-          Отзывы
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button class="rowlink text-left flex items-center justify-between" id="supportBtn">
-          Техподдержка
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button class="rowlink text-left flex items-center justify-between" id="feedbackBtn">
-          Обратная связь
-          <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </section>
-
-      <section id="tabloTapZone">
-        <div id="tabloTapHot" aria-label="tablo-tap-hot"></div>
-      </section>
-    </div>
-  `);
-
-  root.querySelector('#profileEditBtn').onclick = ()=> location.hash = '#/profile-edit';
-  root.querySelector('#ordersBtn').onclick      = ()=> location.hash = '#/history';
-  root.querySelector('#feedbackBtn').onclick    = ()=> location.hash = '#/contact';
-  root.querySelector('#reviewsBtn').onclick     = ()=> alert('Здесь будет экран с отзывами');
-  root.querySelector('#supportBtn').onclick     = ()=> alert('Здесь будет чат/контакты техподдержки');
-  const camImg = root.querySelector('#camImg');
-  root.querySelector('#camRefresh').onclick     = ()=> { const u=new URL(camImg.src); u.searchParams.set('t', Date.now()); camImg.src=u.toString(); };
-  return root;
-}
-  function ContactView(){
-  const p = Object.assign({ phone:'' }, loadProfile());
-  const root = el(`
-    <div class="grid gap-4 pb-24">
-      <div class="flex items-center gap-3">
-        <button id="backOnly" class="px-3 py-2 rounded-xl border bg-white" aria-label="Назад">←</button>
-        <div class="text-lg font-semibold">Обратная связь</div>
-      </div>
-      <section class="card p-4 text-sm grid gap-2">
-        <div>Почта: <a class="underline" href="mailto:sabirbis@bk.ru">sabirbis@bk.ru</a></div>
-        <div>Тел.: <a class="underline" href="tel:+79899932108">+7 989 993-21-08</a></div>
-        ${ p.phone ? `<div class="text-xs text-gray-500">Ваш телефон в профиле: ${p.phone}</div>` : '' }
-      </section>
-    </div>
-  `);
-  root.querySelector('#backOnly').onclick = ()=> history.length ? history.back() : (location.hash='#/profile');
-  return root;
-}
-
 /* ===== Контакты ===== */
 function ProfileEditView(){ 
   const p=Object.assign({ name:'', phone:'', address:'', paymentMethod:'cash' }, loadProfile());
@@ -1197,12 +1101,6 @@ function ProfileEditView(){
           <input id="pPhone" class="border rounded-xl p-3" placeholder="Телефон (+7…)" value="${p.phone||''}">
           <input id="pAddr" class="border rounded-xl p-3" placeholder="Адрес доставки" value="${p.address||''}">
           <div id="pError" class="text-xs text-red-600"></div>
-          <div class="text-sm font-medium mt-2">Способ оплаты по умолчанию</div>
-          <select id="paydef" class="border rounded-xl p-3">
-            <option value="cash">Наличные</option>
-            <option value="card">Банковская карта</option>
-            <option value="transfer">Перевод</option>
-          </select>
           <div class="flex gap-2">
             <button id="pSave" class="px-4 py-3 rounded-xl bg-black text-white flex-1">Сохранить</button>
             <button id="pBack" class="px-4 py-3 rounded-xl border flex-1">Назад</button>
@@ -1220,7 +1118,7 @@ function ProfileEditView(){
       name: root.querySelector('#pName').value.trim(),
       phone: root.querySelector('#pPhone').value.trim(),
       address: root.querySelector('#pAddr').value.trim(),
-      paymentMethod: root.querySelector('#paydef').value
+      paymentMethod: 'cash'
     };
     saveProfile(p2);
 
@@ -1236,12 +1134,12 @@ function ProfileEditView(){
       errEl.textContent = 'Заполните профиль полностью (имя, телефон и адрес).';
     } else {
       errEl.textContent = '';
-      showToast('Профиль сохранён');
-      location.hash = '#/profile';
+            showToast('Профиль сохранён');
+      location.hash = '#/order';
     }
   };
 
-  root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/profile');
+  root.querySelector('#pBack').onclick=()=> history.length ? history.back() : (location.hash='#/order');
   return root;
 }
 
@@ -1341,7 +1239,7 @@ function HistoryView(){
   };
 
   root.querySelector('#back').onclick = () =>
-    history.length ? history.back() : (location.hash = '#/profile');
+    history.length ? history.back() : (location.hash = '#/order');
 
     // при открытии экрана сразу подтягиваем актуальные статусы/ETA
   pullAndMergeStatuses().then(render).catch(() => render());
@@ -1389,7 +1287,7 @@ const root = el(`
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
 
     <div>
-      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/profile'">Назад</button>
+      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
     </div>
   </div>
 `);
@@ -1809,7 +1707,7 @@ function BuilderView(){
 
 /* ===== 4-тап зона ===== */
 function bindTabloTapZone(){
-  const hot = document.getElementById('tabloTapHot');
+  const hot = document.getElementById('profileBtn');
   if (!hot || hot._bound) return; hot._bound = true;
   let taps = 0, first = 0, timer = null;
   const windowMs = 1200;
@@ -1831,19 +1729,17 @@ function bindTabloTapZone(){
 /* ===== Router ===== */
 function mount(view){ const app=document.getElementById('app'); if(app.firstChild && typeof app.firstChild.cleanup==='function'){ try{ app.firstChild.cleanup(); }catch{} } app.innerHTML=''; app.classList.add('phone-shell'); app.appendChild(view); }
 function realRouter(){
-  const h=location.hash.split('?')[0];
-  if(h==='#/profile'){ mount(ProfileHubView()); bindTabloTapZone(); }
-  else if(h==='#/profile-edit') mount(ProfileEditView());
-  else if(h==='#/history') mount(HistoryView());
-  else if(h==='#/contact') mount(ContactView());
-  else if(h==='#/dashboard') mount(DashboardView());
-  else if(h==='#/builder') mount(BuilderView());
+  const h = location.hash.split('?')[0];
+  if (h === '#/profile-edit') mount(ProfileEditView());
+  else if (h === '#/history') mount(HistoryView());
+  else if (h === '#/dashboard') mount(DashboardView());
+  else if (h === '#/builder') mount(BuilderView());
   else mount(OrderView());
 }
 function router(){
   const h=location.hash.split('?')[0];
   const profileBtn=document.getElementById('profileBtn'); const backBtn=document.getElementById('backBtn');
-  const showBack=(h==='#/profile'||h==='#/history'||h==='#/profile-edit'||h==='#/contact'||h==='#/builder');
+  const showBack = (h === '#/history' || h === '#/profile-edit' || h === '#/builder');
   if(showBack){ profileBtn.classList.add('hidden'); backBtn.classList.remove('hidden'); } else { backBtn.classList.add('hidden'); profileBtn.classList.remove('hidden'); }
 
   if(h==='#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK)!=='1'){
@@ -1852,18 +1748,9 @@ function router(){
     const app=document.getElementById('app'); if(app) app.innerHTML='';
     return;
   }
-  if(h==='#/profile'){ document.getElementById('payModal')?.classList.remove('open'); }
-  realRouter();
-}
 window.addEventListener('hashchange', ()=>{ try{ router(); }catch(e){ console.error(e); }});
 try{ router(); }catch(e){ console.error(e); }
   
-/* Header + PIN */
-document.addEventListener('DOMContentLoaded', async ()=>{
-  const profileBtn=document.getElementById('profileBtn');
-  const goProfile=(e)=>{ if(e){ e.preventDefault(); e.stopPropagation(); } location.hash='#/profile'; };
-  ['click','pointerup','touchend'].forEach(ev=> profileBtn.addEventListener(ev, goProfile, {passive:false}));
-
   const backBtn=document.getElementById('backBtn');
  const goOrder = (e) => {
   if (e) {
@@ -1892,7 +1779,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       else { router(); }
     } else { showToast('Введите ключ'); }
   };
-  pinCancel.onclick=()=>{ pinM.classList.remove('open'); sessionStorage.removeItem(WANT_DASH); location.hash='#/profile'; };
+  pinCancel.onclick=()=>{ pinM.classList.remove('open'); sessionStorage.removeItem(WANT_DASH); location.hash='#/order'; };
   pinM.onclick=(e)=>{ if(e.target===pinM) pinCancel.onclick(); };
  // --- Регистрация service worker ---
   if ('serviceWorker' in navigator) {
