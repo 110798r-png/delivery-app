@@ -84,8 +84,8 @@ button:focus, a:focus {
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
-         <div class="sushi-icon" aria-hidden="true">
-  <img id="brandLogo" src="" alt="Логотип" class="w-8 h-8 rounded-full object-contain">
+        <div class="sushi-icon" aria-hidden="true">
+  <img id="brandIcon" src="" alt="" style="width:24px;height:24px;object-fit:contain;">
 </div>
           <div class="leading-tight">
             <div class="brand-title" id="brandTitle">ЯмаMoto</div>
@@ -196,6 +196,7 @@ if (typeof window.CSS.escape !== 'function') {
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
+const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
 // === PUSH / VAPID ===
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
@@ -262,11 +263,13 @@ async function rpc(payload){
   return res.json();
 }
 
-
 /* ===== маршрутизация по умолчанию ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  // читаем номер столика из URL (?table=1)
-  initTableIdFromUrl();
+document.addEventListener('DOMContentLoaded', async () => {
+  // подставляем иконку
+  const iconEl = document.getElementById('brandIcon');
+  if (iconEl && BRAND_ICON_URL) {
+    iconEl.src = BRAND_ICON_URL;
+  }
 
   if (!location.hash || location.hash==='#' || location.hash==='#/') {
     location.hash = '#/order';
