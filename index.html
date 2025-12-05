@@ -80,13 +80,9 @@ button:focus, a:focus {
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
-          <div class="sushi-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" fill="#fff"/>
-              <circle cx="12" cy="12" r="7" fill="#e50000"/>
-              <circle cx="12" cy="12" r="4" fill="#000"/>
-            </svg>
-          </div>
+         <div class="sushi-icon" aria-hidden="true">
+  <img id="brandLogo" src="" alt="Логотип" class="w-8 h-8 rounded-full object-contain">
+</div>
           <div class="leading-tight">
             <div class="brand-title" id="brandTitle">ЯмаMoto</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
@@ -264,8 +260,13 @@ async function rpc(payload){
 
 
 /* ===== маршрутизация по умолчанию ===== */
-document.addEventListener('DOMContentLoaded', async () => {
-  if (!location.hash || location.hash==='#' || location.hash==='#/') location.hash='#/order';
+document.addEventListener('DOMContentLoaded', () => {
+  // читаем номер столика из URL (?table=1)
+  initTableIdFromUrl();
+
+  if (!location.hash || location.hash==='#' || location.hash==='#/') {
+    location.hash = '#/order';
+  }
 });
 
 /* ===== ключи хранилищ ===== */
@@ -279,6 +280,8 @@ const WANT_DASH          = 'WANT_DASH';
 const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
 const NAV_HINT_KEY       = 'nav_hint_shown_v1';
+const TABLE_ID_KEY       = 'table_id_v1';
+
 
 
 /* ===== утилиты ===== */
@@ -324,6 +327,26 @@ function getClientId(){
   return id;
 }
 
+  function initTableIdFromUrl() {
+  try {
+    const sp = new URLSearchParams(location.search);
+    // подхватываем ?table=1 или ?t=1
+    const raw = sp.get('table') || sp.get('t');
+    if (!raw) return;
+
+    const cleaned = String(raw).trim();
+    if (!cleaned) return;
+
+    sessionStorage.setItem(TABLE_ID_KEY, cleaned);
+  } catch (e) {
+    console.warn('initTableIdFromUrl error', e);
+  }
+}
+
+function getTableId() {
+  return sessionStorage.getItem(TABLE_ID_KEY) || '';
+}
+  
 function isProfileFilled(){
   const p = loadProfile();
   if (!p) return false;
@@ -336,6 +359,8 @@ function isProfileFilled(){
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: 'ЯмаMoto',
+  // сюда подставишь свой URL иконки стакана
+  logoUrl: 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png',
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
   menu: [
     { key:'burgers', title:'Бургеры', items:[
@@ -368,8 +393,21 @@ function applyTheme(theme){
   r.style.setProperty('--img-w',        (theme.imgW||110)+'px');
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
-  document.getElementById('brandTitle').textContent = (loadConfig().brandTitle || 'ЯмаMoto');
+
+  const cfg = loadConfig();
+  document.getElementById('brandTitle').textContent = (cfg.brandTitle || 'ЯмаMoto');
+
+  const logoEl = document.getElementById('brandLogo');
+  if (logoEl) {
+    if (cfg.logoUrl) {
+      logoEl.src = cfg.logoUrl;
+      logoEl.classList.remove('hidden');
+    } else {
+      logoEl.classList.add('hidden');
+    }
+  }
 }
+
 function calcConfigVersion(cfg) {
   try {
     return JSON.stringify((cfg && cfg.menu) || []).length;
@@ -920,6 +958,16 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
       `;
     }).join('');
 
+        const tableId = getTableId();
+    if (tableId) {
+      sumBox.insertAdjacentHTML(
+        'afterbegin',
+        `<div class="mb-2 text-sm text-gray-700">
+           Столик: <b>№${tableId}</b>
+         </div>`
+      );
+    }
+    
     sumBox.insertAdjacentHTML(
       'beforeend',
       `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
@@ -985,6 +1033,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
         return;
       }
 
+           const tableId = getTableId();
+
       try {
         const res = await rpc({
           op: 'create',
@@ -992,7 +1042,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
             clientId: getClientId(),
             items: itemsSel,
             total,
-            pay: sel.value || 'cash'
+            pay: sel.value || 'cash',
+            table: tableId || null
           }
         });
 
@@ -1002,7 +1053,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
           items: itemsSel,
           total,
           pay: sel.value || 'cash',
-          status: 'новый'
+          status: 'новый',
+          table: tableId || null
         };
 
         const history = loadHistory();
@@ -1187,10 +1239,12 @@ function HistoryView(){
           <div class="text-2xl font-extrabold">№ ${o.id || '—'}</div>
           <span class="chip ${chipClass}">${o.status || 'новый'}</span>
         </div>
-        <div class="text-xs text-gray-500 mt-1">
+          <div class="text-xs text-gray-500 mt-1">
           ${o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}
         </div>
+        ${o.table ? `<div class="text-sm text-gray-700 mt-1">Столик: №${o.table}</div>` : ''}
         ${etaText}
+
         <div class="mt-3 grid gap-2">
           ${
             items.map(i => `
@@ -1416,10 +1470,13 @@ if (!list || !stockList) {
          </div>`
       : '';
 
-    const card = el(`
+       const card = el(`
       <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
         <div class="flex items-center justify-between">
-          <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          <div>
+            <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+            ${o.table ? `<div class="text-sm text-gray-700 mt-1">Столик: №${o.table}</div>` : ''}
+          </div>
           <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'новый'}</span>
         </div>
         <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
