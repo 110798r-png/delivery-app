@@ -1954,19 +1954,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === pinM) pinCancel.onclick();
   };
 
-   // --- Service worker ---
-  // Временно отключаем service worker, чтобы не кэшировать старые версии.
-  // Когда всё стабилизируем, можно включить обратно.
-  /*
+    // --- Service worker: одноразовое обновление и самоудаление ---
   if ('serviceWorker' in navigator) {
     try {
       await navigator.serviceWorker.register('/sw.js');
-      console.log('Service worker registered');
+      console.log('Service worker registered (cleanup mode)');
     } catch (e) {
       console.warn('SW registration failed', e);
     }
   }
-  */
 
   // --- WebPush ---
   if ('Notification' in window) {
