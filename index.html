@@ -992,12 +992,6 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
 
     if (!items.length) return;
 
-    if (!isProfileFilled()){
-      showToast('Заполните данные для доставки в профиле.');
-      location.hash = '#/profile-edit';
-      return;
-    }
-
     if (confirmBtn._busy) return;
     confirmBtn._busy   = true;
     confirmBtn.disabled = true;
