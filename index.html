@@ -318,6 +318,19 @@ const CLIENT_ID_KEY      = 'client_id_v1';
 const NAV_HINT_KEY       = 'nav_hint_shown_v1';
 const TABLE_ID_KEY       = 'table_id_v1';
 
+  // ===== МИГРАЦИЯ ХРАНИЛИЩА =====
+// один раз полностью очищаем старые данные,
+// чтобы не мешала старая логика прошлых версий
+(function clearLegacyStorage(){
+  const VERSION_KEY = 'app_storage_version';
+  const CURRENT_VERSION = '2'; // если опять всё менять — просто увеличишь число
+
+  const stored = localStorage.getItem(VERSION_KEY);
+  if (stored !== CURRENT_VERSION) {
+    localStorage.clear();
+    localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+  }
+})();
 
 
 /* ===== утилиты ===== */
