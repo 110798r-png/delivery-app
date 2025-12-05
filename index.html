@@ -1954,7 +1954,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === pinM) pinCancel.onclick();
   };
 
-  // --- Service worker ---
+   // --- Service worker ---
+  // Временно отключаем service worker, чтобы не кэшировать старые версии.
+  // Когда всё стабилизируем, можно включить обратно.
+  /*
   if ('serviceWorker' in navigator) {
     try {
       await navigator.serviceWorker.register('/sw.js');
@@ -1963,6 +1966,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('SW registration failed', e);
     }
   }
+  */
 
   // --- WebPush ---
   if ('Notification' in window) {
