@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Mokka Room — локальный стенд</title>
+  <title>Street Food — локальный стенд</title>
   
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#e50000">
@@ -11,7 +11,7 @@
   <!-- PWA / iOS full-screen -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Mokka Room">
+<meta name="apple-mobile-web-app-title" content="Street Food">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
@@ -57,7 +57,7 @@
     .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
 
     /* --- Красная шапка --- */
-    .brand-strip{ background:#e50000; color:#fff; }
+    .brand-strip{ background:#D5B895; color:#fff; }
     .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
     .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
     .brand-wrap{ display:flex; align-items:center; gap:10px; }
@@ -120,7 +120,7 @@ button[data-act="inc"]{
   <img id="brandIcon" src="" alt="">
 </div>
           <div class="leading-tight">
-            <div class="brand-title" id="brandTitle">Mokka Room</div>
+            <div class="brand-title" id="brandTitle">Street Food</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
@@ -225,7 +225,7 @@ if (typeof window.CSS.escape !== 'function') {
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
-const BRAND_TITLE = 'Mokka Room';  // изменишь тут — поменяется в шапке и во вкладке
+const BRAND_TITLE = 'Street Food';  // изменишь тут — поменяется в шапке и во вкладке
 // === PUSH / VAPID ===
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
