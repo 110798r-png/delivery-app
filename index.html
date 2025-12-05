@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>ЯмаMoto — локальный стенд</title>
+  <title>Mokka Room — локальный стенд</title>
   
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#e50000">
@@ -88,7 +88,7 @@ button:focus, a:focus {
   <img id="brandIcon" src="" alt="" style="width:24px;height:24px;object-fit:contain;">
 </div>
           <div class="leading-tight">
-            <div class="brand-title" id="brandTitle">ЯмаMoto</div>
+            <div class="brand-title" id="brandTitle">Mokka Room</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
@@ -365,7 +365,7 @@ function isProfileFilled(){
 
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
-  brandTitle: 'ЯмаMoto',
+  brandTitle: 'Mokka Room',
   // сюда подставишь свой URL иконки стакана
   logoUrl: '',
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
@@ -402,7 +402,7 @@ function applyTheme(theme){
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
   const cfg = loadConfig();
-  document.getElementById('brandTitle').textContent = (cfg.brandTitle || 'ЯмаMoto');
+  document.getElementById('brandTitle').textContent = (cfg.brandTitle || 'Mokka Room');
 
   const logoEl = document.getElementById('brandLogo');
   if (logoEl) {
