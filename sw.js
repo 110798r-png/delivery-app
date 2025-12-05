@@ -1,6 +1,6 @@
 // sw.js — аккуратный SW: API не трогаем, HTML всегда из сети, статику кэшируем
 
-const CACHE_NAME = 'static-v5';
+const CACHE_NAME = 'static-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
