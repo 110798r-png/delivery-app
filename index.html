@@ -1886,6 +1886,7 @@ window.addEventListener('hashchange', () => {
 
 // === общий старт приложения ===
 document.addEventListener('DOMContentLoaded', async () => {
+  initTableIdFromUrl();          // <-- ДОБАВЬ ЭТУ СТРОКУ
   try { router(); } catch (e) { console.error(e); }
 
   // кнопка "Назад" в шапке идёт всегда на /order
