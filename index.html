@@ -55,8 +55,24 @@
     .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
     .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
     .brand-wrap{ display:flex; align-items:center; gap:10px; }
-    .sushi-icon{ width:36px; height:36px; border-radius:999px; display:grid; place-items:center; background:#000; }
-    .sushi-icon svg{ width:24px; height:24px; }
+
+    /* Обёртка под иконку — без чёрного фона */
+.sushi-icon{
+  width:48px;              /* размер области под иконку, можно менять */
+  height:48px;
+  display:grid;
+  place-items:center;
+  background:transparent;  /* убираем чёрный круг */
+  border-radius:0;         /* можно оставить 0, чтобы не было круглой маски */
+}
+
+/* Размер самой иконки стакана */
+#brandIcon{
+  width:40px;              /* увеличивай/уменьшай под себя */
+  height:40px;
+  object-fit:contain;
+}
+    
     .header-row{ padding:10px 12px; }
     .header-ghost{ height:8px; }
     /* Отключаем выделение текста у основных интерактивов */
@@ -76,6 +92,16 @@ button:focus, a:focus {
   outline: none;
   box-shadow: none;
 }
+
+    /* Увеличиваем кнопки + и - */
+button[data-act="dec"],
+button[data-act="inc"]{
+  width:64px !important;    /* можно 70-80, если нужно ещё больше */
+  height:64px !important;
+  font-size:2rem;           /* размер знака +/- */
+  border-radius:18px;       /* более скруглённые */
+}
+    
   </style>
 </head>
 <body>
@@ -84,8 +110,8 @@ button:focus, a:focus {
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
-        <div class="sushi-icon" aria-hidden="true">
-  <img id="brandIcon" src="" alt="" style="width:24px;height:24px;object-fit:contain;">
+        <<div class="sushi-icon" aria-hidden="true">
+  <img id="brandIcon" src="" alt="">
 </div>
           <div class="leading-tight">
             <div class="brand-title" id="brandTitle">Mokka Room</div>
@@ -193,6 +219,7 @@ if (typeof window.CSS.escape !== 'function') {
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
+const BRAND_TITLE = 'Mokka Room';  // изменишь тут — поменяется в шапке и во вкладке
 // === PUSH / VAPID ===
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
@@ -361,7 +388,8 @@ function isProfileFilled(){
 
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
-  brandTitle: 'Mokka Room',
+  brandTitle: BRAND_TITLE,
+  
   // сюда подставишь свой URL иконки стакана
   logoUrl: '',
   theme: { cardRadius:20, imgRadius:12, imgW:110, imgH:70, cardMinH:104, showPrice:true },
@@ -397,8 +425,14 @@ function applyTheme(theme){
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-  const cfg = loadConfig();
-  document.getElementById('brandTitle').textContent = (cfg.brandTitle || 'Mokka Room');
+  const title = BRAND_TITLE;
+  const cfg   = loadConfig();
+
+  // Обновляем название в шапке
+  document.getElementById('brandTitle').textContent = title;
+
+  // Обновляем заголовок вкладки браузера
+  document.title = title + ' — локальный стенд';
 
   const logoEl = document.getElementById('brandLogo');
   if (logoEl) {
