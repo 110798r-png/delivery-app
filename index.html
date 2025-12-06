@@ -35,6 +35,21 @@
     .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
 
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
+    
+        #promoStrip{
+      overflow-x:auto;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      touch-action: pan-x pinch-zoom;
+    }
+    #promoStripInner{
+      display:flex;
+    }
+    .promo-slide{
+      flex:0 0 100%;
+      scroll-snap-align:center;
+    }
+
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
     
@@ -643,16 +658,17 @@ function OrderView(){
   const root = el(`
     <div class="relative">
 
-   <!-- Карусель акций над меню -->
-      <div id="promoStrip" class="mb-2 overflow-x-auto hidden">
-        <div id="promoStripInner" class="flex gap-3 pb-1"></div>
+      <!-- Карусель акций над меню -->
+      <div id="promoStrip" class="mb-2 rounded-2xl overflow-hidden hidden">
+        <div id="promoStripInner"></div>
       </div>
-    
+
       <section class="sticky-top mb-2">
         <div class="glass-panel rounded-2xl px-3 py-3">
           <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
         </div>
       </section>
+
 
       <section>
         <div id="catPager" class="no-scrollbar"></div>
@@ -682,6 +698,13 @@ function OrderView(){
   const confirmBtn  = root.querySelector('#confirmBtn');
 
   setBodyScrollLock(true);
+
+    // --- состояние карусели акций ---
+  let promoSlides = [];    // {idx, title, url}
+  let promoIndex  = 0;     // текущий слайд
+  let promoDir    = 1;     // 1 — вперёд, -1 — назад
+  let promoTimer  = null;  // setInterval
+  
   confirmBtn._busy = false;
 
   let activeIdx         = 0;
@@ -819,18 +842,19 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-    // --- Карусель акций над меню ---
+  
+     // --- Карусель акций над меню ---
   function renderPromoStrip(categories){
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
     inner.innerHTML = '';
+    promoSlides = [];
 
-    const promos = [];
     (categories || []).forEach((cat, idx) => {
-      if (cat && cat.promoUrl) {
-        promos.push({
+      if (cat && cat.promoUrl){
+        promoSlides.push({
           idx,
           title: cat.title || '',
           url: cat.promoUrl
@@ -838,26 +862,57 @@ function OrderView(){
       }
     });
 
-    if (!promos.length){
+    if (!promoSlides.length){
       strip.classList.add('hidden');
+      promoIndex = 0;
+      if (promoTimer) { clearInterval(promoTimer); promoTimer = null; }
       return;
     }
+
     strip.classList.remove('hidden');
 
-    promos.forEach(p => {
-      const card = el(`
-        <button type="button"
-                class="flex-shrink-0 rounded-2xl overflow-hidden bg-white shadow-md">
+    promoSlides.forEach((p, i) => {
+      const slide = el(`
+        <button type="button" class="promo-slide">
           <img src="${p.url}"
                alt="${p.title}"
-               class="w-40 h-20 object-cover">
+               class="w-full h-32 sm:h-40 object-cover">
         </button>
       `);
-      card.addEventListener('click', () => {
-        goToIndex(p.idx, { animate: true });
+
+      // при ручном тапе / клике — идём в нужную категорию
+      slide.addEventListener('click', () => {
+        promoIndex = i;
+        goToIndex(p.idx, { animate:true });
       });
-      inner.appendChild(card);
+
+      inner.appendChild(slide);
     });
+
+    promoIndex = 0;
+    inner.scrollLeft = 0;
+
+    // запускаем/перезапускаем авто-карусель
+    if (promoTimer) clearInterval(promoTimer);
+    promoDir = 1;
+    promoTimer = setInterval(() => {
+      if (!promoSlides.length) return;
+
+      // двигаем индекс туда-сюда (ping-pong)
+      if (promoIndex === promoSlides.length - 1) promoDir = -1;
+      else if (promoIndex === 0) promoDir = 1;
+
+      promoIndex += promoDir;
+      const slideW = strip.getBoundingClientRect().width || 1;
+      const target = slideW * promoIndex;
+
+      // плавный скролл по горизонтали
+      animateScrollX(inner, target, { duration: 400 });
+
+      // синхронно переключаем категорию
+      const p = promoSlides[promoIndex];
+      if (p) goToIndex(p.idx, { animate:true });
+    }, 4000); // интервал автопрокрутки (4 сек)
   }
 
   
@@ -1271,6 +1326,7 @@ if (Array.isArray(remote)){
   root.cleanup = () => {
     setBodyScrollLock(false);
     clearInterval(syncTimer);
+    if (promoTimer) clearInterval(promoTimer);
     window.removeEventListener('stock:updated', handleStockUpdated);
     window.removeEventListener('resize', applyHeights);
   };
