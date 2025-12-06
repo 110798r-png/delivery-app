@@ -642,6 +642,12 @@ function OrderView(){
 
   const root = el(`
     <div class="relative">
+
+   <!-- Карусель акций над меню -->
+      <div id="promoStrip" class="mb-2 overflow-x-auto hidden">
+        <div id="promoStripInner" class="flex gap-3 pb-1"></div>
+      </div>
+    
       <section class="sticky-top mb-2">
         <div class="glass-panel rounded-2xl px-3 py-3">
           <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
@@ -813,6 +819,48 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
+    // --- Карусель акций над меню ---
+  function renderPromoStrip(categories){
+    const strip = root.querySelector('#promoStrip');
+    const inner = root.querySelector('#promoStripInner');
+    if (!strip || !inner) return;
+
+    inner.innerHTML = '';
+
+    const promos = [];
+    (categories || []).forEach((cat, idx) => {
+      if (cat && cat.promoUrl) {
+        promos.push({
+          idx,
+          title: cat.title || '',
+          url: cat.promoUrl
+        });
+      }
+    });
+
+    if (!promos.length){
+      strip.classList.add('hidden');
+      return;
+    }
+    strip.classList.remove('hidden');
+
+    promos.forEach(p => {
+      const card = el(`
+        <button type="button"
+                class="flex-shrink-0 rounded-2xl overflow-hidden bg-white shadow-md">
+          <img src="${p.url}"
+               alt="${p.title}"
+               class="w-40 h-20 object-cover">
+        </button>
+      `);
+      card.addEventListener('click', () => {
+        goToIndex(p.idx, { animate: true });
+      });
+      inner.appendChild(card);
+    });
+  }
+
+  
  function rebuildMenu(){
   catPager.innerHTML = '';
   const cfg = loadConfig();
@@ -1168,6 +1216,8 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
     m.onclick = (e) => { if (e.target === m) onCancel(e); };
   })();
 
+  renderPromoStrip(loadConfig().menu);
+  
    rebuildMenu();
 
   requestAnimationFrame(() => {
@@ -1192,6 +1242,7 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
         const v = calcConfigVersion(cfgRemote);
         if (v !== lastConfigVersion){
           lastConfigVersion = v;
+          renderPromoStrip(cfgRemote.menu || []);
           rebuildMenu();
           recalcTotal();
         }
@@ -1764,6 +1815,18 @@ function BuilderView(){
             </div>
           </div>
           <div class="text-xs text-gray-500 mt-1">key: <code>${cat.key}</code></div>
+
+     <!-- Новое поле: URL акции -->
+          <label class="mt-2 block text-xs">
+            Акция (URL картинки)
+            <input
+              class="mt-1 w-full border rounded-lg p-2 text-xs"
+              placeholder="https://…"
+              value="${cat.promoUrl || ''}"
+              data-k="promoUrl"
+            >
+          </label>
+          
           <div class="mt-3">
             <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
           </div>
@@ -1798,7 +1861,14 @@ function BuilderView(){
         itemsBox.appendChild(row);
       });
 
-      catCard.addEventListener('input',(e)=>{ if(e.target.dataset.k==='title'){ cat.title=e.target.value; }});
+            catCard.addEventListener('input',(e)=>{
+        const k = e.target.dataset.k;
+        if (k === 'title') {
+          cat.title = e.target.value;
+        } else if (k === 'promoUrl') {
+          cat.promoUrl = e.target.value.trim();
+        }
+      });
       catCard.addEventListener('click',(e)=>{
         const act=e.target.dataset.act; if(!act) return;
         if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
