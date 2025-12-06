@@ -18,6 +18,23 @@
   <link rel="icon" href="data:,">
   <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
+    
+    html, body{
+  height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+    .bottom-spacer{
+  height: 120px;     /* запас под нижнюю панель */
+}
+
+@media (min-width: 640px){
+  .bottom-spacer{
+    height: 140px;
+  }
+}
+    
     *, *::before, *::after { box-sizing:border-box; }
     img { max-width:100%; display:block; }
     .hidden{ display:none }
@@ -36,14 +53,21 @@
 
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     
-       #promoStrip{
-  overflow-x: hidden;          /* сами двигаем скролл */
+      /* Внешний контейнер просто обрезает лишнее */
+#promoStrip{
+  overflow: hidden;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pinch-zoom;
 }
+
+/* Внутренний реально скроллится по X */
 #promoStripInner{
   display: flex;
+  overflow-x: auto;      /* ВАЖНО */
+  scroll-behavior: auto; /* анимацию делаем сами */
 }
+
+/* Один слайд = 100% ширины экрана */
 .promo-slide{
   flex: 0 0 100%;
 }
@@ -1010,7 +1034,7 @@ function OrderView(){
       list.appendChild(row);
     });
 
-    list.appendChild(el(`<div class="h-4"></div>`));
+    list.appendChild(el(`<div class="bottom-spacer"></div>`));
 
     vbox.appendChild(list);
     panel.appendChild(vbox);
@@ -1130,6 +1154,11 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
         el.style.paddingBottom = (confirmH + 16) + 'px';
       });
 
+      const spacerH = confirmH + 32; // высота панели + запас
+root.querySelectorAll('.bottom-spacer').forEach(el => {
+  el.style.height = spacerH + 'px';
+});
+      
       goToIndex(activeIdx, { animate: false });
     } catch (err) {}
   }
@@ -2195,6 +2224,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+  
+  window.addEventListener('load', () => {
+  setTimeout(() => {
+    // старый, но иногда рабочий трюк — прокрутить страницу на 1px,
+    // чтобы браузер спрятал адресную строку
+    window.scrollTo(0, 1);
+  }, 250);
+});
+
 </script>
 </body>
 </html>
