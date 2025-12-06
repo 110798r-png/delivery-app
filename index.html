@@ -908,7 +908,7 @@ function OrderView(){
   // только крутим сами баннеры
   animateScrollX(inner, target, { duration: 400 });
 }, 4000);
-  
+  }
  function rebuildMenu(){
   catPager.innerHTML = '';
   const cfg = loadConfig();
@@ -1347,7 +1347,6 @@ function ProfileEditView(){
       </section>
     </div>
   `);
-  root.querySelector('#paydef').value = p.paymentMethod;
 
   const errEl = root.querySelector('#pError');
 
