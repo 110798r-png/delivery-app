@@ -716,6 +716,7 @@ function OrderView(){
     unavailableClient = new Set(loadUnavailable());
     rebuildMenu();
     recalcTotal();
+    applyHeights();
   }
 
   // автоподстановка повторного заказа из истории
@@ -1009,7 +1010,7 @@ function OrderView(){
       list.appendChild(row);
     });
 
-    list.appendChild(el(`<div class="h-24"></div>`));
+    list.appendChild(el(`<div class="h-4"></div>`));
 
     vbox.appendChild(list);
     panel.appendChild(vbox);
@@ -1105,18 +1106,30 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
     recalcTotal();
   });
 
-  function applyHeights(){
+    function applyHeights(){
     try {
       const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
       const chipsH   = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
-      const confirmH = root.querySelector('#confirmBar')?.getBoundingClientRect().height || 0;
-      const availH   = Math.max(240, window.innerHeight - headerH - chipsH - confirmH - 8);
+      const confirmEl = root.querySelector('#confirmBar');
+      const confirmH = confirmEl?.getBoundingClientRect().height || 0;
+
+      const availH   = Math.max(
+        240,
+        window.innerHeight - headerH - chipsH - confirmH - 8
+      );
 
       const first  = root.querySelector('.menu-card');
       const cardH  = first ? Math.ceil(first.getBoundingClientRect().height) : 104;
+
       const h      = Math.min(availH, cardH * 4 + 12 * 3 + 4);
 
-      root.querySelectorAll('.v-scroll').forEach(el => el.style.height = h + 'px');
+      root.querySelectorAll('.v-scroll').forEach(el => {
+        el.style.height = h + 'px';
+        // 👇 вот это главное: даём “запас” снизу,
+        // чтобы последнюю карточку можно было доскроллить НАД плашкой
+        el.style.paddingBottom = (confirmH + 16) + 'px';
+      });
+
       goToIndex(activeIdx, { animate: false });
     } catch (err) {}
   }
@@ -1344,6 +1357,7 @@ vbox.addEventListener('pointermove', onPointerMove, { passive: false });
           renderPromoStrip(cfgRemote.menu || []);
           rebuildMenu();
           recalcTotal();
+          applyHeights();
         }
       }
     } catch (e) {}
@@ -1363,6 +1377,7 @@ if (Array.isArray(remote)){
         unavailableClient = after;
         rebuildMenu();
         recalcTotal();
+        applyHeights();
       }
     }
   }, 4000);
