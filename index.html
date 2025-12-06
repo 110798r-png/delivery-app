@@ -896,25 +896,18 @@ function OrderView(){
     if (promoTimer) clearInterval(promoTimer);
     promoDir = 1;
     promoTimer = setInterval(() => {
-      if (!promoSlides.length) return;
+  if (!promoSlides.length) return;
 
-      // двигаем индекс туда-сюда (ping-pong)
-      if (promoIndex === promoSlides.length - 1) promoDir = -1;
-      else if (promoIndex === 0) promoDir = 1;
+  if (promoIndex === promoSlides.length - 1) promoDir = -1;
+  else if (promoIndex === 0) promoDir = 1;
 
-      promoIndex += promoDir;
-      const slideW = strip.getBoundingClientRect().width || 1;
-      const target = slideW * promoIndex;
+  promoIndex += promoDir;
+  const slideW = strip.getBoundingClientRect().width || 1;
+  const target = slideW * promoIndex;
 
-      // плавный скролл по горизонтали
-      animateScrollX(inner, target, { duration: 400 });
-
-      // синхронно переключаем категорию
-      const p = promoSlides[promoIndex];
-      if (p) goToIndex(p.idx, { animate:true });
-    }, 4000); // интервал автопрокрутки (4 сек)
-  }
-
+  // только крутим сами баннеры
+  animateScrollX(inner, target, { duration: 400 });
+}, 4000);
   
  function rebuildMenu(){
   catPager.innerHTML = '';
