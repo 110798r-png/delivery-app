@@ -1937,11 +1937,6 @@ const root = el(`
   const stockToggle= root.querySelector('#stockToggle');
   const stockArrow = root.querySelector('#stockArrow');
 
-    const exportBtn = root.querySelector('#exportXlsxBtn');
-  if (exportBtn) {
-    exportBtn.onclick = () => exportReportXlsx();
-  }
-
   if (!list || !stockList || !stockPanel || !stockToggle || !stockArrow) {
     console.error('DashboardView: missing containers', { list, stockList, stockPanel, stockToggle, stockArrow });
     showToast('Табло сломано: нет контейнеров list/stockList/stockPanel');
