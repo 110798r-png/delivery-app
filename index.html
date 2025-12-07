@@ -364,6 +364,8 @@ const SOUND_ON_KEY       = 'sound_on_v1';
 const CLIENT_ID_KEY      = 'client_id_v1';
 const NAV_HINT_KEY       = 'nav_hint_shown_v1';
 const TABLE_ID_KEY       = 'table_id_v1';
+const DASH_CLEARED_AFTER_KEY = 'dashboard_cleared_after_ts_v1';
+
 
   // ===== МИГРАЦИЯ ХРАНИЛИЩА =====
 // один раз полностью очищаем старые данные,
@@ -1894,6 +1896,7 @@ const root = el(`
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
         <button id="exportXlsxBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить XLSX</button>
         <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
+        <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
       </div>
     </div>
 
@@ -1956,12 +1959,22 @@ const root = el(`
   };
  
   let unavailable = new Set(loadUnavailable());
-  let dashOrders  = loadDash();
-  window.__dashOrders = dashOrders;
 
+  // когда последний раз очищали табло (только локально)
+  const clearedAfterTs = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+
+  // подгружаем локальное табло с учётом этого времени
+  let dashOrders = loadDash().filter(o => {
+    if (!clearedAfterTs) return true;
+    const t = Number(o.createdAt || 0);
+    // если нет createdAt — оставляем, иначе сравниваем
+    return !t || t >= clearedAfterTs;
+  });
+  window.__dashOrders = dashOrders;
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
   const ding         = document.getElementById('orderDing');
+  
   const soundBtn     = root.querySelector('#soundToggle');
   let hiddenNewCount = 0;
   let pollTimer      = null;
@@ -2176,28 +2189,75 @@ const root = el(`
     renderOrders();
   }
 
-  root.querySelector('#btnClearAll').onclick = async () => {
-    if (!confirm('Удалить все заказы?')) return;
-    const ids = (dashOrders || []).map(o => o.id);
+    root.querySelector('#btnClearAll').onclick = async () => {
+    if (!confirm('Очистить только табло (заказы останутся в истории и отчётах)?')) return;
+
+    const now = Date.now();
+    // запоминаем, что все заказы до этого момента — "старые", их не показываем
+    localStorage.setItem(DASH_CLEARED_AFTER_KEY, String(now));
+
     dashOrders = [];
     saveDash(dashOrders);
+    window.__dashOrders = dashOrders;
+    knownIds = new Set();
     load();
+
+    showToast('Табло очищено. Все заказы остались на сервере.');
+  };
+
+    root.querySelector('#btnClearHistory').onclick = async () => {
+    const pin = prompt('Введите PIN для очистки истории:');
+
+    if (pin === null) {
+      // нажал "Отмена"
+      return;
+    }
+
+    if (pin !== '65Vafuza') {
+      showToast('Неверный PIN');
+      return;
+    }
+
+    if (!confirm('Точно удалить всю историю заказов на сервере? Это также очистит отчёты.')) {
+      return;
+    }
+
     try {
-      await rpc({ op:'clear' });
-    } catch {
-      for (const id of ids){
-        try { await rpc({ op:'delete', id }); } catch {}
-      }
+      await rpc({ op: 'clear' });
+
+      // локально тоже всё обнуляем
+      dashOrders = [];
+      saveDash(dashOrders);
+      window.__dashOrders = dashOrders;
+      knownIds = new Set();
+      localStorage.removeItem(DASH_CLEARED_AFTER_KEY);
+      load();
+
+      showToast('История заказов на сервере очищена');
+    } catch (e) {
+      console.warn('btnClearHistory clear error', e);
+      showToast('Не удалось очистить историю на сервере');
     }
   };
 
-  async function loadOrdersFromCloud(){
+   async function loadOrdersFromCloud(){
     try{
       const res = await rpc({ op:'list' });
       if (Array.isArray(res.orders)){
-        saveDash(res.orders);
-        dashOrders = res.orders.slice();
-         window.__dashOrders = dashOrders;
+        let serverOrders = res.orders.slice();
+
+        // фильтруем по моменту последней очистки табло
+        const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+        if (clearedAfter) {
+          serverOrders = serverOrders.filter(o => {
+            const t = Number(o.createdAt || 0);
+            return !t || t >= clearedAfter;
+          });
+        }
+
+        saveDash(serverOrders);
+        dashOrders = serverOrders.slice();
+        window.__dashOrders = dashOrders;
         load();
       }
     } catch(e){
