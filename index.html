@@ -1280,6 +1280,11 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         e.stopPropagation();
       }
 
+            // отключаем кнопку и сразу прячем модалку — защита от даблтапа
+      if (ok.disabled) return;
+      ok.disabled = true;
+      close();
+
       const cfg    = loadConfig();
       const counts = window.__orderCounts || {};
       const itemsSel = [];
@@ -1295,8 +1300,8 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         })
       );
 
-      if (!itemsSel.length){
-        close();
+           if (!itemsSel.length){
+        ok.disabled = false;
         finalize();
         return;
       }
@@ -1333,14 +1338,15 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         dash.unshift(order);
         saveDash(dash.slice(0, 200));
 
-      } catch (err) {
+           } catch (err) {
         console.warn('RPC create error', err);
         showToast('Не удалось отправить заказ, попробуйте ещё раз.');
+        ok.disabled = false;
         finalize();
         return;
       }
 
-      close();
+      ok.disabled = false;
       finalize();
       resetCounts();
       window.dispatchEvent(new CustomEvent('orders:history-updated'));
