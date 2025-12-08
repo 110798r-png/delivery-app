@@ -676,8 +676,9 @@ function OrderView(){
       const slide = el(`
         <button type="button" class="promo-slide">
           <img src="${p.url}"
-               alt="${p.title}"
-               class="w-full h-32 sm:h-40 object-cover">
+     alt="${p.title}"
+     loading="lazy"
+     class="w-full h-32 sm:h-40 object-cover">
         </button>
       `);
 
@@ -776,7 +777,11 @@ function rebuildMenu() {
               >+</button>
             </div>
           </div>
-          <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
+          <img
+  src="${it.img || 'https://placehold.co/110x70?text=food'}"
+  class="menu-card-img"
+  alt=""
+  loading="lazy">
         </div>
       `);
       list.appendChild(row);
@@ -1377,7 +1382,26 @@ function HistoryView(){
   return root;
 }
 
+// Ленивая (отложенная) загрузка XLSX — только при выгрузке отчёта
+let xlsxReady = null;
+function ensureXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  if (!xlsxReady) {
+    xlsxReady = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = () => resolve();
+      s.onerror = (e) => reject(e);
+      document.head.appendChild(s);
+    });
+  }
+  return xlsxReady;
+}
+
 async function exportReportXlsx() {
+  // сперва подгружаем библиотеку, если её ещё нет
+  await ensureXlsx();
+
   // 1. Берём заказы с сервера (или локальный fallback)
   let allOrders = [];
   try {
