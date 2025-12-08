@@ -56,15 +56,13 @@
       /* Внешний контейнер просто обрезает лишнее */
 #promoStrip{
   overflow: hidden;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pinch-zoom;
 }
 
-/* Внутренний реально скроллится по X */
 #promoStripInner{
   display: flex;
-  overflow-x: auto;      /* ВАЖНО */
-  scroll-behavior: auto; /* анимацию делаем сами */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;  /* плавный скролл на iOS */
+  touch-action: pan-x pinch-zoom;     /* тут именно горизонтальный свайп */
 }
 
 /* Один слайд = 100% ширины экрана */
