@@ -59,7 +59,7 @@
   overflow: hidden;
 }
 
-/* Внутренний — основной скролл/свайп по X */
+/* Внутренний — горизонтальный скролл/свайп */
 #promoStripInner{
   display: flex;
   overflow-x: auto;
@@ -70,7 +70,9 @@
 /* Один слайд = ширина экрана */
 .promo-slide{
   flex: 0 0 100%;
+  scroll-snap-align: start;
 }
+
 
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
@@ -869,8 +871,7 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  
-    // --- Карусель акций над меню ---
+     // --- Карусель акций над меню (простая, нативный свайп) ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
@@ -910,7 +911,7 @@ function OrderView(){
         </button>
       `);
 
-      // клик по слайду — прыгаем в нужную категорию
+      // клик по слайду — открыть соответствующую категорию
       slide.addEventListener('click', () => {
         promoIndex = i;
         goToIndex(p.idx, { animate: true });
@@ -919,61 +920,22 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
-    // стартовая позиция — первый слайд
     promoIndex = 0;
     inner.scrollLeft = 0;
 
-    // ====== Свайп пальцем ======
-    let dragging    = false;
-    let startX      = 0;
-    let startScroll = 0;
+    // --- Отслеживаем, куда пользователь досвайпал нативным скроллом ---
+    inner.addEventListener('scroll', () => {
+      if (inner._scrollTimer) clearTimeout(inner._scrollTimer);
+      inner._scrollTimer = setTimeout(() => {
+        const w = strip.getBoundingClientRect().width || 1;
+        let idx = Math.round(inner.scrollLeft / w);
+        if (idx < 0) idx = 0;
+        if (idx >= promoSlides.length) idx = promoSlides.length - 1;
+        promoIndex = idx;
+      }, 80);
+    });
 
-    const getSlideW = () => strip.getBoundingClientRect().width || 1;
-
-    inner.onpointerdown = (e) => {
-      if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
-      dragging    = true;
-      startX      = e.clientX;
-      startScroll = inner.scrollLeft;
-
-      inner.setPointerCapture?.(e.pointerId);
-
-      // во время ручного свайпа авто не крутим
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-    };
-
-    inner.onpointermove = (e) => {
-      if (!dragging) return;
-      const dx = startX - e.clientX;
-      inner.scrollLeft = startScroll + dx;
-      e.preventDefault();
-    };
-
-    const finishDrag = () => {
-      if (!dragging) return;
-      dragging = false;
-
-      const slideW = getSlideW();
-      let idx = Math.round(inner.scrollLeft / slideW);
-
-      // бесконечный круг: перелистал дальше последнего – вернулись к первому
-      if (idx < 0) idx = 0;
-      if (idx >= promoSlides.length) idx = 0;
-
-      promoIndex = idx;
-
-      animateScrollX(inner, idx * slideW, { duration: 220 });
-      startAuto(); // после ручного свайпа снова включаем авто
-    };
-
-    inner.onpointerup      = finishDrag;
-    inner.onpointercancel  = finishDrag;
-    inner.onpointerleave   = finishDrag;
-
-    // ====== Авто-перелистывание (автосвайп) ======
+    // --- Автоперелистывание по кругу ---
     function startAuto() {
       if (promoTimer) {
         clearInterval(promoTimer);
@@ -982,15 +944,14 @@ function OrderView(){
 
       promoTimer = setInterval(() => {
         if (!promoSlides.length) return;
+        const w = strip.getBoundingClientRect().width || 1;
 
-        const slideW = getSlideW();
-
-        // круг: 0 -> 1 -> ... -> n-1 -> 0 -> ...
+        // бесконечный круг
         promoIndex = (promoIndex + 1) % promoSlides.length;
-        const target = slideW * promoIndex;
+        const target = w * promoIndex;
 
         animateScrollX(inner, target, { duration: 350 });
-      }, 3500); // интервал автоперелистывания
+      }, 3500);
     }
 
     startAuto();
@@ -1192,6 +1153,72 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
       }
     }, 80);
   });
+
+    // ===== Спец-обработка свайпа категорий на iOS (и вообще) =====
+  let catTouch = {
+    active: false,
+    startX: 0,
+    startY: 0,
+    startScrollLeft: 0,
+    isHorizontal: false
+  };
+
+  catPager.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+
+    catTouch.active = true;
+    catTouch.startX = t.clientX;
+    catTouch.startY = t.clientY;
+    catTouch.startScrollLeft = catPager.scrollLeft;
+    catTouch.isHorizontal = false;
+  }, { passive: true });
+
+  catPager.addEventListener('touchmove', (e) => {
+    if (!catTouch.active || e.touches.length !== 1) return;
+    const t = e.touches[0];
+
+    const dx = t.clientX - catTouch.startX;
+    const dy = t.clientY - catTouch.startY;
+
+    // Определяем направление жеста при первом заметном движении
+    if (!catTouch.isHorizontal && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Горизонтальный жест — берём управление на себя
+        catTouch.isHorizontal = true;
+      } else {
+        // Вертикальный — отдаём во v-scroll, сами больше не мешаем
+        catTouch.active = false;
+        return;
+      }
+    }
+
+    if (catTouch.isHorizontal) {
+      // Очень важно: preventDefault, чтобы внутренний вертикальный скролл не захватил жест
+      e.preventDefault();
+      catPager.scrollLeft = catTouch.startScrollLeft - dx;
+    }
+  }, { passive: false });
+
+  catPager.addEventListener('touchend', () => {
+    if (!catTouch.isHorizontal) {
+      catTouch.active = false;
+      return;
+    }
+
+    // Привязываем к ближайшей категории
+    const w   = catPager.getBoundingClientRect().width || 1;
+    let idx   = Math.round(catPager.scrollLeft / w);
+    const cfgNow = loadConfig();
+    idx = Math.max(0, Math.min(cfgNow.menu.length - 1, idx));
+
+    goToIndex(idx, { animate: true });
+    catTouch.active = false;
+  }, { passive: true });
+
+  catPager.addEventListener('touchcancel', () => {
+    catTouch.active = false;
+  }, { passive: true });
 
   function recalcTotal(){
     const cfg    = loadConfig();
