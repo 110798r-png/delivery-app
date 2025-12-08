@@ -871,7 +871,8 @@ function OrderView(){
 
   
     // --- Карусель акций над меню ---
-  function renderPromoStrip(categories) {
+
+    function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
@@ -892,6 +893,7 @@ function OrderView(){
     if (!promoSlides.length) {
       strip.classList.add('hidden');
       promoIndex = 0;
+      // на всякий случай глушим таймер, если он когда-то был
       if (promoTimer) {
         clearInterval(promoTimer);
         promoTimer = null;
@@ -910,7 +912,7 @@ function OrderView(){
         </button>
       `);
 
-      // клик по слайду — прыгаем в нужную категорию
+      // тап по слайду — переход к нужной категории
       slide.addEventListener('click', () => {
         promoIndex = i;
         goToIndex(p.idx, { animate: true });
@@ -930,20 +932,16 @@ function OrderView(){
     const getSlideW = () => strip.getBoundingClientRect().width || 1;
 
     inner.onpointerdown = (e) => {
-      if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
       drag = true;
       startX = e.clientX;
       startScroll = inner.scrollLeft;
       inner.setPointerCapture?.(e.pointerId);
-      // чтобы не дёргалось автолистание
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
     };
 
     inner.onpointermove = (e) => {
       if (!drag) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
       const dx = startX - e.clientX;
       inner.scrollLeft = startScroll + dx;
       e.preventDefault();
@@ -959,33 +957,11 @@ function OrderView(){
       promoIndex = idx;
 
       animateScrollX(inner, idx * slideW, { duration: 220 });
-
-      // перезапускаем автолистание после ручного свайпа
-      startAuto();
     };
 
     inner.onpointerup = finishDrag;
     inner.onpointercancel = finishDrag;
     inner.onpointerleave = finishDrag;
-
-    // ---- автолистание по кругу ----
-    function startAuto() {
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-      promoTimer = setInterval(() => {
-        if (!promoSlides.length) return;
-
-        const slideW = getSlideW();
-        promoIndex = (promoIndex + 1) % promoSlides.length;  // 1→2→…→N→1
-        const target = slideW * promoIndex;
-
-        animateScrollX(inner, target, { duration: 400 });
-      }, 3000); // 3 секунды
-    }
-
-    startAuto();
   }
 
 function rebuildMenu() {
