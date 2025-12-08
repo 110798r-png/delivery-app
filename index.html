@@ -73,7 +73,7 @@
 }
 
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
-    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
     
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
     .modal.open{ display:flex }
@@ -988,8 +988,7 @@ function OrderView(){
     startAuto();
   }
 
-  
- function rebuildMenu(){
+function rebuildMenu() {
   catPager.innerHTML = '';
   const cfg = loadConfig();
 
@@ -1038,6 +1037,7 @@ function OrderView(){
       list.appendChild(row);
     });
 
+    // запас снизу
     list.appendChild(el(`<div class="bottom-spacer"></div>`));
 
     vbox.appendChild(list);
@@ -1045,99 +1045,101 @@ function OrderView(){
     catPager.appendChild(panel);
 
     // === свайп по категориям (горизонтальный) ===
-const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
-const supportsPointer = !!window.PointerEvent;
+    const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
+    const supportsPointer = !!window.PointerEvent;
 
-let down = false;
-let used = false;
-let sx = 0;
-let sy = 0;
-let locked = null;
+    let down   = false;
+    let used   = false;
+    let sx     = 0;
+    let sy     = 0;
+    let locked = null;
 
-const PIX_LOCK = 10;
-const THRESH = () =>
-  Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
+    const PIX_LOCK = 10;
+    const THRESH = () =>
+      Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
 
-function startDrag(x, y) {
-  if (isAnimating) return;
-  down = true;
-  used = false;
-  sx = x;
-  sy = y;
-  locked = null;
-}
-
-function moveDrag(x, y, e) {
-  if (!down || used || isAnimating) return;
-
-  const dx = x - sx;
-  const dy = y - sy;
-
-  if (locked === null) {
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) {
-      locked = 'x';
-    } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) {
-      locked = 'y';
-    }
-  }
-
-  if (locked === 'x') {
-    // горизонтальный жест — перехватываем, чтобы не скроллилась страница
-    if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
+    function startDrag(x, y) {
+      if (isAnimating) return;
+      down = true;
+      used = false;
+      sx = x;
+      sy = y;
+      locked = null;
     }
 
-    if (Math.abs(dx) >= THRESH()) {
-      used = true;
-      const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
-      goToIndex(next, { animate: true });
+    function moveDrag(x, y, e) {
+      if (!down || used || isAnimating) return;
+
+      const dx = x - sx;
+      const dy = y - sy;
+
+      if (locked === null) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) {
+          locked = 'x';
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) {
+          locked = 'y';
+        }
+      }
+
+      if (locked === 'x') {
+        // горизонтальный жест — листаем категории
+        if (e && typeof e.preventDefault === 'function') {
+          e.preventDefault();
+        }
+
+        if (Math.abs(dx) >= THRESH()) {
+          used = true;
+          const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
+          goToIndex(next, { animate: true });
+        }
+      }
     }
-  }
+
+    function endDrag() {
+      down = false;
+      used = false;
+      locked = null;
+    }
+
+    // ANDROID / другие — Pointer Events
+    if (supportsPointer && !isIOS) {
+      vbox.addEventListener('pointerdown', (e) => {
+        const pt = e.pointerType;
+        if (pt && pt !== 'touch') return;   // мышь игнорим
+        startDrag(e.clientX, e.clientY);
+      }, { passive: true });
+
+      vbox.addEventListener('pointermove', (e) => {
+        const pt = e.pointerType;
+        if (pt && pt !== 'touch') return;
+        moveDrag(e.clientX, e.clientY, e);
+      }, { passive: false });
+
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
+        vbox.addEventListener(evt, endDrag, { passive: true })
+      );
+
+    // iOS — touch-события
+    } else {
+      vbox.addEventListener('touchstart', (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        startDrag(t.clientX, t.clientY);
+      }, { passive: true });
+
+      vbox.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        moveDrag(t.clientX, t.clientY, e);
+      }, { passive: false });
+
+      ['touchend', 'touchcancel'].forEach(evt =>
+        vbox.addEventListener(evt, endDrag, { passive: true })
+      );
+    }
+    // === конец свайпа ===
+  });
 }
-
-function endDrag() {
-  down = false;
-  used = false;
-  locked = null;
-}
-
-// ANDROID / ДРУГИЕ: Pointer Events
-if (supportsPointer && !isIOS) {
-  vbox.addEventListener('pointerdown', (e) => {
-    const pt = e.pointerType;
-    if (pt && pt !== 'touch') return;
-    startDrag(e.clientX, e.clientY);
-  }, { passive: true });
-
-  vbox.addEventListener('pointermove', (e) => {
-    const pt = e.pointerType;
-    if (pt && pt !== 'touch') return;
-    moveDrag(e.clientX, e.clientY, e);
-  }, { passive: false });
-
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
-    vbox.addEventListener(evt, endDrag, { passive: true })
-  );
-
-// iOS: явный fallback на touch-события
-} else {
-  vbox.addEventListener('touchstart', (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    startDrag(t.clientX, t.clientY);
-  }, { passive: true });
-
-  vbox.addEventListener('touchmove', (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    moveDrag(t.clientX, t.clientY, e);
-  }, { passive: false });
-
-  ['touchend', 'touchcancel'].forEach(evt =>
-    vbox.addEventListener(evt, endDrag, { passive: true })
-  );
-}
-// === конец свайпа ===
 
   // обработчик +/− по делегированию
   catPager.addEventListener('click', (e) => {
