@@ -685,16 +685,15 @@ function OrderView(){
     <div class="relative">
 
       <!-- Карусель акций над меню -->
-     <div id="promoStrip" class="mb-2 rounded-2xl overflow-hidden no-scrollbar hidden">
-  <div id="promoStripInner"></div>
-</div>
+      <div id="promoStrip" class="mb-2 rounded-2xl overflow-hidden no-scrollbar hidden">
+        <div id="promoStripInner"></div>
+      </div>
 
       <section class="sticky-top mb-2">
         <div class="glass-panel rounded-2xl px-3 py-3">
           <div id="categoryBar" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
         </div>
       </section>
-
 
       <section>
         <div id="catPager" class="no-scrollbar"></div>
@@ -725,12 +724,11 @@ function OrderView(){
 
   setBodyScrollLock(true);
 
-    // --- состояние карусели акций ---
+  // --- состояние карусели акций ---
   let promoSlides = [];    // {idx, title, url}
   let promoIndex  = 0;     // текущий слайд
-  let promoDir    = 1;     // 1 — вперёд, -1 — назад
   let promoTimer  = null;  // setInterval
-  
+
   confirmBtn._busy = false;
 
   let activeIdx         = 0;
@@ -762,9 +760,9 @@ function OrderView(){
 
     window.__orderCounts = window.__orderCounts || {};
 
-    const cfg = loadConfig();
+    const cfgNow = loadConfig();
     const namesSet = new Set(
-      cfg.menu.flatMap(cat => cat.items.map(it => it.name))
+      cfgNow.menu.flatMap(cat => cat.items.map(it => it.name))
     );
 
     items.forEach(it => {
@@ -819,8 +817,8 @@ function OrderView(){
   }
 
   function goToIndex(idx, { animate = true } = {}){
-    const cfg = loadConfig();
-    idx = Math.max(0, Math.min(cfg.menu.length - 1, idx));
+    const cfgNow = loadConfig();
+    idx = Math.max(0, Math.min(cfgNow.menu.length - 1, idx));
     const target = Math.round(panelW() * idx);
     highlightChip(idx);
 
@@ -829,11 +827,11 @@ function OrderView(){
     if (!animate){
       const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
       if (old){
-        scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+        scrollMemory.set(cfgNow.menu[activeIdx].key, old.scrollTop);
       }
       catPager.scrollLeft = target;
       if (box){
-        box.scrollTop = scrollMemory.get(cfg.menu[idx].key) || 0;
+        box.scrollTop = scrollMemory.get(cfgNow.menu[idx].key) || 0;
       }
       activeIdx = idx;
       return;
@@ -845,7 +843,7 @@ function OrderView(){
 
     const old = catPager.children[activeIdx]?.querySelector('.v-scroll');
     if (old){
-      scrollMemory.set(cfg.menu[activeIdx].key, old.scrollTop);
+      scrollMemory.set(cfgNow.menu[activeIdx].key, old.scrollTop);
     }
 
     animateScrollX(catPager, target, {
@@ -869,8 +867,7 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  
-    // --- Карусель акций над меню ---
+  // --- Карусель акций над меню ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
@@ -935,7 +932,6 @@ function OrderView(){
       startX = e.clientX;
       startScroll = inner.scrollLeft;
       inner.setPointerCapture?.(e.pointerId);
-      // чтобы не дёргалось автолистание
       if (promoTimer) {
         clearInterval(promoTimer);
         promoTimer = null;
@@ -959,8 +955,6 @@ function OrderView(){
       promoIndex = idx;
 
       animateScrollX(inner, idx * slideW, { duration: 220 });
-
-      // перезапускаем автолистание после ручного свайпа
       startAuto();
     };
 
@@ -968,7 +962,6 @@ function OrderView(){
     inner.onpointercancel = finishDrag;
     inner.onpointerleave = finishDrag;
 
-    // ---- автолистание по кругу ----
     function startAuto() {
       if (promoTimer) {
         clearInterval(promoTimer);
@@ -978,73 +971,76 @@ function OrderView(){
         if (!promoSlides.length) return;
 
         const slideW = getSlideW();
-        promoIndex = (promoIndex + 1) % promoSlides.length;  // 1→2→…→N→1
+        promoIndex = (promoIndex + 1) % promoSlides.length;
         const target = slideW * promoIndex;
 
         animateScrollX(inner, target, { duration: 400 });
-      }, 3000); // 3 секунды
+      }, 3000);
     }
 
     startAuto();
   }
 
-  
- function rebuildMenu(){
-  catPager.innerHTML = '';
-  const cfg = loadConfig();
+  // --- построение карточек меню ---
+  function rebuildMenu(){
+    catPager.innerHTML = '';
+    const cfgNow = loadConfig();
 
-  cfg.menu.forEach((cat) => {
-    const panel = el(`<div class="cat-panel"></div>`);
-    const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
-    const list  = el(`<div class="grid gap-3"></div>`);
+    cfgNow.menu.forEach((cat) => {
+      const panel = el(`<div class="cat-panel"></div>`);
+      const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
+      const list  = el(`<div class="grid gap-3"></div>`);
 
-    cat.items.forEach(it => {
-      const q        = (window.__orderCounts?.[it.name] || 0);
-      const disabled = unavailableClient.has(it.name);
+      cat.items.forEach(it => {
+        const q        = (window.__orderCounts?.[it.name] || 0);
+        const disabled = unavailableClient.has(it.name);
 
-      const row = el(`
-        <div class="menu-card ${disabled ? 'opacity-50' : ''}">
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm flex items-center gap-2">
-              ${it.name}
-              ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
+        const row = el(`
+          <div class="menu-card ${disabled ? 'opacity-50' : ''}">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm flex items-center gap-2">
+                ${it.name}
+                ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
+              </div>
+              ${
+                cfgNow.theme.showPrice
+                  ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                  : ''
+              }
+              <div class="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl border"
+                  data-name="${it.name}"
+                  data-act="dec"
+                  ${disabled ? 'disabled' : ''}
+                >−</button>
+                <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-xl bg-black text-white"
+                  data-name="${it.name}"
+                  data-act="inc"
+                  ${disabled ? 'disabled' : ''}
+                >+</button>
+              </div>
             </div>
-            ${
-              cfg.theme.showPrice
-                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
-                : ''
-            }
-            <div class="flex items-center gap-3 mt-3">
-              <button
-                type="button"
-                class="w-8 h-8 rounded-xl border"
-                data-name="${it.name}"
-                data-act="dec"
-                ${disabled ? 'disabled' : ''}
-              >−</button>
-              <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-              <button
-                type="button"
-                class="w-8 h-8 rounded-xl bg-black text-white"
-                data-name="${it.name}"
-                data-act="inc"
-                ${disabled ? 'disabled' : ''}
-              >+</button>
-            </div>
+            <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
           </div>
-          <img src="${it.img || 'https://placehold.co/110x70?text=food'}" class="menu-card-img" alt="">
-        </div>
-      `);
+        `);
       list.appendChild(row);
+      });
+
+      // "запас" снизу, чтобы последняя карточка не уходила под панель
+      list.appendChild(el(`<div class="bottom-spacer"></div>`));
+
+      vbox.appendChild(list);
+      panel.appendChild(vbox);
+      catPager.appendChild(panel);
     });
+  }
 
-    list.appendChild(el(`<div class="bottom-spacer"></div>`));
-
-    vbox.appendChild(list);
-    panel.appendChild(vbox);
-    catPager.appendChild(panel);
-
-  // обработчик +/− по делегированию
+  // один делегированный обработчик +/− для всех карточек
   catPager.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn || btn.disabled) return;
@@ -1070,12 +1066,12 @@ function OrderView(){
     recalcTotal();
   });
 
-    function applyHeights(){
+  function applyHeights(){
     try {
-      const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
-      const chipsH   = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
+      const headerH   = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
+      const chipsH    = root.querySelector('.sticky-top')?.getBoundingClientRect().height || 0;
       const confirmEl = root.querySelector('#confirmBar');
-      const confirmH = confirmEl?.getBoundingClientRect().height || 0;
+      const confirmH  = confirmEl?.getBoundingClientRect().height || 0;
 
       const availH   = Math.max(
         240,
@@ -1087,18 +1083,16 @@ function OrderView(){
 
       const h      = Math.min(availH, cardH * 4 + 12 * 3 + 4);
 
-      root.querySelectorAll('.v-scroll').forEach(el => {
-        el.style.height = h + 'px';
-        // 👇 вот это главное: даём “запас” снизу,
-        // чтобы последнюю карточку можно было доскроллить НАД плашкой
-        el.style.paddingBottom = (confirmH + 16) + 'px';
+      root.querySelectorAll('.v-scroll').forEach(elm => {
+        elm.style.height = h + 'px';
+        elm.style.paddingBottom = (confirmH + 16) + 'px';
       });
 
-      const spacerH = confirmH + 32; // высота панели + запас
-root.querySelectorAll('.bottom-spacer').forEach(el => {
-  el.style.height = spacerH + 'px';
-});
-      
+      const spacerH = confirmH + 32;
+      root.querySelectorAll('.bottom-spacer').forEach(elm => {
+        elm.style.height = spacerH + 'px';
+      });
+
       goToIndex(activeIdx, { animate: false });
     } catch (err) {}
   }
@@ -1118,10 +1112,10 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
   });
 
   function recalcTotal(){
-    const cfg    = loadConfig();
+    const cfgNow = loadConfig();
     const counts = window.__orderCounts || {};
     let sum = 0;
-    cfg.menu.forEach(cat =>
+    cfgNow.menu.forEach(cat =>
       cat.items.forEach(it => {
         sum += (counts[it.name] || 0) * (it.price || 0);
       })
@@ -1133,11 +1127,11 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
 
   // обработка "Оформить заказ"
   confirmBtn.addEventListener('click', () => {
-    const cfg    = loadConfig();
+    const cfgNow = loadConfig();
     const counts = window.__orderCounts || {};
     const items  = [];
 
-    cfg.menu.forEach(cat =>
+    cfgNow.menu.forEach(cat =>
       cat.items.forEach(it => {
         const q = (counts[it.name] || 0);
         if (q > 0){
@@ -1164,7 +1158,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
       `;
     }).join('');
 
-        const tableId = getTableId();
+    const tableId = getTableId();
     if (tableId) {
       sumBox.insertAdjacentHTML(
         'afterbegin',
@@ -1173,7 +1167,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
          </div>`
       );
     }
-    
+
     sumBox.insertAdjacentHTML(
       'beforeend',
       `<div class="mt-2 pt-2 border-t flex items-center justify-between font-semibold">
@@ -1218,17 +1212,16 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         e.stopPropagation();
       }
 
-            // отключаем кнопку и сразу прячем модалку — защита от даблтапа
       if (ok.disabled) return;
       ok.disabled = true;
       close();
 
-      const cfg    = loadConfig();
+      const cfgNow = loadConfig();
       const counts = window.__orderCounts || {};
       const itemsSel = [];
       let total = 0;
 
-      cfg.menu.forEach(cat =>
+      cfgNow.menu.forEach(cat =>
         cat.items.forEach(it => {
           const q = (counts[it.name] || 0);
           if (q > 0){
@@ -1238,13 +1231,13 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         })
       );
 
-           if (!itemsSel.length){
+      if (!itemsSel.length){
         ok.disabled = false;
         finalize();
         return;
       }
 
-           const tableId = getTableId();
+      const tableId = getTableId();
 
       try {
         const res = await rpc({
@@ -1276,7 +1269,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         dash.unshift(order);
         saveDash(dash.slice(0, 200));
 
-           } catch (err) {
+      } catch (err) {
         console.warn('RPC create error', err);
         showToast('Не удалось отправить заказ, попробуйте ещё раз.');
         ok.disabled = false;
@@ -1304,13 +1297,10 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
   })();
 
   renderPromoStrip(loadConfig().menu);
-  
-   rebuildMenu();
+  rebuildMenu();
 
   requestAnimationFrame(() => {
-    // выставляем высоты для внутреннего скролла
     applyHeights();
-
     highlightChip(0);
     goToIndex(0, { animate:false });
     recalcTotal();
@@ -1342,8 +1332,8 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
 
     // наличие с сервера
     const before = new Set(unavailableClient);
-   const remote = await fetchUnavailableRemote().catch(() => []);
-if (Array.isArray(remote)){
+    const remote = await fetchUnavailableRemote().catch(() => []);
+    if (Array.isArray(remote)){
       const after = new Set(remote);
       if (
         before.size !== after.size ||
@@ -1367,6 +1357,7 @@ if (Array.isArray(remote)){
 
   return root;
 }
+
 
 /* ===== Контакты ===== */
 function ProfileEditView(){ 
