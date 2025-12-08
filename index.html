@@ -1056,7 +1056,9 @@ const THRESH = () =>
   Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
 
 function onPointerDown(e){
-  if (e.pointerType !== 'touch') return;  // ПК/мышь игнорим
+const pt = e.pointerType;
+// если браузер не заполняет pointerType (undefined / ''), считаем это touch
+if (pt && pt !== 'touch') return;  // ПК/мышь игнорим
   if (isAnimating) return;
 
   down = true;
@@ -1069,8 +1071,11 @@ function onPointerDown(e){
 }
 
 function onPointerMove(e){
-  if (e.pointerType !== 'touch') return;
+  const pt = e.pointerType;
+  if (pt && pt !== 'touch') return;
   if (!down || used || isAnimating) return;
+
+
 
   const dx = e.clientX - sx;
   const dy = e.clientY - sy;
