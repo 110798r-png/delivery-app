@@ -32,11 +32,6 @@ if (typeof window.CSS.escape !== 'function') {
     return String(value).replace(/"/g, '\\"');
   };
 }
-</script>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  
-<script>
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
