@@ -54,18 +54,20 @@
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     
       /* Внешний контейнер просто обрезает лишнее */
+/* Внешний просто маска */
 #promoStrip{
   overflow: hidden;
 }
 
+/* Внутренний — основной скролл/свайп по X */
 #promoStripInner{
   display: flex;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;  /* плавный скролл на iOS */
-  touch-action: pan-x pinch-zoom;     /* тут именно горизонтальный свайп */
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pinch-zoom;
 }
 
-/* Один слайд = 100% ширины экрана */
+/* Один слайд = ширина экрана */
 .promo-slide{
   flex: 0 0 100%;
 }
@@ -917,23 +919,26 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
+    // стартовая позиция — первый слайд
     promoIndex = 0;
     inner.scrollLeft = 0;
 
-    // ---- свайп по одному слайду ----
-    let drag = false;
-    let startX = 0;
+    // ====== Свайп пальцем ======
+    let dragging    = false;
+    let startX      = 0;
     let startScroll = 0;
 
     const getSlideW = () => strip.getBoundingClientRect().width || 1;
 
     inner.onpointerdown = (e) => {
       if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
-      drag = true;
-      startX = e.clientX;
+      dragging    = true;
+      startX      = e.clientX;
       startScroll = inner.scrollLeft;
+
       inner.setPointerCapture?.(e.pointerId);
-      // чтобы не дёргалось автолистание
+
+      // во время ручного свайпа авто не крутим
       if (promoTimer) {
         clearInterval(promoTimer);
         promoTimer = null;
@@ -941,52 +946,56 @@ function OrderView(){
     };
 
     inner.onpointermove = (e) => {
-      if (!drag) return;
+      if (!dragging) return;
       const dx = startX - e.clientX;
       inner.scrollLeft = startScroll + dx;
       e.preventDefault();
     };
 
     const finishDrag = () => {
-      if (!drag) return;
-      drag = false;
+      if (!dragging) return;
+      dragging = false;
 
       const slideW = getSlideW();
       let idx = Math.round(inner.scrollLeft / slideW);
-      idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
+
+      // бесконечный круг: перелистал дальше последнего – вернулись к первому
+      if (idx < 0) idx = 0;
+      if (idx >= promoSlides.length) idx = 0;
+
       promoIndex = idx;
 
       animateScrollX(inner, idx * slideW, { duration: 220 });
-
-      // перезапускаем автолистание после ручного свайпа
-      startAuto();
+      startAuto(); // после ручного свайпа снова включаем авто
     };
 
-    inner.onpointerup = finishDrag;
-    inner.onpointercancel = finishDrag;
-    inner.onpointerleave = finishDrag;
+    inner.onpointerup      = finishDrag;
+    inner.onpointercancel  = finishDrag;
+    inner.onpointerleave   = finishDrag;
 
-    // ---- автолистание по кругу ----
+    // ====== Авто-перелистывание (автосвайп) ======
     function startAuto() {
       if (promoTimer) {
         clearInterval(promoTimer);
         promoTimer = null;
       }
+
       promoTimer = setInterval(() => {
         if (!promoSlides.length) return;
 
         const slideW = getSlideW();
-        promoIndex = (promoIndex + 1) % promoSlides.length;  // 1→2→…→N→1
+
+        // круг: 0 -> 1 -> ... -> n-1 -> 0 -> ...
+        promoIndex = (promoIndex + 1) % promoSlides.length;
         const target = slideW * promoIndex;
 
-        animateScrollX(inner, target, { duration: 400 });
-      }, 3000); // 3 секунды
+        animateScrollX(inner, target, { duration: 350 });
+      }, 3500); // интервал автоперелистывания
     }
 
     startAuto();
   }
 
-  
  function rebuildMenu(){
   catPager.innerHTML = '';
   const cfg = loadConfig();
