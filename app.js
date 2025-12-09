@@ -1377,7 +1377,190 @@ function HistoryView(){
   return root;
 }
 
+// ===== PDF-ОТЧЁТ (jsPDF) =====
+let pdfReady = null;
+function ensureJsPdf() {
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if (!pdfReady) {
+    pdfReady = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      s.onload = () => resolve();
+      s.onerror = (e) => reject(e);
+      document.head.appendChild(s);
+    });
+  }
+  return pdfReady;
+}
 
+async function exportReportPdf() {
+  await ensureJsPdf();
+
+  // 1. Берём все заказы
+  let allOrders = [];
+  try {
+    const res = await rpc({ op: 'list', all: true });
+    if (Array.isArray(res.orders)) {
+      allOrders = res.orders;
+    }
+  } catch (e) {
+    console.warn('exportReportPdf: rpc list error, fallback to __dashOrders', e);
+    if (typeof window !== 'undefined' && Array.isArray(window.__dashOrders)) {
+      allOrders = window.__dashOrders.slice();
+    }
+  }
+
+  if (!allOrders.length) {
+    showToast('Нет заказов для отчёта');
+    return;
+  }
+
+  const now   = new Date();
+  const nowTs = now.getTime();
+  const MS_DAY = 24 * 60 * 60 * 1000;
+
+  const startDay   = nowTs - MS_DAY;
+  const startWeek  = nowTs - 7 * MS_DAY;
+  const startMonth = nowTs - 30 * MS_DAY;
+
+  function normalizeTotal(o) {
+    const items = Array.isArray(o.items) ? o.items : [];
+    const clientTotal = items.reduce(
+      (s, it) => s + (Number(it.price || 0) * Number(it.qty || 0)),
+      0
+    );
+    const total = typeof o.total === 'number'
+      ? Math.max(o.total, clientTotal)
+      : clientTotal;
+    return total;
+  }
+
+  function filterBy(startTs) {
+    return allOrders.filter(o => {
+      const t = Number(o.createdAt || 0);
+      return t >= startTs && t <= nowTs;
+    });
+  }
+
+  const dayOrders   = filterBy(startDay);
+  const weekOrders  = filterBy(startWeek);
+  const monthOrders = filterBy(startMonth);
+
+  function calcRevenue(orders) {
+    return orders.reduce((sum, o) => sum + normalizeTotal(o), 0);
+  }
+
+  const revenueDay   = calcRevenue(dayOrders);
+  const revenueWeek  = calcRevenue(weekOrders);
+  const revenueMonth = calcRevenue(monthOrders);
+  const revenueAll   = calcRevenue(allOrders); // выручка в момент отчётности
+
+  function avgCheck(orders) {
+    if (!orders.length) return 0;
+    return calcRevenue(orders) / orders.length;
+  }
+
+  const avgCheckDay   = avgCheck(dayOrders);
+  const avgCheckWeek  = avgCheck(weekOrders);
+  const avgCheckMonth = avgCheck(monthOrders);
+
+  function topN(orders, n) {
+    const agg = new Map();
+    orders.forEach(o => {
+      const items = Array.isArray(o.items) ? o.items : [];
+      items.forEach(it => {
+        if (!it.name) return;
+        const qty   = Number(it.qty || 0);
+        const price = Number(it.price || 0);
+        const sum   = qty * price;
+
+        const rec = agg.get(it.name) || { qty: 0, sum: 0 };
+        rec.qty += qty;
+        rec.sum += sum;
+        agg.set(it.name, rec);
+      });
+    });
+
+    return [...agg.entries()]
+      .map(([name, v]) => ({ name, qty: v.qty, sum: v.sum }))
+      .sort((a, b) => b.qty - a.qty || b.sum - a.sum)
+      .slice(0, n);
+  }
+
+  const top5Week  = topN(weekOrders, 5);
+  const top5Month = topN(monthOrders, 5);
+
+  // 2. Формируем PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
+  let y = 40;
+  function line(text, opts = {}) {
+    const maxWidth = 520;
+    const lines = doc.splitTextToSize(text, maxWidth);
+    lines.forEach(l => {
+      if (y > 780) {
+        doc.addPage();
+        y = 40;
+      }
+      doc.text(l, 40, y);
+      y += (opts.lineGap || 14);
+    });
+  }
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad2(now.getDate())}.${pad2(now.getMonth() + 1)}.${now.getFullYear()}`;
+  const timeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
+  doc.setFontSize(16);
+  doc.text('Отчёт BELISSIMO', 40, y);
+  y += 22;
+
+  doc.setFontSize(10);
+  line(`Дата и время отчёта: ${dateStr} ${timeStr}`);
+  line(`Всего заказов в системе: ${allOrders.length}`);
+  y += 8;
+
+  doc.setFontSize(12);
+  line('Топ 5 за неделю (последние 7 дней):', { lineGap: 16 });
+
+  if (top5Week.length) {
+    top5Week.forEach((it, i) => {
+      line(`${i + 1}. ${it.name} — ${it.qty} шт / ${Math.round(it.sum)} ₽`);
+    });
+  } else {
+    line('Нет данных за последнюю неделю.');
+  }
+
+  y += 10;
+  line('Топ 5 за месяц (последние 30 дней):', { lineGap: 16 });
+
+  if (top5Month.length) {
+    top5Month.forEach((it, i) => {
+      line(`${i + 1}. ${it.name} — ${it.qty} шт / ${Math.round(it.sum)} ₽`);
+    });
+  } else {
+    line('Нет данных за последний месяц.');
+  }
+
+  y += 16;
+  line('Средний чек:', { lineGap: 16 });
+  line(`• Средний чек за день (последние 24 часа): ${Math.round(avgCheckDay)} ₽`);
+  line(`• Средний чек за неделю (последние 7 дней): ${Math.round(avgCheckWeek)} ₽`);
+  line(`• Средний чек за месяц (последние 30 дней): ${Math.round(avgCheckMonth)} ₽`);
+
+  y += 16;
+  line('Выручка:', { lineGap: 16 });
+  line(`• Выручка за день (последние 24 часа): ${Math.round(revenueDay)} ₽`);
+  line(`• Выручка за неделю (последние 7 дней): ${Math.round(revenueWeek)} ₽`);
+  line(`• Выручка за месяц (последние 30 дней): ${Math.round(revenueMonth)} ₽`);
+  line(`• Выручка в момент отчётности (все заказы): ${Math.round(revenueAll)} ₽`);
+
+  const fname = `report_${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}.pdf`;
+  doc.save(fname);
+
+  showToast('PDF отчёт сформирован');
+}
 
 /* ===== Табло ===== */
 function DashboardView(){ 
@@ -1390,10 +1573,17 @@ const root = el(`
       </div>
       <div class="flex items-center gap-2">
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
+          <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
         <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
         <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
       </div>
     </div>
+
+    // Кнопка “Выгрузить PDF”
+const exportPdfBtn = root.querySelector('#exportPdfBtn');
+if (exportPdfBtn) {
+  exportPdfBtn.onclick = () => exportReportPdf();
+}
 
         <div class="p-4 rounded-2xl bg-white border">
       <!-- Кнопка-шапка шторки -->
@@ -1996,8 +2186,18 @@ window.addEventListener('hashchange', () => {
 
 // === общий старт приложения ===
 document.addEventListener('DOMContentLoaded', async () => {
-  initTableIdFromUrl();          // <-- ДОБАВЬ ЭТУ СТРОКУ
-  try { router(); } catch (e) { console.error(e); }
+  initTableIdFromUrl();
+
+  // 1) СНАЧАЛА тянем конфиг и наличие с сервера
+  await fetchRemoteConfig().catch(() => {});
+  await fetchUnavailableRemote().catch(() => {});
+
+  // 2) Теперь можно смело рисовать нужный экран
+  try {
+    router();
+  } catch (e) {
+    console.error(e);
+  }
 
   // кнопка "Назад" в шапке идёт всегда на /order
   const backButton = document.getElementById('backBtn');
@@ -2014,10 +2214,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // скрытый вход на табло по 4-тапу
   bindTabloTapZone();
-
-  // тянем конфиг меню и список "нет в наличии" с сервера
-  await fetchRemoteConfig().catch(() => {});
-  await fetchUnavailableRemote().catch(() => {});
 
   // --- PIN-модалка ---
   const pinM     = document.getElementById('pinModal');
@@ -2051,7 +2247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === pinM) pinCancel.onclick();
   };
 
-    // --- Service worker: одноразовое обновление и самоудаление ---
+  // --- Service worker ---
   if ('serviceWorker' in navigator) {
     try {
       await navigator.serviceWorker.register('/sw.js');
@@ -2077,6 +2273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 });
+
   
   window.addEventListener('load', () => {
   setTimeout(() => {
