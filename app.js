@@ -1579,12 +1579,6 @@ const root = el(`
       </div>
     </div>
 
-    // Кнопка “Выгрузить PDF”
-const exportPdfBtn = root.querySelector('#exportPdfBtn');
-if (exportPdfBtn) {
-  exportPdfBtn.onclick = () => exportReportPdf();
-}
-
         <div class="p-4 rounded-2xl bg-white border">
       <!-- Кнопка-шапка шторки -->
       <button
@@ -1618,6 +1612,12 @@ if (exportPdfBtn) {
     </div>
   </div>
 `);
+
+     // Кнопка “Выгрузить PDF”
+const exportPdfBtn = root.querySelector('#exportPdfBtn');
+if (exportPdfBtn) {
+  exportPdfBtn.onclick = () => exportReportPdf();
+}
   
    const list       = root.querySelector('#list');
   const stockList  = root.querySelector('#stockList');
