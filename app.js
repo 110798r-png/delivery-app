@@ -1377,26 +1377,40 @@ function HistoryView(){
   return root;
 }
 
-// ===== PDF-ОТЧЁТ (jsPDF) =====
+/* ==== PDF-ОТЧЁТ (pdfmake, поддержка кириллицы) ==== */
+
+// Ленивая подгрузка pdfmake + шрифтов (один раз)
 let pdfReady = null;
-function ensureJsPdf() {
-  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+function ensurePdfLib() {
+  if (window.pdfMake) return Promise.resolve();
   if (!pdfReady) {
     pdfReady = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-      s.onload = () => resolve();
-      s.onerror = (e) => reject(e);
-      document.head.appendChild(s);
+      const s1 = document.createElement('script');
+      s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js';
+      s1.onload = () => {
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js';
+        s2.onload = () => resolve();
+        s2.onerror = reject;
+        document.head.appendChild(s2);
+      };
+      s1.onerror = reject;
+      document.head.appendChild(s1);
     });
   }
   return pdfReady;
 }
 
-async function exportReportPdf() {
-  await ensureJsPdf();
+function formatMoneyPlain(num) {
+  num = Number(num || 0);
+  return `${Math.round(num)} ₽`;
+}
 
-  // 1. Берём все заказы
+// Основная функция выгрузки PDF
+async function exportReportPdf() {
+  await ensurePdfLib();
+
+  // 1. Берём ВСЕ заказы с сервера
   let allOrders = [];
   try {
     const res = await rpc({ op: 'list', all: true });
@@ -1404,10 +1418,7 @@ async function exportReportPdf() {
       allOrders = res.orders;
     }
   } catch (e) {
-    console.warn('exportReportPdf: rpc list error, fallback to __dashOrders', e);
-    if (typeof window !== 'undefined' && Array.isArray(window.__dashOrders)) {
-      allOrders = window.__dashOrders.slice();
-    }
+    console.warn('exportReportPdf: rpc list error', e);
   }
 
   if (!allOrders.length) {
@@ -1415,151 +1426,210 @@ async function exportReportPdf() {
     return;
   }
 
-  const now   = new Date();
-  const nowTs = now.getTime();
   const MS_DAY = 24 * 60 * 60 * 1000;
+  const nowTs  = Date.now();
+  const dayFrom   = nowTs - MS_DAY;        // последние 24 часа
+  const weekFrom  = nowTs - 7 * MS_DAY;    // последние 7 дней
+  const monthFrom = nowTs - 30 * MS_DAY;   // последние 30 дней
 
-  const startDay   = nowTs - MS_DAY;
-  const startWeek  = nowTs - 7 * MS_DAY;
-  const startMonth = nowTs - 30 * MS_DAY;
+  let totalAll = 0;
 
-  function normalizeTotal(o) {
+  // Для среднего чека
+  let revDay = 0,   cntDay = 0;
+  let revWeek = 0,  cntWeek = 0;
+  let revMonth = 0, cntMonth = 0;
+
+  // Для топов
+  const weekAgg  = new Map(); // name -> { qty, sum }
+  const monthAgg = new Map();
+
+  function orderTotal(o) {
     const items = Array.isArray(o.items) ? o.items : [];
-    const clientTotal = items.reduce(
-      (s, it) => s + (Number(it.price || 0) * Number(it.qty || 0)),
+    const client = items.reduce(
+      (s, it) => s + (Number(it.qty || 0) * Number(it.price || 0)),
       0
     );
-    const total = typeof o.total === 'number'
-      ? Math.max(o.total, clientTotal)
-      : clientTotal;
-    return total;
+    if (typeof o.total === 'number' && o.total > 0) {
+      return Math.max(o.total, client);
+    }
+    return client;
   }
 
-  function filterBy(startTs) {
-    return allOrders.filter(o => {
-      const t = Number(o.createdAt || 0);
-      return t >= startTs && t <= nowTs;
-    });
-  }
+  allOrders.forEach(o => {
+    const t = Number(o.createdAt || 0);
+    const sum = orderTotal(o);
+    totalAll += sum;
 
-  const dayOrders   = filterBy(startDay);
-  const weekOrders  = filterBy(startWeek);
-  const monthOrders = filterBy(startMonth);
+    if (t >= dayFrom) {
+      revDay += sum;
+      cntDay++;
+    }
+    if (t >= weekFrom) {
+      revWeek += sum;
+      cntWeek++;
+    }
+    if (t >= monthFrom) {
+      revMonth += sum;
+      cntMonth++;
+    }
 
-  function calcRevenue(orders) {
-    return orders.reduce((sum, o) => sum + normalizeTotal(o), 0);
-  }
+    const items = Array.isArray(o.items) ? o.items : [];
+    items.forEach(it => {
+      const name = it.name || '';
+      if (!name) return;
+      const q = Number(it.qty || 0);
+      const p = Number(it.price || 0);
+      const s = q * p;
 
-  const revenueDay   = calcRevenue(dayOrders);
-  const revenueWeek  = calcRevenue(weekOrders);
-  const revenueMonth = calcRevenue(monthOrders);
-  const revenueAll   = calcRevenue(allOrders); // выручка в момент отчётности
-
-  function avgCheck(orders) {
-    if (!orders.length) return 0;
-    return calcRevenue(orders) / orders.length;
-  }
-
-  const avgCheckDay   = avgCheck(dayOrders);
-  const avgCheckWeek  = avgCheck(weekOrders);
-  const avgCheckMonth = avgCheck(monthOrders);
-
-  function topN(orders, n) {
-    const agg = new Map();
-    orders.forEach(o => {
-      const items = Array.isArray(o.items) ? o.items : [];
-      items.forEach(it => {
-        if (!it.name) return;
-        const qty   = Number(it.qty || 0);
-        const price = Number(it.price || 0);
-        const sum   = qty * price;
-
-        const rec = agg.get(it.name) || { qty: 0, sum: 0 };
-        rec.qty += qty;
-        rec.sum += sum;
-        agg.set(it.name, rec);
-      });
-    });
-
-    return [...agg.entries()]
-      .map(([name, v]) => ({ name, qty: v.qty, sum: v.sum }))
-      .sort((a, b) => b.qty - a.qty || b.sum - a.sum)
-      .slice(0, n);
-  }
-
-  const top5Week  = topN(weekOrders, 5);
-  const top5Month = topN(monthOrders, 5);
-
-  // 2. Формируем PDF
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-
-  let y = 40;
-  function line(text, opts = {}) {
-    const maxWidth = 520;
-    const lines = doc.splitTextToSize(text, maxWidth);
-    lines.forEach(l => {
-      if (y > 780) {
-        doc.addPage();
-        y = 40;
+      if (t >= weekFrom) {
+        const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
+        rec.qty += q;
+        rec.sum += s;
+        weekAgg.set(name, rec);
       }
-      doc.text(l, 40, y);
-      y += (opts.lineGap || 14);
+      if (t >= monthFrom) {
+        const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
+        rec.qty += q;
+        rec.sum += s;
+        monthAgg.set(name, rec);
+      }
     });
+  });
+
+  function avgCheck(rev, cnt) {
+    if (!cnt) return '—';
+    return formatMoneyPlain(rev / cnt);
   }
 
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const dateStr = `${pad2(now.getDate())}.${pad2(now.getMonth() + 1)}.${now.getFullYear()}`;
-  const timeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const avgDay    = avgCheck(revDay,   cntDay);
+  const avgWeek   = avgCheck(revWeek,  cntWeek);
+  const avgMonth  = avgCheck(revMonth, cntMonth);
 
-  doc.setFontSize(16);
-  doc.text('Отчёт BELISSIMO', 40, y);
-  y += 22;
-
-  doc.setFontSize(10);
-  line(`Дата и время отчёта: ${dateStr} ${timeStr}`);
-  line(`Всего заказов в системе: ${allOrders.length}`);
-  y += 8;
-
-  doc.setFontSize(12);
-  line('Топ 5 за неделю (последние 7 дней):', { lineGap: 16 });
-
-  if (top5Week.length) {
-    top5Week.forEach((it, i) => {
-      line(`${i + 1}. ${it.name} — ${it.qty} шт / ${Math.round(it.sum)} ₽`);
-    });
-  } else {
-    line('Нет данных за последнюю неделю.');
+  function top5FromMap(m) {
+    return [...m.entries()]
+      .map(([name, v]) => ({ name, qty: v.qty, sum: v.sum }))
+      .sort((a,b) => b.qty - a.qty)
+      .slice(0, 5);
   }
 
-  y += 10;
-  line('Топ 5 за месяц (последние 30 дней):', { lineGap: 16 });
+  const topWeek  = top5FromMap(weekAgg);
+  const topMonth = top5FromMap(monthAgg);
 
-  if (top5Month.length) {
-    top5Month.forEach((it, i) => {
-      line(`${i + 1}. ${it.name} — ${it.qty} шт / ${Math.round(it.sum)} ₽`);
-    });
-  } else {
-    line('Нет данных за последний месяц.');
-  }
+  const now = new Date();
 
-  y += 16;
-  line('Средний чек:', { lineGap: 16 });
-  line(`• Средний чек за день (последние 24 часа): ${Math.round(avgCheckDay)} ₽`);
-  line(`• Средний чек за неделю (последние 7 дней): ${Math.round(avgCheckWeek)} ₽`);
-  line(`• Средний чек за месяц (последние 30 дней): ${Math.round(avgCheckMonth)} ₽`);
+  // Готовим docDefinition для pdfmake
+  const docDefinition = {
+    content: [
+      { text: 'Отчёт по продажам', style: 'header' },
+      { text: `Заведение: ${BRAND_TITLE}`, style: 'subheader' },
+      { text: `Дата и время выгрузки: ${now.toLocaleString('ru-RU')}`, margin: [0, 0, 0, 10] },
 
-  y += 16;
-  line('Выручка:', { lineGap: 16 });
-  line(`• Выручка за день (последние 24 часа): ${Math.round(revenueDay)} ₽`);
-  line(`• Выручка за неделю (последние 7 дней): ${Math.round(revenueWeek)} ₽`);
-  line(`• Выручка за месяц (последние 30 дней): ${Math.round(revenueMonth)} ₽`);
-  line(`• Выручка в момент отчётности (все заказы): ${Math.round(revenueAll)} ₽`);
+      {
+        text: 'Выручка на момент выгрузки',
+        style: 'sectionHeader',
+        margin: [0, 10, 0, 4]
+      },
+      {
+        text: formatMoneyPlain(totalAll),
+        style: 'bigNumber',
+        margin: [0, 0, 0, 14]
+      },
 
-  const fname = `report_${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}.pdf`;
-  doc.save(fname);
+      {
+        text: 'Средний чек',
+        style: 'sectionHeader',
+        margin: [0, 6, 0, 4]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto'],
+          body: [
+            ['Период', 'Средний чек'],
+            ['День (последние 24 часа)',  avgDay],
+            ['Неделя (последние 7 дней)', avgWeek],
+            ['Месяц (последние 30 дней)', avgMonth],
+          ]
+        },
+        layout: 'lightHorizontalLines',
+        margin: [0, 0, 0, 12]
+      },
 
-  showToast('PDF отчёт сформирован');
+      {
+        text: 'ТОП-5 позиций за неделю',
+        style: 'sectionHeader',
+        margin: [0, 10, 0, 4]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto', 'auto'],
+          body: [
+            ['Позиция', 'Кол-во', 'Выручка'],
+            ...(
+              topWeek.length
+                ? topWeek.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+                : [['Нет данных', '', '']]
+            )
+          ]
+        },
+        layout: 'lightHorizontalLines',
+        margin: [0, 0, 0, 12]
+      },
+
+      {
+        text: 'ТОП-5 позиций за месяц',
+        style: 'sectionHeader',
+        margin: [0, 10, 0, 4]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto', 'auto'],
+          body: [
+            ['Позиция', 'Кол-во', 'Выручка'],
+            ...(
+              topMonth.length
+                ? topMonth.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+                : [['Нет данных', '', '']]
+            )
+          ]
+        },
+        layout: 'lightHorizontalLines'
+      }
+    ],
+    styles: {
+      header: {
+        fontSize: 18,
+        bold: true,
+        margin: [0, 0, 0, 4]
+      },
+      subheader: {
+        fontSize: 11,
+        color: '#555555',
+        margin: [0, 0, 0, 2]
+      },
+      sectionHeader: {
+        fontSize: 13,
+        bold: true
+      },
+      bigNumber: {
+        fontSize: 20,
+        bold: true
+      }
+    },
+    defaultStyle: {
+      font: 'Roboto'
+    }
+  };
+
+  const fname =
+    `report_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,'0')}`
+    + `-${String(now.getDate()).padStart(2,'0')}_`
+    + `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.pdf`;
+
+  pdfMake.createPdf(docDefinition).download(fname);
+  showToast('PDF-отчёт выгружен');
 }
 
 /* ===== Табло ===== */
