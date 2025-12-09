@@ -635,92 +635,94 @@ function OrderView(){
 
   
     // --- Карусель акций над меню ---
-  function renderPromoStrip(categories) {
-    const strip = root.querySelector('#promoStrip');
-    const inner = root.querySelector('#promoStripInner');
-    if (!strip || !inner) return;
+    function renderPromoStrip(categories) {
+  const strip = root.querySelector('#promoStrip');
+  const inner = root.querySelector('#promoStripInner');
+  if (!strip || !inner) return;
 
-    inner.innerHTML = '';
-    promoSlides = [];
+  inner.innerHTML = '';
+  promoSlides = [];
 
-    (categories || []).forEach((cat, idx) => {
-      if (cat && cat.promoUrl) {
-        promoSlides.push({
-          idx,
-          title: cat.title || '',
-          url: cat.promoUrl
-        });
-      }
-    });
-
-    // если акций нет — прячем полоску и останавливаем таймер
-    if (!promoSlides.length) {
-      strip.classList.add('hidden');
-      promoIndex = 0;
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-      return;
-    }
-
-    strip.classList.remove('hidden');
-
-    promoSlides.forEach((p, i) => {
-      const slide = el(`
-        <button type="button" class="promo-slide">
-          <img
-            src="${p.url}"
-            alt="${p.title}"
-            loading="lazy"
-            class="w-full h-32 sm:h-40 object-cover">
-        </button>
-      `);
-
-      // тап по слайду — переход к нужной категории
-      slide.addEventListener('click', () => {
-        promoIndex = i;
-        const catIdx = p.idx;
-        goToIndex(catIdx, { animate: true });
+  (categories || []).forEach((cat, idx) => {
+    if (cat && cat.promoUrl) {
+      promoSlides.push({
+        idx,
+        title: cat.title || '',
+        url: cat.promoUrl
       });
+    }
+  });
 
-      inner.appendChild(slide);
-    });
-
+  if (!promoSlides.length) {
+    strip.classList.add('hidden');
     promoIndex = 0;
-    inner.scrollLeft = 0;
-
-    // 👉 отключаем ручной свайп: никаких pointer/touch обработчиков,
-    // пользователь просто не может таскать эту карусель пальцем
-
-    // Сначала глушим предыдущий таймер, если был
+    // на всякий случай глушим таймер, если он когда-то был
     if (promoTimer) {
       clearInterval(promoTimer);
       promoTimer = null;
     }
-
-    // Если слайд один — нет смысла крутить
-    if (promoSlides.length <= 1) return;
-
-    const getSlideW = () => strip.getBoundingClientRect().width || 1;
-
-    // Автолистание раз в 6 секунд
-    promoTimer = setInterval(() => {
-      promoIndex = (promoIndex + 1) % promoSlides.length;
-
-      const slideW = getSlideW();
-      const offset = promoIndex * slideW;
-
-      // прокручиваем картинку
-      animateScrollX(inner, offset, { duration: 300 });
-
-      // и двигаем категорию в меню
-      const p = promoSlides[promoIndex];
-      if (p) {
-        goToIndex(p.idx, { animate: true });
-      }
-    }, 6000);
+    return;
   }
+
+  strip.classList.remove('hidden');
+
+  promoSlides.forEach((p, i) => {
+    const slide = el(`
+      <button type="button" class="promo-slide">
+        <img
+          src="${p.url}"
+          alt="${p.title}"
+          loading="lazy"
+          class="w-full h-32 sm:h-40 object-cover"
+        >
+      </button>
+    `);
+
+    // тап по баннеру — перейти в нужную категорию
+    slide.addEventListener('click', () => {
+      promoIndex = i;
+      goToIndex(p.idx, { animate: true });
+    });
+
+    inner.appendChild(slide);
+  });
+
+  promoIndex = 0;
+  inner.scrollLeft = 0;
+
+  // ===== АВТОКАРУСЕЛЬ, БЕЗ СВАЙПОВ ПАЛЬЦЕМ =====
+
+  // убиваем старый таймер, если был
+  if (promoTimer) {
+    clearInterval(promoTimer);
+    promoTimer = null;
+  }
+
+  // если всего один слайд – крутить нечего
+  if (promoSlides.length <= 1) {
+    return;
+  }
+
+  const getSlideW = () => strip.getBoundingClientRect().width || 1;
+
+  // листаем баннеры раз в 6 секунд
+  promoTimer = setInterval(() => {
+    // следующий индекс по кругу
+    promoIndex = (promoIndex + 1) % promoSlides.length;
+
+    const slideW = getSlideW();
+    const offset = promoIndex * slideW;
+
+    // плавно прокручиваем сами баннеры
+    animateScrollX(inner, offset, { duration: 300 });
+
+    // и синхронно перелистываем категорию меню
+    const p = promoSlides[promoIndex];
+    if (p) {
+      goToIndex(p.idx, { animate: true });
+    }
+  }, 6000);
+}
 
 
   // обработчик +/− по делегированию
