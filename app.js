@@ -633,24 +633,17 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-    // --- Карусель акций над меню (как категории: нативный свайп, без авто) ---
+     // --- Карусель акций над меню: один свайп = одна картинка, без авто ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
     inner.innerHTML = '';
-
-    // оформляем как горизонтальную ленту
-    inner.style.display = 'flex';
-    inner.style.flexWrap = 'nowrap';
-    inner.style.overflowX = 'auto';
-    inner.style.scrollSnapType = 'x mandatory';
-    inner.classList.add('no-scrollbar'); // чтобы не было полосы прокрутки
-
     promoSlides = [];
+    promoIndex  = 0;
 
-    // берём promo[] или старый promoUrl
+    // Собираем слайды: promo[] или старый promoUrl
     (categories || []).forEach((cat, idx) => {
       if (!cat) return;
 
@@ -677,6 +670,15 @@ function OrderView(){
 
     strip.classList.remove('hidden');
 
+    // Базовая раскладка: flex, без скролла
+    inner.style.display = 'flex';
+    inner.style.flexWrap = 'nowrap';
+    inner.style.overflow = 'hidden';
+    inner.style.touchAction = 'pan-y'; // чтобы свайп по X не ломал вертикальную прокрутку
+    inner.classList.add('no-scrollbar');
+    inner.style.transform = 'translateX(0px)';
+    inner.style.transition = 'transform 0.25s cubic-bezier(0.33, 1, 0.68, 1)';
+
     promoSlides.forEach((p) => {
       const slide = el(`
         <button type="button" class="promo-slide">
@@ -689,12 +691,11 @@ function OrderView(){
         </button>
       `);
 
-      // каждый слайд = 100% ширины контейнера, как одна страница
+      // Каждый слайд = 100% ширины контейнера
       slide.style.flex = '0 0 100%';
-      slide.style.scrollSnapAlign = 'center';
       slide.style.display = 'block';
 
-      // клик по слайду — переходим в нужную категорию
+      // Клик по слайду — просто прыжок в категорию (без свайпа)
       slide.addEventListener('click', () => {
         goToIndex(p.idx, { animate: true });
       });
@@ -702,10 +703,85 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
-    // стартуем с первого слайда
-    inner.scrollLeft = 0;
-  }
+    // ====== ЛОГИКА СВАЙПА "ОДИН ЖЕСТ — ОДНА КАРТИНКА" ======
+    let isDragging   = false;
+    let startX       = 0;
+    let startIndex   = 0;
+    let slideW       = strip.getBoundingClientRect().width || 1;
+    let lastDx       = 0;
 
+    function applyIndex(idx, withAnim = true) {
+      promoIndex = Math.max(0, Math.min(promoSlides.length - 1, idx));
+      if (withAnim) {
+        inner.style.transition = 'transform 0.25s cubic-bezier(0.33, 1, 0.68, 1)';
+      } else {
+        inner.style.transition = 'none';
+      }
+      const offset = -promoIndex * slideW;
+      inner.style.transform = `translateX(${offset}px)`;
+    }
+
+    // При ресайзе перезадаём ширину и позицию
+    const onResize = () => {
+      slideW = strip.getBoundingClientRect().width || 1;
+      applyIndex(promoIndex, false);
+    };
+    window.addEventListener('resize', onResize);
+
+    inner.onpointerdown = (e) => {
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
+      isDragging = true;
+      startX     = e.clientX;
+      startIndex = promoIndex;
+      lastDx     = 0;
+      slideW     = strip.getBoundingClientRect().width || 1;
+      inner.style.transition = 'none';
+      inner.setPointerCapture?.(e.pointerId);
+    };
+
+    inner.onpointermove = (e) => {
+      if (!isDragging) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
+
+      const dx = e.clientX - startX;
+      lastDx   = dx;
+
+      const baseOffset = -startIndex * slideW;
+      const offset     = baseOffset + dx;
+
+      inner.style.transform = `translateX(${offset}px)`;
+      e.preventDefault();
+    };
+
+    const finishDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const threshold = slideW * 0.15; // 15% ширины — достаточно, чтобы переключить кадр
+      let nextIndex = startIndex;
+
+      if (lastDx < -threshold) {
+        // свайп влево → следующая картинка
+        nextIndex = startIndex + 1;
+      } else if (lastDx > threshold) {
+        // свайп вправо → предыдущая картинка
+        nextIndex = startIndex - 1;
+      }
+
+      applyIndex(nextIndex, true);
+
+      if (e && e.pointerId != null) {
+        inner.releasePointerCapture?.(e.pointerId);
+      }
+    };
+
+    inner.onpointerup = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave = finishDrag;
+
+    // стартуем с нулевого слайда
+    applyIndex(0, false);
+  }
 
 function rebuildMenu() {
   catPager.innerHTML = '';
