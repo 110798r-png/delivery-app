@@ -633,171 +633,168 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  // --- Карусель акций над меню ---
-function renderPromoStrip(categories) {
-  const strip = root.querySelector('#promoStrip');
-  const inner = root.querySelector('#promoStripInner');
-  if (!strip || !inner) return;
+    // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
+  function renderPromoStrip(categories) {
+    const strip = root.querySelector('#promoStrip');
+    const inner = root.querySelector('#promoStripInner');
+    if (!strip || !inner) return;
 
-  // глушим старый таймер, если был
-  if (promoTimer) {
-    clearInterval(promoTimer);
-    promoTimer = null;
-  }
-
-  inner.innerHTML = '';
-  promoSlides = [];
-  promoIndex  = 0;
-  promoDir    = 1;
-
-  // собираем слайды: promo[] (новый формат) или promoUrl (старый)
-  (categories || []).forEach((cat, idx) => {
-    if (!cat) return;
-
-    let urls = [];
-    if (Array.isArray(cat.promo)) {
-      urls = cat.promo.filter(Boolean).slice(0, 5);   // до 5 картинок
-    } else if (cat.promoUrl) {
-      urls = [cat.promoUrl];
+    // глушим старый таймер, если был
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
     }
 
-    urls.forEach(url => {
-      promoSlides.push({
-        idx,               // индекс категории
-        title: cat.title || '',
-        url
+    inner.innerHTML = '';
+    promoSlides = [];
+    promoIndex  = 0;
+    promoDir    = 1;
+
+    // берём promo: массив ссылок для каждой категории
+    (categories || []).forEach((cat, idx) => {
+      if (!cat || !Array.isArray(cat.promo)) return;
+      const urls = cat.promo.filter(Boolean); // сколько есть, столько и будет
+
+      urls.forEach(url => {
+        promoSlides.push({
+          idx,               // индекс категории
+          title: cat.title || '',
+          url
+        });
       });
     });
-  });
 
-  if (!promoSlides.length) {
-    strip.classList.add('hidden');
-    promoIndex = 0;
-    return;
-  }
+    if (!promoSlides.length) {
+      strip.classList.add('hidden');
+      return;
+    }
 
-  strip.classList.remove('hidden');
+    strip.classList.remove('hidden');
 
-  promoSlides.forEach((p, i) => {
-    const slide = el(`
-      <button type="button" class="promo-slide">
-        <img
-          src="${p.url}"
-          alt="${p.title}"
-          loading="lazy"
-          class="w-full h-32 sm:h-40 object-cover"
-        >
-      </button>
-    `);
+    promoSlides.forEach((p, i) => {
+      const slide = el(`
+        <button type="button" class="promo-slide">
+          <img
+            src="${p.url}"
+            alt="${p.title}"
+            loading="lazy"
+            class="w-full h-32 sm:h-40 object-cover"
+          >
+        </button>
+      `);
 
-    // тап по слайду — переход к нужной категории
-    slide.addEventListener('click', () => {
-      promoIndex = i;
-      goToIndex(p.idx, { animate: true });
+      // КЛИК по слайду → перейти в категорию (никаких скроллов, просто смена)
+      slide.addEventListener('click', () => {
+        promoIndex = i;
+        goToIndex(p.idx, { animate: true });
+      });
+
+      inner.appendChild(slide);
     });
 
-    inner.appendChild(slide);
-  });
+    // делаем "настоящий" свайп через transform, а не scrollLeft
+    inner.style.display    = 'flex';
+    inner.style.willChange = 'transform';
+    inner.style.transform  = 'translate3d(0,0,0)';
+    inner.style.transition = 'transform 0.25s ease-out';
 
-  // ширину берём у самого слайда (так надёжнее, чем у strip)
-  const getSlideW = () =>
-    inner.firstElementChild?.getBoundingClientRect().width ||
-    strip.getBoundingClientRect().width ||
-    1;
+    const getWidth = () => strip.getBoundingClientRect().width || 1;
 
-  function snapToCurrent(animate = true) {
-    const slideW = getSlideW();
-    const target = promoIndex * slideW;
-    if (animate) {
-      animateScrollX(inner, target, { duration: 260 });
-    } else {
-      inner.scrollLeft = target;
+    function setTranslate(x, withAnim) {
+      inner.style.transition = withAnim ? 'transform 0.25s ease-out' : 'none';
+      inner.style.transform  = `translate3d(${x}px,0,0)`;
     }
-  }
 
-  // ---- свайп по одному слайду ----
-  let drag = false;
-  let startX = 0;
-  let startScroll = 0;
-  let prevSnap = inner.style.scrollSnapType || '';
-
-  inner.onpointerdown = (e) => {
-    if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-
-    drag = true;
-    startX = e.clientX;
-    startScroll = inner.scrollLeft;
-    prevSnap = inner.style.scrollSnapType || '';
-    inner.style.scrollSnapType = 'none'; // отключаем принудительный snap
-    inner.setPointerCapture?.(e.pointerId);
-
-    // на время жеста глушим автолистание
-    if (promoTimer) {
-      clearInterval(promoTimer);
-      promoTimer = null;
+    function snapToCurrent(withAnim = true) {
+      const w = getWidth();
+      const x = -promoIndex * w;
+      setTranslate(x, withAnim);
     }
-  };
 
-  inner.onpointermove = (e) => {
-    if (!drag) return;
-    if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    // ---- ручной свайп ----
+    let dragging       = false;
+    let startX         = 0;
+    let startTranslate = 0;
+    let lastTranslate  = 0;
 
-    const dx = startX - e.clientX;
-    inner.scrollLeft = startScroll + dx;
-    e.preventDefault();
-  };
+    inner.onpointerdown = (e) => {
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
 
-  const finishDrag = () => {
-    if (!drag) return;
-    drag = false;
+      dragging = true;
+      startX   = e.clientX;
 
-    const slideW = getSlideW();
-    let idx = Math.round(inner.scrollLeft / slideW);
-    idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
-    promoIndex = idx;
+      const w = getWidth();
+      startTranslate = -promoIndex * w;
+      lastTranslate  = startTranslate;
 
-    // аккуратно доскролливаем к ближайшему слайду
-    snapToCurrent(true);
+      setTranslate(startTranslate, false);
+      inner.setPointerCapture?.(e.pointerId);
 
-    // возвращаем scroll-snap, если был
-    inner.style.scrollSnapType = prevSnap;
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+    };
 
-    // после свайпа снова запускаем автолистание
-    startPromoTimer();
-  };
+    inner.onpointermove = (e) => {
+      if (!dragging) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
 
-  inner.onpointerup = finishDrag;
-  inner.onpointercancel = finishDrag;
-  inner.onpointerleave = finishDrag;
+      const dx = e.clientX - startX;
+      lastTranslate = startTranslate + dx;
+      setTranslate(lastTranslate, false);
+      e.preventDefault();
+    };
 
-  // --- автоперелистывание ---
-  function startPromoTimer() {
-    if (promoTimer) {
-      clearInterval(promoTimer);
-      promoTimer = null;
-    }
-    if (!promoSlides.length) return;
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging = false;
 
-    promoTimer = setInterval(() => {
-      if (drag) return;           // не дёргаем во время свайпа
-      if (!promoSlides.length) return;
+      const w = getWidth();
+      const moved = startTranslate - lastTranslate;
+      const threshold = w * 0.2; // на сколько нужно "дёрнуть", чтобы перелистнуть
 
-      // маятник: туда-обратно
-      if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
-        promoDir = -1;
-      } else if (promoDir < 0 && promoIndex <= 0) {
-        promoDir = 1;
+      if (Math.abs(moved) > threshold) {
+        if (moved > 0 && promoIndex < promoSlides.length - 1) {
+          promoIndex++;
+        } else if (moved < 0 && promoIndex > 0) {
+          promoIndex--;
+        }
       }
 
-      promoIndex += promoDir;
       snapToCurrent(true);
-    }, 4500); // интервал автолистания
-  }
+      startPromoTimer();
+    };
 
-  // стартовое положение
-  snapToCurrent(false);
-  startPromoTimer();
-}
+    inner.onpointerup     = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave  = finishDrag;
+
+    // --- автосвайп "маятником" ---
+    function startPromoTimer() {
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+      if (!promoSlides.length) return;
+
+      promoTimer = setInterval(() => {
+        if (dragging) return;
+
+        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+          promoDir = -1;
+        } else if (promoDir < 0 && promoIndex <= 0) {
+          promoDir = 1;
+        }
+
+        promoIndex += promoDir;
+        snapToCurrent(true);
+      }, 4500);
+    }
+
+    snapToCurrent(false);
+    startPromoTimer();
+  }
 
 function rebuildMenu() {
   catPager.innerHTML = '';
@@ -2097,155 +2094,169 @@ if (exportPdfBtn) {
 }
 
 /* ===== КОНСТРУКТОР (меню) ===== */
-function BuilderView(){
-  const cfg = loadConfig();
-  const root = el(`
-    <div class="grid gap-4 pb-28">
-      <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Конструктор меню</h2>
-        <div class="flex gap-2">
-          <button id="exportBtn" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
-          <label class="px-3 py-2 rounded-xl border cursor-pointer">
-            Импорт JSON<input id="importInput" type="file" accept="application/json" class="hidden">
-          </label>
-          <button id="backBtn2" class="px-3 py-2 rounded-xl border">Назад</button>
-        </div>
-      </div>
 
-      <section class="card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold">Категории и товары</h3>
-          <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
-        </div>
-        <div id="catsBox" class="grid gap-4"></div>
-      </section>
+  // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
+  function renderPromoStrip(categories) {
+    const strip = root.querySelector('#promoStrip');
+    const inner = root.querySelector('#promoStripInner');
+    if (!strip || !inner) return;
 
-      <div class="flex gap-2">
-        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white">Сохранить и обновить меню</button>
-      </div>
-    </div>
-  `);
+    // глушим старый таймер, если был
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
 
-  const catsBox = root.querySelector('#catsBox');
-  function render(){
-    catsBox.innerHTML='';
-    cfg.menu.forEach((cat, cidx)=>{
-      const catCard = el(`
-        <div class="border rounded-2xl p-3 bg-white">
-          <div class="flex items-center justify-between">
-            <input value="${cat.title}" class="border rounded-xl p-2 font-semibold w-1/2" data-k="title">
-            <div class="flex gap-2">
-              <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
-              <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
-              <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
-            </div>
-          </div>
-          <div class="text-xs text-gray-500 mt-1">key: <code>${cat.key}</code></div>
+    inner.innerHTML = '';
+    promoSlides = [];
+    promoIndex  = 0;
+    promoDir    = 1;
 
-     <!-- Новое поле: URL акции -->
-          <label class="mt-2 block text-xs">
-            Акция (URL картинки)
-            <input
-              class="mt-1 w-full border rounded-lg p-2 text-xs"
-              placeholder="https://…"
-              value="${cat.promoUrl || ''}"
-              data-k="promoUrl"
-            >
-          </label>
-          
-          <div class="mt-3">
-            <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
-          </div>
-          <div class="mt-3 grid gap-2" data-items></div>
-        </div>
-      `);
-      const itemsBox = catCard.querySelector('[data-items]');
-      cat.items.forEach((it, iidx)=>{
-        const row = el(`
-          <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
-            <input class="col-span-5 border rounded-lg p-2" placeholder="Название" value="${it.name||''}" data-k="name">
-            <input class="col-span-2 border rounded-lg p-2" type="number" placeholder="Цена" value="${it.price||0}" data-k="price">
-            <input class="col-span-4 border rounded-lg p-2" placeholder="URL фото" value="${it.img||''}" data-k="img">
-            <div class="col-span-1 flex items-center gap-1 justify-end">
-              <button class="px-2 py-1 rounded-md border" data-act="iUp">↑</button>
-              <button class="px-2 py-1 rounded-md border" data-act="iDown">↓</button>
-              <button class="px-2 py-1 rounded-md border text-red-600" data-act="iDel">✕</button>
-            </div>
-          </div>
-        `);
-        row.addEventListener('input', (e)=>{
-          const k=e.target.dataset.k;
-          if(k==='price') cat.items[iidx][k]=Number(e.target.value||0);
-          else cat.items[iidx][k]=e.target.value;
+    // берём promo: массив ссылок для каждой категории
+    (categories || []).forEach((cat, idx) => {
+      if (!cat || !Array.isArray(cat.promo)) return;
+      const urls = cat.promo.filter(Boolean); // сколько есть, столько и будет
+
+      urls.forEach(url => {
+        promoSlides.push({
+          idx,               // индекс категории
+          title: cat.title || '',
+          url
         });
-        row.addEventListener('click',(e)=>{
-          const act=e.target.dataset.act; if(!act) return;
-          if(act==='iDel'){ cat.items.splice(iidx,1); render(); }
-          if(act==='iUp' && iidx>0){ const t=cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
-          if(act==='iDown' && iidx<cat.items.length-1){ const t=cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
-        });
-        itemsBox.appendChild(row);
       });
-
-            catCard.addEventListener('input',(e)=>{
-        const k = e.target.dataset.k;
-        if (k === 'title') {
-          cat.title = e.target.value;
-        } else if (k === 'promoUrl') {
-          cat.promoUrl = e.target.value.trim();
-        }
-      });
-      catCard.addEventListener('click',(e)=>{
-        const act=e.target.dataset.act; if(!act) return;
-        if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
-        if(act==='up' && cidx>0){ const t=cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
-        if(act==='down' && cidx<cfg.menu.length-1){ const t=cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
-        if(act==='addItem'){ cat.items.push({name:'Новый товар', price:0, img:''}); render(); }
-      });
-
-      catsBox.appendChild(catCard);
     });
-  }
-  render();
 
-  root.querySelector('#addCatBtn').onclick=()=>{
-    const id = 'cat'+(Date.now().toString().slice(-5));
-    cfg.menu.push({ key:id, title:'Новая категория', items:[] });
-    render();
-  };
-
-  root.querySelector('#exportBtn').onclick=()=>{
-    const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yamamoto-config.json'; a.click(); URL.revokeObjectURL(a.href);
-  };
-  root.querySelector('#importInput').onchange=(e)=>{
-    const f=e.target.files?.[0]; if(!f) return;
-    const fr=new FileReader(); fr.onload=()=>{ try{ const json=JSON.parse(fr.result); saveConfig(json); showToast('Импортирован конфиг'); location.reload(); }catch{ alert('Неверный JSON'); } };
-    fr.readAsText(f);
-  };
-
-  root.querySelector('#applyBtn').onclick=async ()=>{
-    saveConfig(cfg);
-    applyTheme(cfg.theme);
-    MENU_CATEGORIES = cfg.menu.slice();
-
-    // пробуем сохранить общий конфиг на сервере
-    try{
-      await rpc({ op: 'config_set', config: cfg });
-    }catch(e){
-      console.warn('config_set error', e);
-      showToast('Меню сохранено локально, но сервер недоступен');
-      history.length ? history.back() : (location.hash='#/dashboard');
+    if (!promoSlides.length) {
+      strip.classList.add('hidden');
       return;
     }
 
-    showToast('Меню сохранено (сервер)');
-    history.length ? history.back() : (location.hash='#/dashboard');
-  };
-  
-  root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/dashboard');
-  return root;
-}
+    strip.classList.remove('hidden');
+
+    promoSlides.forEach((p, i) => {
+      const slide = el(`
+        <button type="button" class="promo-slide">
+          <img
+            src="${p.url}"
+            alt="${p.title}"
+            loading="lazy"
+            class="w-full h-32 sm:h-40 object-cover"
+          >
+        </button>
+      `);
+
+      // КЛИК по слайду → перейти в категорию (никаких скроллов, просто смена)
+      slide.addEventListener('click', () => {
+        promoIndex = i;
+        goToIndex(p.idx, { animate: true });
+      });
+
+      inner.appendChild(slide);
+    });
+
+    // делаем "настоящий" свайп через transform, а не scrollLeft
+    inner.style.display    = 'flex';
+    inner.style.willChange = 'transform';
+    inner.style.transform  = 'translate3d(0,0,0)';
+    inner.style.transition = 'transform 0.25s ease-out';
+
+    const getWidth = () => strip.getBoundingClientRect().width || 1;
+
+    function setTranslate(x, withAnim) {
+      inner.style.transition = withAnim ? 'transform 0.25s ease-out' : 'none';
+      inner.style.transform  = `translate3d(${x}px,0,0)`;
+    }
+
+    function snapToCurrent(withAnim = true) {
+      const w = getWidth();
+      const x = -promoIndex * w;
+      setTranslate(x, withAnim);
+    }
+
+    // ---- ручной свайп ----
+    let dragging       = false;
+    let startX         = 0;
+    let startTranslate = 0;
+    let lastTranslate  = 0;
+
+    inner.onpointerdown = (e) => {
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+      dragging = true;
+      startX   = e.clientX;
+
+      const w = getWidth();
+      startTranslate = -promoIndex * w;
+      lastTranslate  = startTranslate;
+
+      setTranslate(startTranslate, false);
+      inner.setPointerCapture?.(e.pointerId);
+
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+    };
+
+    inner.onpointermove = (e) => {
+      if (!dragging) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+      const dx = e.clientX - startX;
+      lastTranslate = startTranslate + dx;
+      setTranslate(lastTranslate, false);
+      e.preventDefault();
+    };
+
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+
+      const w = getWidth();
+      const moved = startTranslate - lastTranslate;
+      const threshold = w * 0.2; // на сколько нужно "дёрнуть", чтобы перелистнуть
+
+      if (Math.abs(moved) > threshold) {
+        if (moved > 0 && promoIndex < promoSlides.length - 1) {
+          promoIndex++;
+        } else if (moved < 0 && promoIndex > 0) {
+          promoIndex--;
+        }
+      }
+
+      snapToCurrent(true);
+      startPromoTimer();
+    };
+
+    inner.onpointerup     = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave  = finishDrag;
+
+    // --- автосвайп "маятником" ---
+    function startPromoTimer() {
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+      if (!promoSlides.length) return;
+
+      promoTimer = setInterval(() => {
+        if (dragging) return;
+
+        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+          promoDir = -1;
+        } else if (promoDir < 0 && promoIndex <= 0) {
+          promoDir = 1;
+        }
+
+        promoIndex += promoDir;
+        snapToCurrent(true);
+      }, 4500);
+    }
+
+    snapToCurrent(false);
+    startPromoTimer();
+  }
 
 /* ===== 4-тап зона ===== */
 function bindTabloTapZone(){
