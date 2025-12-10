@@ -1686,7 +1686,7 @@ const root = el(`
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
+<div id="list" class="flex flex-wrap gap-4 justify-start"></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1838,7 +1838,8 @@ if (exportPdfBtn) {
       : '';
 
        const card = el(`
-      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
+     <div
+    class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
         <div class="flex items-center justify-between">
           <div>
             <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1873,6 +1874,10 @@ if (exportPdfBtn) {
       </div>
     `);
 
+    // ширина карточки: на мобиле почти вся, на широком экране — несколько колонок
+card.style.flex = '1 1 260px'; // минимальная ширина
+card.style.maxWidth = '360px'; // чтобы не были слишком широкие
+    
     card.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]');
       if (!btn) return;
@@ -2326,11 +2331,16 @@ function bindTabloTapZone(){
     if (!first) first = now; taps++;
     if (now - first > windowMs){ reset(); taps = 1; first = now; }
     if (taps >= 4){
-      reset();
-      document.getElementById('payModal')?.classList.remove('open');
-      if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){ location.hash = '#/dashboard'; }
-      else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal').classList.add('open'); }
-    }else{ if (timer) clearTimeout(timer); timer = setTimeout(reset, windowMs); }
+  reset();
+  document.getElementById('payModal')?.classList.remove('open');
+
+  // всегда только через PIN
+  sessionStorage.setItem(WANT_DASH, '1');
+  document.getElementById('pinModal').classList.add('open');
+} else {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(reset, windowMs);
+}
   }
   ['click','pointerup','touchend'].forEach(ev => hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}));
 }
@@ -2374,14 +2384,24 @@ function router(){
     profileBtn.classList.remove('hidden');
   }
 
-  // защищаем табло PIN-ом
-  if (h === '#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK) !== '1') {
+ // защищаем табло PIN-ом: каждый раз
+if (h === '#/dashboard') {
+  const canEnterOnce = sessionStorage.getItem(TABLO_PIN_OK) === '1';
+
+  if (canEnterOnce) {
+    // расходуем одноразовый допуск
+    sessionStorage.removeItem(TABLO_PIN_OK);
+    realRouter();
+  } else {
     sessionStorage.setItem(WANT_DASH, '1');
     document.getElementById('pinModal').classList.add('open');
     const app = document.getElementById('app');
     if (app) app.innerHTML = '';
-    return;
   }
+  return;
+}
+
+realRouter();
 
   realRouter();
 }
@@ -2428,21 +2448,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pinCancel= document.getElementById('pinCancel');
   const pinInput = document.getElementById('pinInput');
 
-  pinOk.onclick = (e) => {
-    e && e.preventDefault();
-    if ((pinInput.value || '').length > 0) {
+ pinOk.onclick = (e) => {
+  e && e.preventDefault();
+  if ((pinInput.value || '').length > 0) {
+    pinM.classList.remove('open');
+
+    if (sessionStorage.getItem(WANT_DASH) === '1') {
+      // разрешаем ОДИН раз зайти на табло
+      sessionStorage.removeItem(WANT_DASH);
       sessionStorage.setItem(TABLO_PIN_OK, '1');
-      pinM.classList.remove('open');
-      if (sessionStorage.getItem(WANT_DASH) === '1') {
-        sessionStorage.removeItem(WANT_DASH);
-        location.hash = '#/dashboard';
-      } else {
-        router();
-      }
+      location.hash = '#/dashboard';
     } else {
-      showToast('Введите ключ');
+      router();
     }
-  };
+  } else {
+    showToast('Введите ключ');
+  }
+};
 
   pinCancel.onclick = () => {
     pinM.classList.remove('open');
