@@ -634,30 +634,44 @@ function OrderView(){
   });
 
   // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
+
+    // --- Карусель акций над меню ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
-    // глушим старый таймер, если был
+    // оформление контейнера как "свайп-ленты"
+    inner.innerHTML = '';
+    inner.style.display = 'flex';
+    inner.style.flexWrap = 'nowrap';
+    inner.style.overflowX = 'auto';
+    inner.style.scrollBehavior = 'auto';
+    inner.classList.add('no-scrollbar'); // чтобы не торчала серая полоса
+
+    // сбрасываем состояние карусели
     if (promoTimer) {
       clearInterval(promoTimer);
       promoTimer = null;
     }
-
-    inner.innerHTML = '';
     promoSlides = [];
     promoIndex  = 0;
     promoDir    = 1;
 
-    // берём promo: массив ссылок для каждой категории
+    // собираем слайды: cat.promo = [url1, url2, ...] или старый cat.promoUrl
     (categories || []).forEach((cat, idx) => {
-      if (!cat || !Array.isArray(cat.promo)) return;
-      const urls = cat.promo.filter(Boolean); // сколько есть, столько и будет
+      if (!cat) return;
+
+      let urls = [];
+      if (Array.isArray(cat.promo)) {
+        urls = cat.promo.filter(Boolean);
+      } else if (cat.promoUrl) {
+        urls = [cat.promoUrl];
+      }
 
       urls.forEach(url => {
         promoSlides.push({
-          idx,               // индекс категории
+          idx,
           title: cat.title || '',
           url
         });
@@ -668,9 +682,9 @@ function OrderView(){
       strip.classList.add('hidden');
       return;
     }
-
     strip.classList.remove('hidden');
 
+    // создаём слайды
     promoSlides.forEach((p, i) => {
       const slide = el(`
         <button type="button" class="promo-slide">
@@ -683,7 +697,11 @@ function OrderView(){
         </button>
       `);
 
-      // КЛИК по слайду → перейти в категорию (никаких скроллов, просто смена)
+      // каждый слайд ровно на ширину вьюпорта
+      slide.style.flex = '0 0 100%';      // ширина = 100% контейнера
+      slide.style.display = 'block';      // чтобы w-full работал предсказуемо
+
+      // клик — переход к категории
       slide.addEventListener('click', () => {
         promoIndex = i;
         goToIndex(p.idx, { animate: true });
@@ -692,44 +710,36 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
-    // делаем "настоящий" свайп через transform, а не scrollLeft
-    inner.style.display    = 'flex';
-    inner.style.willChange = 'transform';
-    inner.style.transform  = 'translate3d(0,0,0)';
-    inner.style.transition = 'transform 0.25s ease-out';
+    const getSlideW = () => strip.getBoundingClientRect().width || 1;
 
-    const getWidth = () => strip.getBoundingClientRect().width || 1;
+    // начальная позиция
+    inner.scrollLeft = 0;
 
-    function setTranslate(x, withAnim) {
-      inner.style.transition = withAnim ? 'transform 0.25s ease-out' : 'none';
-      inner.style.transform  = `translate3d(${x}px,0,0)`;
+    function snapToCurrent(animate = true) {
+      const slideW = getSlideW();
+      const target = promoIndex * slideW;
+      if (animate) {
+        animateScrollX(inner, target, { duration: 260 });
+      } else {
+        inner.scrollLeft = target;
+      }
     }
 
-    function snapToCurrent(withAnim = true) {
-      const w = getWidth();
-      const x = -promoIndex * w;
-      setTranslate(x, withAnim);
-    }
-
-    // ---- ручной свайп ----
-    let dragging       = false;
-    let startX         = 0;
-    let startTranslate = 0;
-    let lastTranslate  = 0;
+    // ---- свайп по одному слайду ----
+    let drag = false;
+    let startX = 0;
+    let startScroll = 0;
+    let moved = false;
 
     inner.onpointerdown = (e) => {
       if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-
-      dragging = true;
-      startX   = e.clientX;
-
-      const w = getWidth();
-      startTranslate = -promoIndex * w;
-      lastTranslate  = startTranslate;
-
-      setTranslate(startTranslate, false);
+      drag = true;
+      moved = false;
+      startX = e.clientX;
+      startScroll = inner.scrollLeft;
       inner.setPointerCapture?.(e.pointerId);
 
+      // на время свайпа останавливаем автолистание
       if (promoTimer) {
         clearInterval(promoTimer);
         promoTimer = null;
@@ -737,34 +747,59 @@ function OrderView(){
     };
 
     inner.onpointermove = (e) => {
-      if (!dragging) return;
+      if (!drag) return;
       if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-
-      const dx = e.clientX - startX;
-      lastTranslate = startTranslate + dx;
-      setTranslate(lastTranslate, false);
+      const dx = startX - e.clientX;
+      if (Math.abs(dx) > 3) moved = true;
+      inner.scrollLeft = startScroll + dx;
       e.preventDefault();
     };
 
     const finishDrag = () => {
-      if (!dragging) return;
-      dragging = false;
+      if (!drag) return;
+      drag = false;
 
-      const w = getWidth();
-      const moved = startTranslate - lastTranslate;
-      const threshold = w * 0.2; // на сколько нужно "дёрнуть", чтобы перелистнуть
-
-      if (Math.abs(moved) > threshold) {
-        if (moved > 0 && promoIndex < promoSlides.length - 1) {
-          promoIndex++;
-        } else if (moved < 0 && promoIndex > 0) {
-          promoIndex--;
-        }
-      }
+      const slideW = getSlideW();
+      let idx = Math.round(inner.scrollLeft / slideW);
+      idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
+      promoIndex = idx;
 
       snapToCurrent(true);
       startPromoTimer();
     };
+
+    inner.onpointerup = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave = finishDrag;
+
+    // --- автоперелистывание (маятником) ---
+    function startPromoTimer() {
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+      if (!promoSlides.length) return;
+
+      promoTimer = setInterval(() => {
+        // если пользователь тянет — не трогаем
+        if (drag) return;
+        if (!promoSlides.length) return;
+
+        const last = promoSlides.length - 1;
+        if (promoDir > 0 && promoIndex >= last) {
+          promoDir = -1;
+        } else if (promoDir < 0 && promoIndex <= 0) {
+          promoDir = 1;
+        }
+
+        promoIndex += promoDir;
+        snapToCurrent(true);
+      }, 4500);
+    }
+
+    snapToCurrent(false);
+    startPromoTimer();
+  }
 
     inner.onpointerup     = finishDrag;
     inner.onpointercancel = finishDrag;
