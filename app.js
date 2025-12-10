@@ -633,7 +633,7 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-     // --- Карусель акций над меню: один свайп = одна картинка, без авто ---
+      // --- Карусель акций над меню: один свайп = одна картинка, без авто ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
