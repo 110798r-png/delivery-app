@@ -1,4 +1,4 @@
-// ==== ПОЛИФИЛЫ ДЛЯ СТАРЫХ/КАПРИЗНЫХ БРАУЗЕРОВ ====0
+// ==== ПОЛИФИЛЫ ДЛЯ СТАРЫХ/КАПРИЗНЫХ БРАУЗЕРОВ ====
 
 // matches
 if (!Element.prototype.matches) {
@@ -633,79 +633,101 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-    // --- Карусель акций над меню (как категории: нативный свайп, без авто) ---
-  function renderPromoStrip(categories) {
+  
+    // --- Карусель акций над меню ---
+
+    function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
     inner.innerHTML = '';
-
-    // оформляем как горизонтальную ленту
-    inner.style.display = 'flex';
-    inner.style.flexWrap = 'nowrap';
-    inner.style.overflowX = 'auto';
-    inner.style.scrollSnapType = 'x mandatory';
-    inner.classList.add('no-scrollbar'); // чтобы не было полосы прокрутки
-
     promoSlides = [];
 
-    // берём promo[] или старый promoUrl
     (categories || []).forEach((cat, idx) => {
-      if (!cat) return;
-
-      let urls = [];
-      if (Array.isArray(cat.promo)) {
-        urls = cat.promo.filter(Boolean);
-      } else if (cat.promoUrl) {
-        urls = [cat.promoUrl];
-      }
-
-      urls.forEach(url => {
+      if (cat && cat.promoUrl) {
         promoSlides.push({
           idx,
           title: cat.title || '',
-          url
+          url: cat.promoUrl
         });
-      });
+      }
     });
 
     if (!promoSlides.length) {
       strip.classList.add('hidden');
+      promoIndex = 0;
+      // на всякий случай глушим таймер, если он когда-то был
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
       return;
     }
 
     strip.classList.remove('hidden');
 
-    promoSlides.forEach((p) => {
+    promoSlides.forEach((p, i) => {
       const slide = el(`
         <button type="button" class="promo-slide">
-          <img
-            src="${p.url}"
-            alt="${p.title}"
-            loading="lazy"
-            class="w-full h-32 sm:h-40 object-cover"
-          >
+          <img src="${p.url}"
+     alt="${p.title}"
+     loading="lazy"
+     class="w-full h-32 sm:h-40 object-cover">
         </button>
       `);
 
-      // каждый слайд = 100% ширины контейнера, как одна страница
-      slide.style.flex = '0 0 100%';
-      slide.style.scrollSnapAlign = 'center';
-      slide.style.display = 'block';
-
-      // клик по слайду — переходим в нужную категорию
+      // тап по слайду — переход к нужной категории
       slide.addEventListener('click', () => {
+        promoIndex = i;
         goToIndex(p.idx, { animate: true });
       });
 
       inner.appendChild(slide);
     });
 
-    // стартуем с первого слайда
+    promoIndex = 0;
     inner.scrollLeft = 0;
-  }
 
+    // ---- свайп по одному слайду ----
+    let drag = false;
+    let startX = 0;
+    let startScroll = 0;
+
+    const getSlideW = () => strip.getBoundingClientRect().width || 1;
+
+    inner.onpointerdown = (e) => {
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      drag = true;
+      startX = e.clientX;
+      startScroll = inner.scrollLeft;
+      inner.setPointerCapture?.(e.pointerId);
+    };
+
+    inner.onpointermove = (e) => {
+      if (!drag) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      const dx = startX - e.clientX;
+      inner.scrollLeft = startScroll + dx;
+      e.preventDefault();
+    };
+
+    const finishDrag = () => {
+      if (!drag) return;
+      drag = false;
+
+      const slideW = getSlideW();
+      let idx = Math.round(inner.scrollLeft / slideW);
+      idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
+      promoIndex = idx;
+
+      animateScrollX(inner, idx * slideW, { duration: 220 });
+    };
+
+    inner.onpointerup = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave = finishDrag;
+  }
 
 function rebuildMenu() {
   catPager.innerHTML = '';
@@ -2005,15 +2027,17 @@ if (exportPdfBtn) {
 }
 
 /* ===== КОНСТРУКТОР (меню) ===== */
-
 function BuilderView(){
   const cfg = loadConfig();
-
   const root = el(`
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">Конструктор меню</h2>
         <div class="flex gap-2">
+          <button id="exportBtn" class="px-3 py-2 rounded-xl border">Экспорт JSON</button>
+          <label class="px-3 py-2 rounded-xl border cursor-pointer">
+            Импорт JSON<input id="importInput" type="file" accept="application/json" class="hidden">
+          </label>
           <button id="backBtn2" class="px-3 py-2 rounded-xl border">Назад</button>
         </div>
       </div>
@@ -2027,20 +2051,15 @@ function BuilderView(){
       </section>
 
       <div class="flex gap-2">
-        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white">
-          Сохранить и обновить меню
-        </button>
+        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white">Сохранить и обновить меню</button>
       </div>
     </div>
   `);
 
   const catsBox = root.querySelector('#catsBox');
-
   function render(){
     catsBox.innerHTML='';
     cfg.menu.forEach((cat, cidx)=>{
-      if (!Array.isArray(cat.items)) cat.items = [];
-
       const catCard = el(`
         <div class="border rounded-2xl p-3 bg-white">
           <div class="flex items-center justify-between">
@@ -2051,30 +2070,25 @@ function BuilderView(){
               <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
             </div>
           </div>
-          <div class="text-xs text-gray-500 mt-1">
-            key: <code>${cat.key}</code>
-          </div>
+          <div class="text-xs text-gray-500 mt-1">key: <code>${cat.key}</code></div>
 
-          <!-- Блок промо-картинок для карусели -->
-          <div class="mt-2 text-xs font-semibold">
-            Акции (картинки для карусели)
-          </div>
-          <div class="mt-1 grid gap-2" data-promo-box></div>
-          <button
-            class="mt-1 px-3 py-1.5 rounded-xl border text-xs"
-            data-act="addPromo"
-          >
-            + Картинка акции
-          </button>
-
+     <!-- Новое поле: URL акции -->
+          <label class="mt-2 block text-xs">
+            Акция (URL картинки)
+            <input
+              class="mt-1 w-full border rounded-lg p-2 text-xs"
+              placeholder="https://…"
+              value="${cat.promoUrl || ''}"
+              data-k="promoUrl"
+            >
+          </label>
+          
           <div class="mt-3">
             <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
           </div>
           <div class="mt-3 grid gap-2" data-items></div>
         </div>
       `);
-
-      /* ==== ТОВАРЫ ==== */
       const itemsBox = catCard.querySelector('[data-items]');
       cat.items.forEach((it, iidx)=>{
         const row = el(`
@@ -2089,122 +2103,63 @@ function BuilderView(){
             </div>
           </div>
         `);
-
         row.addEventListener('input', (e)=>{
-          const k = e.target.dataset.k;
-          if (!k) return;
-          if (k === 'price') {
-            cat.items[iidx][k] = Number(e.target.value || 0);
-          } else {
-            cat.items[iidx][k] = e.target.value;
-          }
+          const k=e.target.dataset.k;
+          if(k==='price') cat.items[iidx][k]=Number(e.target.value||0);
+          else cat.items[iidx][k]=e.target.value;
         });
-
         row.addEventListener('click',(e)=>{
-          const act = e.target.dataset.act;
-          if(!act) return;
+          const act=e.target.dataset.act; if(!act) return;
           if(act==='iDel'){ cat.items.splice(iidx,1); render(); }
-          if(act==='iUp' && iidx>0){
-            const t = cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render();
-          }
-          if(act==='iDown' && iidx<cat.items.length-1){
-            const t = cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render();
-          }
+          if(act==='iUp' && iidx>0){ const t=cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
+          if(act==='iDown' && iidx<cat.items.length-1){ const t=cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render(); }
         });
-
         itemsBox.appendChild(row);
       });
 
-      /* ==== ПРОМО-КАРТИНКИ ==== */
-      const promoBox = catCard.querySelector('[data-promo-box]');
-
-      function renderPromoRows(){
-        promoBox.innerHTML = '';
-        if (!Array.isArray(cat.promo)) cat.promo = [];
-
-        cat.promo.forEach((url, pidx) => {
-          const row = el(`
-            <div class="flex items-center gap-2">
-              <input
-                class="flex-1 border rounded-lg p-2 text-xs"
-                placeholder="https://…"
-                value="${url || ''}"
-                data-promo-input="${pidx}"
-              >
-              <button
-                class="px-2 py-1 rounded-md border text-red-600 text-xs"
-                data-act="delPromo"
-                data-promo-idx="${pidx}"
-              >
-                ✕
-              </button>
-            </div>
-          `);
-
-          row.querySelector('input').addEventListener('input', (e)=>{
-            cat.promo[pidx] = e.target.value.trim();
-          });
-
-          promoBox.appendChild(row);
-        });
-      }
-
-      renderPromoRows();
-
-      /* ==== ПРОЧЕЕ В КАТЕГОРИИ ==== */
-      catCard.addEventListener('input',(e)=>{
+            catCard.addEventListener('input',(e)=>{
         const k = e.target.dataset.k;
         if (k === 'title') {
           cat.title = e.target.value;
+        } else if (k === 'promoUrl') {
+          cat.promoUrl = e.target.value.trim();
         }
       });
-
       catCard.addEventListener('click',(e)=>{
-        const act = e.target.dataset.act;
-        if (!act) return;
-
-        if (act === 'del') {
-          if (confirm('Удалить категорию?')) {
-            cfg.menu.splice(cidx,1);
-            render();
-          }
-        } else if (act === 'up' && cidx > 0) {
-          const t = cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render();
-        } else if (act === 'down' && cidx < cfg.menu.length-1) {
-          const t = cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render();
-        } else if (act === 'addItem') {
-          cat.items.push({name:'Новый товар', price:0, img:''});
-          render();
-        } else if (act === 'addPromo') {
-          if (!Array.isArray(cat.promo)) cat.promo = [];
-          cat.promo.push('');
-          renderPromoRows();
-        } else if (act === 'delPromo') {
-          const pidx = Number(e.target.dataset.promoIdx || 0);
-          if (Array.isArray(cat.promo)) {
-            cat.promo.splice(pidx,1);
-            renderPromoRows();
-          }
-        }
+        const act=e.target.dataset.act; if(!act) return;
+        if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
+        if(act==='up' && cidx>0){ const t=cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
+        if(act==='down' && cidx<cfg.menu.length-1){ const t=cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render(); }
+        if(act==='addItem'){ cat.items.push({name:'Новый товар', price:0, img:''}); render(); }
       });
 
       catsBox.appendChild(catCard);
     });
   }
-
   render();
 
-  root.querySelector('#addCatBtn').onclick = () => {
+  root.querySelector('#addCatBtn').onclick=()=>{
     const id = 'cat'+(Date.now().toString().slice(-5));
-    cfg.menu.push({ key:id, title:'Новая категория', items:[], promo:[] });
+    cfg.menu.push({ key:id, title:'Новая категория', items:[] });
     render();
   };
 
-  root.querySelector('#applyBtn').onclick = async () => {
+  root.querySelector('#exportBtn').onclick=()=>{
+    const blob=new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yamamoto-config.json'; a.click(); URL.revokeObjectURL(a.href);
+  };
+  root.querySelector('#importInput').onchange=(e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    const fr=new FileReader(); fr.onload=()=>{ try{ const json=JSON.parse(fr.result); saveConfig(json); showToast('Импортирован конфиг'); location.reload(); }catch{ alert('Неверный JSON'); } };
+    fr.readAsText(f);
+  };
+
+  root.querySelector('#applyBtn').onclick=async ()=>{
     saveConfig(cfg);
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
 
+    // пробуем сохранить общий конфиг на сервере
     try{
       await rpc({ op: 'config_set', config: cfg });
     }catch(e){
@@ -2217,13 +2172,10 @@ function BuilderView(){
     showToast('Меню сохранено (сервер)');
     history.length ? history.back() : (location.hash='#/dashboard');
   };
-
-  root.querySelector('#backBtn2').onclick = () =>
-    history.length ? history.back() : (location.hash='#/dashboard');
-
+  
+  root.querySelector('#backBtn2').onclick=()=> history.length ? history.back() : (location.hash='#/dashboard');
   return root;
 }
-
 
 /* ===== 4-тап зона ===== */
 function bindTabloTapZone(){
