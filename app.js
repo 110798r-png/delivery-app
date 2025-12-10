@@ -1824,10 +1824,10 @@ if (exportPdfBtn) {
     };
     const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-    const itemsHtml = (o.items || []).map(i => `
-      <div class="flex justify-between text-lg">
-        <div>${i.name}</div>
-        <div class="font-semibold">${i.qty} × ${i.price}</div>
+        const itemsHtml = (o.items || []).map(i => `
+      <div class="flex justify-between">
+        <div class="mr-2">${i.name}</div>
+        <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
       </div>
     `).join('');
 
@@ -1837,35 +1837,49 @@ if (exportPdfBtn) {
          </div>`
       : '';
 
-       const card = el(`
-     <div
-    class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
+          const card = el(`
+      <div
+        class="w-full sm:w-[260px] md:w-[280px] lg:w-[320px]
+               p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+               flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+        data-id="${o.id}"
+      >
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-sm text-gray-700 mt-1">Столик: №${o.table}</div>` : ''}
+            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
           </div>
-          <span class="px-3 py-1 rounded-full text-sm font-medium border bg-white/50">${o.status || 'новый'}</span>
+          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+            ${o.status || 'новый'}
+          </span>
         </div>
-        <div class="text-gray-600 text-sm">${created.toLocaleString()}</div>
+
+        <div class="text-gray-600 text-xs mt-1">
+          ${created.toLocaleString()}
+        </div>
+
         ${etaBlock}
-        <div class="mt-2 grid gap-1 text-lg">
+
+        <div class="mt-2 grid gap-1 text-sm max-h-40 overflow-y-auto pr-1">
           ${itemsHtml || '—'}
         </div>
-        <div class="mt-3 flex items-center justify-between text-xl font-bold">
-          <div>Итого:</div><div>${total} ₽</div>
+
+        <div class="mt-2 flex items-center justify-between text-lg font-bold">
+          <div>Итого:</div>
+          <div>${total} ₽</div>
         </div>
-            <div class="mt-2 flex flex-wrap gap-2 items-center">
+
+        <div class="mt-2 flex flex-wrap gap-2 items-center">
           <button
             type="button"
-            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100"
+            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
             data-act="ready"
           >
             Готово
           </button>
           <button
             type="button"
-            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 ml-auto"
+            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
             data-act="delete"
           >
             Удалить
