@@ -2095,6 +2095,224 @@ if (exportPdfBtn) {
 
 /* ===== КОНСТРУКТОР (меню) ===== */
 
+function BuilderView(){
+  const cfg = loadConfig();
+
+  const root = el(`
+    <div class="grid gap-4 pb-28">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Конструктор меню</h2>
+        <div class="flex gap-2">
+          <button id="backBtn2" class="px-3 py-2 rounded-xl border">Назад</button>
+        </div>
+      </div>
+
+      <section class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Категории и товары</h3>
+          <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
+        </div>
+        <div id="catsBox" class="grid gap-4"></div>
+      </section>
+
+      <div class="flex gap-2">
+        <button id="applyBtn" class="px-4 py-3 rounded-xl bg-black text-white">
+          Сохранить и обновить меню
+        </button>
+      </div>
+    </div>
+  `);
+
+  const catsBox = root.querySelector('#catsBox');
+
+  function render(){
+    catsBox.innerHTML='';
+    cfg.menu.forEach((cat, cidx)=>{
+      if (!Array.isArray(cat.items)) cat.items = [];
+
+      const catCard = el(`
+        <div class="border rounded-2xl p-3 bg-white">
+          <div class="flex items-center justify-between">
+            <input value="${cat.title}" class="border rounded-xl p-2 font-semibold w-1/2" data-k="title">
+            <div class="flex gap-2">
+              <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
+              <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
+              <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
+            </div>
+          </div>
+          <div class="text-xs text-gray-500 mt-1">
+            key: <code>${cat.key}</code>
+          </div>
+
+          <!-- Блок промо-картинок для карусели -->
+          <div class="mt-2 text-xs font-semibold">
+            Акции (картинки для карусели)
+          </div>
+          <div class="mt-1 grid gap-2" data-promo-box></div>
+          <button
+            class="mt-1 px-3 py-1.5 rounded-xl border text-xs"
+            data-act="addPromo"
+          >
+            + Картинка акции
+          </button>
+
+          <div class="mt-3">
+            <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
+          </div>
+          <div class="mt-3 grid gap-2" data-items></div>
+        </div>
+      `);
+
+      /* ==== ТОВАРЫ ==== */
+      const itemsBox = catCard.querySelector('[data-items]');
+      cat.items.forEach((it, iidx)=>{
+        const row = el(`
+          <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
+            <input class="col-span-5 border rounded-lg p-2" placeholder="Название" value="${it.name||''}" data-k="name">
+            <input class="col-span-2 border rounded-lg p-2" type="number" placeholder="Цена" value="${it.price||0}" data-k="price">
+            <input class="col-span-4 border rounded-lg p-2" placeholder="URL фото" value="${it.img||''}" data-k="img">
+            <div class="col-span-1 flex items-center gap-1 justify-end">
+              <button class="px-2 py-1 rounded-md border" data-act="iUp">↑</button>
+              <button class="px-2 py-1 rounded-md border" data-act="iDown">↓</button>
+              <button class="px-2 py-1 rounded-md border text-red-600" data-act="iDel">✕</button>
+            </div>
+          </div>
+        `);
+
+        row.addEventListener('input', (e)=>{
+          const k = e.target.dataset.k;
+          if (!k) return;
+          if (k === 'price') {
+            cat.items[iidx][k] = Number(e.target.value || 0);
+          } else {
+            cat.items[iidx][k] = e.target.value;
+          }
+        });
+
+        row.addEventListener('click',(e)=>{
+          const act = e.target.dataset.act;
+          if(!act) return;
+          if(act==='iDel'){ cat.items.splice(iidx,1); render(); }
+          if(act==='iUp' && iidx>0){
+            const t = cat.items[iidx-1]; cat.items[iidx-1]=cat.items[iidx]; cat.items[iidx]=t; render();
+          }
+          if(act==='iDown' && iidx<cat.items.length-1){
+            const t = cat.items[iidx+1]; cat.items[iidx+1]=cat.items[iidx]; cat.items[iidx]=t; render();
+          }
+        });
+
+        itemsBox.appendChild(row);
+      });
+
+      /* ==== ПРОМО-КАРТИНКИ ==== */
+      const promoBox = catCard.querySelector('[data-promo-box]');
+
+      function renderPromoRows(){
+        promoBox.innerHTML = '';
+        if (!Array.isArray(cat.promo)) cat.promo = [];
+
+        cat.promo.forEach((url, pidx) => {
+          const row = el(`
+            <div class="flex items-center gap-2">
+              <input
+                class="flex-1 border rounded-lg p-2 text-xs"
+                placeholder="https://…"
+                value="${url || ''}"
+                data-promo-input="${pidx}"
+              >
+              <button
+                class="px-2 py-1 rounded-md border text-red-600 text-xs"
+                data-act="delPromo"
+                data-promo-idx="${pidx}"
+              >
+                ✕
+              </button>
+            </div>
+          `);
+
+          row.querySelector('input').addEventListener('input', (e)=>{
+            cat.promo[pidx] = e.target.value.trim();
+          });
+
+          promoBox.appendChild(row);
+        });
+      }
+
+      renderPromoRows();
+
+      /* ==== ПРОЧЕЕ В КАТЕГОРИИ ==== */
+      catCard.addEventListener('input',(e)=>{
+        const k = e.target.dataset.k;
+        if (k === 'title') {
+          cat.title = e.target.value;
+        }
+      });
+
+      catCard.addEventListener('click',(e)=>{
+        const act = e.target.dataset.act;
+        if (!act) return;
+
+        if (act === 'del') {
+          if (confirm('Удалить категорию?')) {
+            cfg.menu.splice(cidx,1);
+            render();
+          }
+        } else if (act === 'up' && cidx > 0) {
+          const t = cfg.menu[cidx-1]; cfg.menu[cidx-1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render();
+        } else if (act === 'down' && cidx < cfg.menu.length-1) {
+          const t = cfg.menu[cidx+1]; cfg.menu[cidx+1]=cfg.menu[cidx]; cfg.menu[cidx]=t; render();
+        } else if (act === 'addItem') {
+          cat.items.push({name:'Новый товар', price:0, img:''});
+          render();
+        } else if (act === 'addPromo') {
+          if (!Array.isArray(cat.promo)) cat.promo = [];
+          cat.promo.push('');
+          renderPromoRows();
+        } else if (act === 'delPromo') {
+          const pidx = Number(e.target.dataset.promoIdx || 0);
+          if (Array.isArray(cat.promo)) {
+            cat.promo.splice(pidx,1);
+            renderPromoRows();
+          }
+        }
+      });
+
+      catsBox.appendChild(catCard);
+    });
+  }
+
+  render();
+
+  root.querySelector('#addCatBtn').onclick = () => {
+    const id = 'cat'+(Date.now().toString().slice(-5));
+    cfg.menu.push({ key:id, title:'Новая категория', items:[], promo:[] });
+    render();
+  };
+
+  root.querySelector('#applyBtn').onclick = async () => {
+    saveConfig(cfg);
+    applyTheme(cfg.theme);
+    MENU_CATEGORIES = cfg.menu.slice();
+
+    try{
+      await rpc({ op: 'config_set', config: cfg });
+    }catch(e){
+      console.warn('config_set error', e);
+      showToast('Меню сохранено локально, но сервер недоступен');
+      history.length ? history.back() : (location.hash='#/dashboard');
+      return;
+    }
+
+    showToast('Меню сохранено (сервер)');
+    history.length ? history.back() : (location.hash='#/dashboard');
+  };
+
+  root.querySelector('#backBtn2').onclick = () =>
+    history.length ? history.back() : (location.hash='#/dashboard');
+
+  return root;
+}
+
   // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
