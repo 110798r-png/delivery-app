@@ -633,8 +633,6 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  
-    // --- Карусель акций над меню ---
     // --- Карусель акций над меню ---
   function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
@@ -816,6 +814,81 @@ function OrderView(){
     recalcTotal();
   });
 
+    // ===== Перестроение меню =====
+  function rebuildMenu() {
+    const cfg  = loadConfig();
+    const menu = cfg.menu || [];
+
+    catPager.innerHTML = '';
+    MENU_CATEGORIES = menu.slice();
+
+    menu.forEach((cat) => {
+      const col = el(`
+        <div class="inline-block w-full align-top">
+          <div class="v-scroll overflow-y-auto">
+            <div class="grid gap-3"></div>
+            <div class="bottom-spacer"></div>
+          </div>
+        </div>
+      `);
+
+      const grid = col.querySelector('.grid');
+
+      (cat.items || []).forEach((it) => {
+        const count = (window.__orderCounts && window.__orderCounts[it.name]) || 0;
+        const isOff = unavailableClient.has(it.name);
+
+        const card = el(`
+          <article class="menu-card flex gap-3 rounded-3xl bg-white border shadow-sm p-3 ${isOff ? 'opacity-40 pointer-events-none' : ''}">
+            <div class="flex-1 min-w-0">
+              <div class="text-base font-semibold truncate">${it.name || ''}</div>
+              ${it.price ? `<div class="mt-1 text-sm text-gray-500">${money(it.price)}</div>` : ''}
+              ${isOff ? `<div class="mt-1 text-xs text-red-500">Нет в наличии</div>` : ''}
+
+              <div class="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-full border flex items-center justify-center"
+                  data-act="dec"
+                  data-name="${it.name}"
+                  ${isOff ? 'disabled' : ''}
+                >−</button>
+                <div
+                  class="w-6 text-center text-base"
+                  data-q="${escAttr(it.name)}"
+                >${count}</div>
+                <button
+                  type="button"
+                  class="w-8 h-8 rounded-full border flex items-center justify-center"
+                  data-act="inc"
+                  data-name="${it.name}"
+                  ${isOff ? 'disabled' : ''}
+                >+</button>
+              </div>
+            </div>
+
+            ${
+              it.img
+                ? `<div class="flex-shrink-0">
+                     <img
+                       src="${it.img}"
+                       alt="${it.name || ''}"
+                       class="object-cover rounded-2xl"
+                       style="width: var(--img-w); height: var(--img-h);"
+                     >
+                   </div>`
+                : ''
+            }
+          </article>
+        `);
+
+        grid.appendChild(card);
+      });
+
+      catPager.appendChild(col);
+    });
+  }
+  
     function applyHeights(){
     try {
       const headerH  = document.querySelector('.brand-strip')?.getBoundingClientRect().height || 0;
