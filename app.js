@@ -504,6 +504,107 @@ function OrderView(){
 
   const panelW = () => catPager.getBoundingClientRect().width || 1;
 
+    // Перестроение меню по текущему конфигу + учёт отсутствующих товаров
+  function rebuildMenu() {
+    const cfg = loadConfig();
+    const cats = cfg.menu || [];
+    const counts = window.__orderCounts || {};
+
+    catPager.innerHTML = '';
+
+    cats.forEach((cat, catIdx) => {
+      const items = Array.isArray(cat.items) ? cat.items : [];
+
+      const itemsHtml = items.map(it => {
+        const name = it.name || '';
+        if (!name) return '';
+
+        const qty = counts[name] || 0;
+        const unav = unavailableClient.has(name);
+
+        const disabledCardClass = unav ? 'opacity-40 pointer-events-none' : '';
+        const disabledBtnAttr   = unav ? 'disabled' : '';
+        const unavLabel = unav
+          ? '<div class="mt-1 text-xs font-medium text-red-600">Нет в наличии</div>'
+          : '';
+
+        const imgPart = it.img
+          ? `
+            <div class="flex-shrink-0">
+              <img
+                src="${it.img}"
+                alt=""
+                class="rounded-2xl object-cover"
+                style="
+                  width: var(--img-w, 110px);
+                  height: var(--img-h, 70px);
+                "
+                loading="lazy"
+              >
+            </div>
+          `
+          : '';
+
+        const pricePart =
+          (typeof it.price === 'number' && (cfg.theme?.showPrice ?? true))
+            ? `<div class="mt-1 text-sm font-semibold">${money(it.price)}</div>`
+            : '';
+
+        return `
+          <div class="menu-card flex gap-3 rounded-2xl bg-white p-3 mb-3 shadow-sm ${disabledCardClass}">
+            ${imgPart}
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold truncate">${name}</div>
+              ${pricePart}
+              ${unavLabel}
+            </div>
+            <div class="flex flex-col items-center justify-center gap-2">
+              <button
+                type="button"
+                class="w-8 h-8 rounded-full border flex items-center justify-center text-lg leading-none"
+                data-act="inc"
+                data-name="${name}"
+                ${disabledBtnAttr}
+              >+</button>
+              <div
+                class="text-base font-semibold"
+                data-q="${escAttr(name)}"
+              >${qty}</div>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-full border flex items-center justify-center text-lg leading-none"
+                data-act="dec"
+                data-name="${name}"
+                ${disabledBtnAttr}
+              >−</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const page = el(`
+        <div class="inline-block align-top w-full shrink-0 snap-start">
+          <div class="v-scroll overflow-y-auto no-scrollbar px-1">
+            ${
+              itemsHtml ||
+              '<div class="text-sm text-gray-400 px-2 pt-3">В этой категории пока нет товаров.</div>'
+            }
+            <div class="bottom-spacer"></div>
+          </div>
+        </div>
+      `);
+
+      catPager.appendChild(page);
+    });
+
+    // после перестройки обновляем высоты и сумму
+    requestAnimationFrame(() => {
+      applyHeights();
+      goToIndex(activeIdx, { animate: false });
+      recalcTotal();
+    });
+  }
+  
   function handleStockUpdated(){
     unavailableClient = new Set(loadUnavailable());
     rebuildMenu();
@@ -813,81 +914,6 @@ function OrderView(){
     window.__orderCounts[name] = next;
     recalcTotal();
   });
-
-    // ===== Перестроение меню =====
-  function rebuildMenu() {
-    const cfg  = loadConfig();
-    const menu = cfg.menu || [];
-
-    catPager.innerHTML = '';
-    MENU_CATEGORIES = menu.slice();
-
-    menu.forEach((cat) => {
-      const col = el(`
-        <div class="inline-block w-full align-top">
-          <div class="v-scroll overflow-y-auto">
-            <div class="grid gap-3"></div>
-            <div class="bottom-spacer"></div>
-          </div>
-        </div>
-      `);
-
-      const grid = col.querySelector('.grid');
-
-      (cat.items || []).forEach((it) => {
-        const count = (window.__orderCounts && window.__orderCounts[it.name]) || 0;
-        const isOff = unavailableClient.has(it.name);
-
-        const card = el(`
-          <article class="menu-card flex gap-3 rounded-3xl bg-white border shadow-sm p-3 ${isOff ? 'opacity-40 pointer-events-none' : ''}">
-            <div class="flex-1 min-w-0">
-              <div class="text-base font-semibold truncate">${it.name || ''}</div>
-              ${it.price ? `<div class="mt-1 text-sm text-gray-500">${money(it.price)}</div>` : ''}
-              ${isOff ? `<div class="mt-1 text-xs text-red-500">Нет в наличии</div>` : ''}
-
-              <div class="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  class="w-8 h-8 rounded-full border flex items-center justify-center"
-                  data-act="dec"
-                  data-name="${it.name}"
-                  ${isOff ? 'disabled' : ''}
-                >−</button>
-                <div
-                  class="w-6 text-center text-base"
-                  data-q="${escAttr(it.name)}"
-                >${count}</div>
-                <button
-                  type="button"
-                  class="w-8 h-8 rounded-full border flex items-center justify-center"
-                  data-act="inc"
-                  data-name="${it.name}"
-                  ${isOff ? 'disabled' : ''}
-                >+</button>
-              </div>
-            </div>
-
-            ${
-              it.img
-                ? `<div class="flex-shrink-0">
-                     <img
-                       src="${it.img}"
-                       alt="${it.name || ''}"
-                       class="object-cover rounded-2xl"
-                       style="width: var(--img-w); height: var(--img-h);"
-                     >
-                   </div>`
-                : ''
-            }
-          </article>
-        `);
-
-        grid.appendChild(card);
-      });
-
-      catPager.appendChild(col);
-    });
-  }
   
     function applyHeights(){
     try {
