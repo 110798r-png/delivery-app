@@ -633,101 +633,171 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  
-    // --- Карусель акций над меню ---
+  // --- Карусель акций над меню ---
+function renderPromoStrip(categories) {
+  const strip = root.querySelector('#promoStrip');
+  const inner = root.querySelector('#promoStripInner');
+  if (!strip || !inner) return;
 
-    function renderPromoStrip(categories) {
-    const strip = root.querySelector('#promoStrip');
-    const inner = root.querySelector('#promoStripInner');
-    if (!strip || !inner) return;
+  // глушим старый таймер, если был
+  if (promoTimer) {
+    clearInterval(promoTimer);
+    promoTimer = null;
+  }
 
-    inner.innerHTML = '';
-    promoSlides = [];
+  inner.innerHTML = '';
+  promoSlides = [];
+  promoIndex  = 0;
+  promoDir    = 1;
 
-    (categories || []).forEach((cat, idx) => {
-      if (cat && cat.promoUrl) {
-        promoSlides.push({
-          idx,
-          title: cat.title || '',
-          url: cat.promoUrl
-        });
-      }
-    });
+  // собираем слайды: promo[] (новый формат) или promoUrl (старый)
+  (categories || []).forEach((cat, idx) => {
+    if (!cat) return;
 
-    if (!promoSlides.length) {
-      strip.classList.add('hidden');
-      promoIndex = 0;
-      // на всякий случай глушим таймер, если он когда-то был
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-      return;
+    let urls = [];
+    if (Array.isArray(cat.promo)) {
+      urls = cat.promo.filter(Boolean).slice(0, 5);   // до 5 картинок
+    } else if (cat.promoUrl) {
+      urls = [cat.promoUrl];
     }
 
-    strip.classList.remove('hidden');
-
-    promoSlides.forEach((p, i) => {
-      const slide = el(`
-        <button type="button" class="promo-slide">
-          <img src="${p.url}"
-     alt="${p.title}"
-     loading="lazy"
-     class="w-full h-32 sm:h-40 object-cover">
-        </button>
-      `);
-
-      // тап по слайду — переход к нужной категории
-      slide.addEventListener('click', () => {
-        promoIndex = i;
-        goToIndex(p.idx, { animate: true });
+    urls.forEach(url => {
+      promoSlides.push({
+        idx,               // индекс категории
+        title: cat.title || '',
+        url
       });
+    });
+  });
 
-      inner.appendChild(slide);
+  if (!promoSlides.length) {
+    strip.classList.add('hidden');
+    promoIndex = 0;
+    return;
+  }
+
+  strip.classList.remove('hidden');
+
+  promoSlides.forEach((p, i) => {
+    const slide = el(`
+      <button type="button" class="promo-slide">
+        <img
+          src="${p.url}"
+          alt="${p.title}"
+          loading="lazy"
+          class="w-full h-32 sm:h-40 object-cover"
+        >
+      </button>
+    `);
+
+    // тап по слайду — переход к нужной категории
+    slide.addEventListener('click', () => {
+      promoIndex = i;
+      goToIndex(p.idx, { animate: true });
     });
 
-    promoIndex = 0;
-    inner.scrollLeft = 0;
+    inner.appendChild(slide);
+  });
 
-    // ---- свайп по одному слайду ----
-    let drag = false;
-    let startX = 0;
-    let startScroll = 0;
+  // ширину берём у самого слайда (так надёжнее, чем у strip)
+  const getSlideW = () =>
+    inner.firstElementChild?.getBoundingClientRect().width ||
+    strip.getBoundingClientRect().width ||
+    1;
 
-    const getSlideW = () => strip.getBoundingClientRect().width || 1;
-
-    inner.onpointerdown = (e) => {
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-      drag = true;
-      startX = e.clientX;
-      startScroll = inner.scrollLeft;
-      inner.setPointerCapture?.(e.pointerId);
-    };
-
-    inner.onpointermove = (e) => {
-      if (!drag) return;
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-      const dx = startX - e.clientX;
-      inner.scrollLeft = startScroll + dx;
-      e.preventDefault();
-    };
-
-    const finishDrag = () => {
-      if (!drag) return;
-      drag = false;
-
-      const slideW = getSlideW();
-      let idx = Math.round(inner.scrollLeft / slideW);
-      idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
-      promoIndex = idx;
-
-      animateScrollX(inner, idx * slideW, { duration: 220 });
-    };
-
-    inner.onpointerup = finishDrag;
-    inner.onpointercancel = finishDrag;
-    inner.onpointerleave = finishDrag;
+  function snapToCurrent(animate = true) {
+    const slideW = getSlideW();
+    const target = promoIndex * slideW;
+    if (animate) {
+      animateScrollX(inner, target, { duration: 260 });
+    } else {
+      inner.scrollLeft = target;
+    }
   }
+
+  // ---- свайп по одному слайду ----
+  let drag = false;
+  let startX = 0;
+  let startScroll = 0;
+  let prevSnap = inner.style.scrollSnapType || '';
+
+  inner.onpointerdown = (e) => {
+    if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+    drag = true;
+    startX = e.clientX;
+    startScroll = inner.scrollLeft;
+    prevSnap = inner.style.scrollSnapType || '';
+    inner.style.scrollSnapType = 'none'; // отключаем принудительный snap
+    inner.setPointerCapture?.(e.pointerId);
+
+    // на время жеста глушим автолистание
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
+  };
+
+  inner.onpointermove = (e) => {
+    if (!drag) return;
+    if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+    const dx = startX - e.clientX;
+    inner.scrollLeft = startScroll + dx;
+    e.preventDefault();
+  };
+
+  const finishDrag = () => {
+    if (!drag) return;
+    drag = false;
+
+    const slideW = getSlideW();
+    let idx = Math.round(inner.scrollLeft / slideW);
+    idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
+    promoIndex = idx;
+
+    // аккуратно доскролливаем к ближайшему слайду
+    snapToCurrent(true);
+
+    // возвращаем scroll-snap, если был
+    inner.style.scrollSnapType = prevSnap;
+
+    // после свайпа снова запускаем автолистание
+    startPromoTimer();
+  };
+
+  inner.onpointerup = finishDrag;
+  inner.onpointercancel = finishDrag;
+  inner.onpointerleave = finishDrag;
+
+  // --- автоперелистывание ---
+  function startPromoTimer() {
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
+    if (!promoSlides.length) return;
+
+    promoTimer = setInterval(() => {
+      if (drag) return;           // не дёргаем во время свайпа
+      if (!promoSlides.length) return;
+
+      // маятник: туда-обратно
+      if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+        promoDir = -1;
+      } else if (promoDir < 0 && promoIndex <= 0) {
+        promoDir = 1;
+      }
+
+      promoIndex += promoDir;
+      snapToCurrent(true);
+    }, 4500); // интервал автолистания
+  }
+
+  // стартовое положение
+  snapToCurrent(false);
+  startPromoTimer();
+}
 
 function rebuildMenu() {
   catPager.innerHTML = '';
