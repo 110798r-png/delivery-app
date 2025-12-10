@@ -635,33 +635,48 @@ function OrderView(){
 
   
     // --- Карусель акций над меню ---
-
-    function renderPromoStrip(categories) {
+    // --- Карусель акций над меню ---
+  function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
+    // глушим старый таймер, если был
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
+
     inner.innerHTML = '';
     promoSlides = [];
+    promoIndex  = 0;
+    promoDir    = 1;
 
+    // собираем слайды: от 1 до 5 картинок на одну категорию
     (categories || []).forEach((cat, idx) => {
-      if (cat && cat.promoUrl) {
-        promoSlides.push({
-          idx,
-          title: cat.title || '',
-          url: cat.promoUrl
-        });
+      if (!cat) return;
+
+      // Новый формат: cat.promo = [url1, url2, ...]
+      let urls = [];
+      if (Array.isArray(cat.promo)) {
+        urls = cat.promo.filter(Boolean).slice(0, 5);
+      // Поддержка старого формата: promoUrl — одна картинка на категорию
+      } else if (cat.promoUrl) {
+        urls = [cat.promoUrl];
       }
+
+      urls.forEach(url => {
+        promoSlides.push({
+          idx,               // индекс категории
+          title: cat.title || '',
+          url
+        });
+      });
     });
 
     if (!promoSlides.length) {
       strip.classList.add('hidden');
       promoIndex = 0;
-      // на всякий случай глушим таймер, если он когда-то был
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
       return;
     }
 
@@ -670,14 +685,16 @@ function OrderView(){
     promoSlides.forEach((p, i) => {
       const slide = el(`
         <button type="button" class="promo-slide">
-          <img src="${p.url}"
-     alt="${p.title}"
-     loading="lazy"
-     class="w-full h-32 sm:h-40 object-cover">
+          <img
+            src="${p.url}"
+            alt="${p.title}"
+            loading="lazy"
+            class="w-full h-32 sm:h-40 object-cover"
+          >
         </button>
       `);
 
-      // тап по слайду — переход к нужной категории
+      // тап по слайду — переход к НУЖНОЙ категории (одна категория на слайд)
       slide.addEventListener('click', () => {
         promoIndex = i;
         goToIndex(p.idx, { animate: true });
@@ -686,15 +703,22 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
-    promoIndex = 0;
-    inner.scrollLeft = 0;
+    const getSlideW = () => strip.getBoundingClientRect().width || 1;
+
+    function snapToCurrent(animate = true) {
+      const slideW = getSlideW();
+      const target = promoIndex * slideW;
+      if (animate) {
+        animateScrollX(inner, target, { duration: 260 });
+      } else {
+        inner.scrollLeft = target;
+      }
+    }
 
     // ---- свайп по одному слайду ----
     let drag = false;
     let startX = 0;
     let startScroll = 0;
-
-    const getSlideW = () => strip.getBoundingClientRect().width || 1;
 
     inner.onpointerdown = (e) => {
       if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
@@ -702,6 +726,12 @@ function OrderView(){
       startX = e.clientX;
       startScroll = inner.scrollLeft;
       inner.setPointerCapture?.(e.pointerId);
+
+      // на время жеста останавливаем авто-листание
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
     };
 
     inner.onpointermove = (e) => {
@@ -721,170 +751,44 @@ function OrderView(){
       idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
       promoIndex = idx;
 
-      animateScrollX(inner, idx * slideW, { duration: 220 });
+      snapToCurrent(true);
+      startPromoTimer();  // после свайпа снова включаем авто-листание
     };
 
     inner.onpointerup = finishDrag;
     inner.onpointercancel = finishDrag;
     inner.onpointerleave = finishDrag;
+
+    // --- автоперелистывание ---
+    function startPromoTimer() {
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+
+      if (!promoSlides.length) return;
+
+      promoTimer = setInterval(() => {
+        // не дёргаем, если пользователь сейчас свайпает
+        if (drag) return;
+        if (!promoSlides.length) return;
+
+        // "маятник": доходим до последнего — едем назад, и наоборот
+        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+          promoDir = -1;
+        } else if (promoDir < 0 && promoIndex <= 0) {
+          promoDir = 1;
+        }
+
+        promoIndex += promoDir;
+        snapToCurrent(true);
+      }, 4500); // интервал автолистания (можешь поменять)
+    }
+
+    // начальная позиция
+    snapToCurrent(false);
+    startPromoTimer();
   }
-
-function rebuildMenu() {
-  catPager.innerHTML = '';
-  const cfg = loadConfig();
-
-  cfg.menu.forEach((cat) => {
-    const panel = el(`<div class="cat-panel"></div>`);
-    const vbox  = el(`<div class="v-scroll px-0.5"></div>`);
-    const list  = el(`<div class="grid gap-3"></div>`);
-
-    cat.items.forEach(it => {
-      const q        = (window.__orderCounts?.[it.name] || 0);
-      const disabled = unavailableClient.has(it.name);
-
-      const row = el(`
-        <div class="menu-card ${disabled ? 'opacity-50' : ''}">
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm flex items-center gap-2">
-              ${it.name}
-              ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
-            </div>
-            ${
-              cfg.theme.showPrice
-                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
-                : ''
-            }
-            <div class="flex items-center gap-3 mt-3">
-              <button
-                type="button"
-                class="w-8 h-8 rounded-xl border"
-                data-name="${it.name}"
-                data-act="dec"
-                ${disabled ? 'disabled' : ''}
-              >−</button>
-              <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
-              <button
-                type="button"
-                class="w-8 h-8 rounded-xl bg-black text-white"
-                data-name="${it.name}"
-                data-act="inc"
-                ${disabled ? 'disabled' : ''}
-              >+</button>
-            </div>
-          </div>
-          <img
-  src="${it.img || 'https://placehold.co/110x70?text=food'}"
-  class="menu-card-img"
-  alt=""
-  loading="lazy">
-        </div>
-      `);
-      list.appendChild(row);
-    });
-
-    // запас снизу
-    list.appendChild(el(`<div class="bottom-spacer"></div>`));
-
-    vbox.appendChild(list);
-    panel.appendChild(vbox);
-    catPager.appendChild(panel);
-
-    // === свайп по категориям (горизонтальный) ===
-    const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
-    const supportsPointer = !!window.PointerEvent;
-
-    let down   = false;
-    let used   = false;
-    let sx     = 0;
-    let sy     = 0;
-    let locked = null;
-
-    const PIX_LOCK = 10;
-    const THRESH = () =>
-      Math.max(40, (catPager.getBoundingClientRect().width || 1) * 0.25);
-
-    function startDrag(x, y) {
-      if (isAnimating) return;
-      down = true;
-      used = false;
-      sx = x;
-      sy = y;
-      locked = null;
-    }
-
-    function moveDrag(x, y, e) {
-      if (!down || used || isAnimating) return;
-
-      const dx = x - sx;
-      const dy = y - sy;
-
-      if (locked === null) {
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > PIX_LOCK) {
-          locked = 'x';
-        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > PIX_LOCK) {
-          locked = 'y';
-        }
-      }
-
-      if (locked === 'x') {
-        // горизонтальный жест — листаем категории
-        if (e && typeof e.preventDefault === 'function') {
-          e.preventDefault();
-        }
-
-        if (Math.abs(dx) >= THRESH()) {
-          used = true;
-          const next = dx < 0 ? activeIdx + 1 : activeIdx - 1;
-          goToIndex(next, { animate: true });
-        }
-      }
-    }
-
-    function endDrag() {
-      down = false;
-      used = false;
-      locked = null;
-    }
-
-    // ANDROID / другие — Pointer Events
-    if (supportsPointer && !isIOS) {
-      vbox.addEventListener('pointerdown', (e) => {
-        const pt = e.pointerType;
-        if (pt && pt !== 'touch') return;   // мышь игнорим
-        startDrag(e.clientX, e.clientY);
-      }, { passive: true });
-
-      vbox.addEventListener('pointermove', (e) => {
-        const pt = e.pointerType;
-        if (pt && pt !== 'touch') return;
-        moveDrag(e.clientX, e.clientY, e);
-      }, { passive: false });
-
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
-        vbox.addEventListener(evt, endDrag, { passive: true })
-      );
-
-    // iOS — touch-события
-    } else {
-      vbox.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        if (!t) return;
-        startDrag(t.clientX, t.clientY);
-      }, { passive: true });
-
-      vbox.addEventListener('touchmove', (e) => {
-        const t = e.touches[0];
-        if (!t) return;
-        moveDrag(t.clientX, t.clientY, e);
-      }, { passive: false });
-
-      ['touchend', 'touchcancel'].forEach(evt =>
-        vbox.addEventListener(evt, endDrag, { passive: true })
-      );
-    }
-    // === конец свайпа ===
-  });
-}
 
   // обработчик +/− по делегированию
   catPager.addEventListener('click', (e) => {
@@ -2072,16 +1976,11 @@ function BuilderView(){
           </div>
           <div class="text-xs text-gray-500 mt-1">key: <code>${cat.key}</code></div>
 
-     <!-- Новое поле: URL акции -->
-          <label class="mt-2 block text-xs">
-            Акция (URL картинки)
-            <input
-              class="mt-1 w-full border rounded-lg p-2 text-xs"
-              placeholder="https://…"
-              value="${cat.promoUrl || ''}"
-              data-k="promoUrl"
-            >
-          </label>
+              <!-- Новые поля: до 5 URL картинок акций -->
+          <div class="mt-2 text-xs font-semibold">
+            Акции (до 5 URL картинок для этой категории)
+          </div>
+          <div class="mt-1 grid gap-1" data-promo-box></div>
           
           <div class="mt-3">
             <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
@@ -2117,14 +2016,43 @@ function BuilderView(){
         itemsBox.appendChild(row);
       });
 
-            catCard.addEventListener('input',(e)=>{
+            const promoBox = catCard.querySelector('[data-promo-box]');
+
+      // Собираем текущие URL-ы: новый формат promo[], но понимаем и старый promoUrl
+      let promos = [];
+      if (Array.isArray(cat.promo)) {
+        promos = cat.promo.slice(0, 5);
+      } else if (cat.promoUrl) {
+        promos = [cat.promoUrl];
+      }
+
+      for (let i = 0; i < 5; i++) {
+        const val = promos[i] || '';
+        const input = el(`
+          <input
+            class="w-full border rounded-lg p-2 text-xs"
+            placeholder="https://…"
+            value="${val}"
+            data-promo-idx="${i}"
+          >
+        `);
+
+        input.addEventListener('input', (e) => {
+          const idx = Number(e.target.dataset.promoIdx || 0);
+          if (!Array.isArray(cat.promo)) cat.promo = [];
+          cat.promo[idx] = e.target.value.trim();
+        });
+
+        promoBox.appendChild(input);
+      }
+
+               catCard.addEventListener('input',(e)=>{
         const k = e.target.dataset.k;
         if (k === 'title') {
           cat.title = e.target.value;
-        } else if (k === 'promoUrl') {
-          cat.promoUrl = e.target.value.trim();
         }
       });
+
       catCard.addEventListener('click',(e)=>{
         const act=e.target.dataset.act; if(!act) return;
         if(act==='del'){ if(confirm('Удалить категорию?')){ cfg.menu.splice(cidx,1); render(); } }
