@@ -1686,7 +1686,7 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="flex flex-wrap gap-4 justify-start"></div>
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="list"></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1838,24 +1838,8 @@ if (exportPdfBtn) {
       : '';
 
        const card = el(`
-const card = el(`
-  <div
-    class="
-      order-card
-      p-6 rounded-3xl border-2 ${statusColor}
-      shadow-sm flex flex-col gap-3
-      transition-transform hover:scale-[1.01]
-    "
-    data-id="${o.id}"
-  >
-  </div>
-`);
-
-// ширина карточки: на мобиле 100%, на широкой — несколько колонок
-card.style.flex = '1 1 260px';   // минимум ~260px
-card.style.maxWidth = '360px';   // чтобы не были слишком жирные
-
-<div class="flex items-center justify-between">
+      <div class="p-6 rounded-3xl border-2 ${statusColor} shadow-sm flex flex-col gap-3 transition-transform hover:scale-[1.01]" data-id="${o.id}">
+        <div class="flex items-center justify-between">
           <div>
             <div class="text-2xl font-extrabold tracking-tight">#${o.id || '—'}</div>
             ${o.table ? `<div class="text-sm text-gray-700 mt-1">Столик: №${o.table}</div>` : ''}
@@ -2342,16 +2326,11 @@ function bindTabloTapZone(){
     if (!first) first = now; taps++;
     if (now - first > windowMs){ reset(); taps = 1; first = now; }
     if (taps >= 4){
-  reset();
-  document.getElementById('payModal')?.classList.remove('open');
-
-  // всегда просим PIN
-  sessionStorage.setItem(WANT_DASH, '1');
-  document.getElementById('pinModal').classList.add('open');
-} else {
-  if (timer) clearTimeout(timer);
-  timer = setTimeout(reset, windowMs);
-}
+      reset();
+      document.getElementById('payModal')?.classList.remove('open');
+      if (sessionStorage.getItem(TABLO_PIN_OK) === '1'){ location.hash = '#/dashboard'; }
+      else { sessionStorage.setItem(WANT_DASH,'1'); document.getElementById('pinModal').classList.add('open'); }
+    }else{ if (timer) clearTimeout(timer); timer = setTimeout(reset, windowMs); }
   }
   ['click','pointerup','touchend'].forEach(ev => hot.addEventListener(ev, (e)=>{ e.preventDefault(); e.stopPropagation(); handler(); }, {passive:false}));
 }
@@ -2395,14 +2374,14 @@ function router(){
     profileBtn.classList.remove('hidden');
   }
 
-  // табло всегда только через PIN
-if (h === '#/dashboard') {
-  sessionStorage.setItem(WANT_DASH, '1');
-  document.getElementById('pinModal').classList.add('open');
-  const app = document.getElementById('app');
-  if (app) app.innerHTML = '';
-  return;
-}
+  // защищаем табло PIN-ом
+  if (h === '#/dashboard' && sessionStorage.getItem(TABLO_PIN_OK) !== '1') {
+    sessionStorage.setItem(WANT_DASH, '1');
+    document.getElementById('pinModal').classList.add('open');
+    const app = document.getElementById('app');
+    if (app) app.innerHTML = '';
+    return;
+  }
 
   realRouter();
 }
@@ -2452,6 +2431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   pinOk.onclick = (e) => {
     e && e.preventDefault();
     if ((pinInput.value || '').length > 0) {
+      sessionStorage.setItem(TABLO_PIN_OK, '1');
       pinM.classList.remove('open');
       if (sessionStorage.getItem(WANT_DASH) === '1') {
         sessionStorage.removeItem(WANT_DASH);
