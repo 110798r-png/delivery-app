@@ -1686,7 +1686,7 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="flex flex-wrap gap-4 justify-start"></div>
+<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1839,7 +1839,7 @@ if (exportPdfBtn) {
 
           const card = el(`
       <div
-        class="w-full sm:w-[260px] md:w-[280px] lg:w-[320px]
+        class="w-full
                p-4 rounded-3xl border-2 ${statusColor} shadow-sm
                flex flex-col gap-2 transition-transform hover:scale-[1.01]"
         data-id="${o.id}"
@@ -1887,10 +1887,6 @@ if (exportPdfBtn) {
         </div>
       </div>
     `);
-
-    // ширина карточки: на мобиле почти вся, на широком экране — несколько колонок
-card.style.flex = '1 1 260px'; // минимальная ширина
-card.style.maxWidth = '360px'; // чтобы не были слишком широкие
     
     card.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]');
