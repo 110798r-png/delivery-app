@@ -801,35 +801,6 @@ function OrderView(){
     startPromoTimer();
   }
 
-    inner.onpointerup     = finishDrag;
-    inner.onpointercancel = finishDrag;
-    inner.onpointerleave  = finishDrag;
-
-    // --- автосвайп "маятником" ---
-    function startPromoTimer() {
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-      if (!promoSlides.length) return;
-
-      promoTimer = setInterval(() => {
-        if (dragging) return;
-
-        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
-          promoDir = -1;
-        } else if (promoDir < 0 && promoIndex <= 0) {
-          promoDir = 1;
-        }
-
-        promoIndex += promoDir;
-        snapToCurrent(true);
-      }, 4500);
-    }
-
-    snapToCurrent(false);
-    startPromoTimer();
-  }  
 
 function rebuildMenu() {
   catPager.innerHTML = '';
