@@ -633,51 +633,74 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-  
-    // --- Карусель акций над меню ---
-
-    function renderPromoStrip(categories) {
+    // --- Карусель акций над меню: только авто-листание + клик в категорию ---
+  function renderPromoStrip(categories) {
     const strip = root.querySelector('#promoStrip');
     const inner = root.querySelector('#promoStripInner');
     if (!strip || !inner) return;
 
+    // глушим старый таймер, если был
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
+
     inner.innerHTML = '';
     promoSlides = [];
+    promoIndex  = 0;
+    promoDir    = 1; // 1 — вперёд, -1 — назад
 
+    // собираем слайды: поддерживаем и новый формат promo[], и старый promoUrl
     (categories || []).forEach((cat, idx) => {
-      if (cat && cat.promoUrl) {
-        promoSlides.push({
-          idx,
-          title: cat.title || '',
-          url: cat.promoUrl
-        });
+      if (!cat) return;
+
+      let urls = [];
+      if (Array.isArray(cat.promo)) {
+        urls = cat.promo.filter(Boolean);
+      } else if (cat.promoUrl) {
+        urls = [cat.promoUrl];
       }
+
+      urls.forEach((url) => {
+        promoSlides.push({
+          idx,               // индекс категории
+          title: cat.title || '',
+          url
+        });
+      });
     });
 
     if (!promoSlides.length) {
       strip.classList.add('hidden');
-      promoIndex = 0;
-      // на всякий случай глушим таймер, если он когда-то был
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
       return;
     }
 
     strip.classList.remove('hidden');
 
+    // базовая раскладка
+    inner.style.display     = 'flex';
+    inner.style.flexWrap    = 'nowrap';
+    inner.style.overflowX   = 'hidden';
+    inner.style.touchAction = 'pan-y';
+    inner.classList.add('no-scrollbar');
+
     promoSlides.forEach((p, i) => {
       const slide = el(`
         <button type="button" class="promo-slide">
-          <img src="${p.url}"
-     alt="${p.title}"
-     loading="lazy"
-     class="w-full h-32 sm:h-40 object-cover">
+          <img
+            src="${p.url}"
+            alt="${p.title}"
+            loading="lazy"
+            class="w-full h-32 sm:h-40 object-cover"
+          >
         </button>
       `);
 
-      // тап по слайду — переход к нужной категории
+      // каждый слайд ровно ширина вьюпорта
+      slide.style.flex    = '0 0 100%';
+      slide.style.display = 'block';
+
+      // клик по баннеру — переход в категорию
       slide.addEventListener('click', () => {
         promoIndex = i;
         goToIndex(p.idx, { animate: true });
@@ -686,47 +709,35 @@ function OrderView(){
       inner.appendChild(slide);
     });
 
-    promoIndex = 0;
-    inner.scrollLeft = 0;
-
-    // ---- свайп по одному слайду ----
-    let drag = false;
-    let startX = 0;
-    let startScroll = 0;
-
     const getSlideW = () => strip.getBoundingClientRect().width || 1;
 
-    inner.onpointerdown = (e) => {
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-      drag = true;
-      startX = e.clientX;
-      startScroll = inner.scrollLeft;
-      inner.setPointerCapture?.(e.pointerId);
-    };
-
-    inner.onpointermove = (e) => {
-      if (!drag) return;
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-      const dx = startX - e.clientX;
-      inner.scrollLeft = startScroll + dx;
-      e.preventDefault();
-    };
-
-    const finishDrag = () => {
-      if (!drag) return;
-      drag = false;
-
+    function snapToCurrent(animate = true) {
       const slideW = getSlideW();
-      let idx = Math.round(inner.scrollLeft / slideW);
-      idx = Math.max(0, Math.min(promoSlides.length - 1, idx));
-      promoIndex = idx;
+      const target = promoIndex * slideW;
+      if (animate) {
+        animateScrollX(inner, target, { duration: 260 });
+      } else {
+        inner.scrollLeft = target;
+      }
+    }
 
-      animateScrollX(inner, idx * slideW, { duration: 220 });
-    };
+    // стартовая позиция
+    snapToCurrent(false);
 
-    inner.onpointerup = finishDrag;
-    inner.onpointercancel = finishDrag;
-    inner.onpointerleave = finishDrag;
+    // --- автоперелистывание ---
+    promoTimer = setInterval(() => {
+      if (!promoSlides.length) return;
+
+      // маятник: дошли до конца — поехали назад
+      if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+        promoDir = -1;
+      } else if (promoDir < 0 && promoIndex <= 0) {
+        promoDir = 1;
+      }
+
+      promoIndex += promoDir;
+      snapToCurrent(true);
+    }, 4500); // 4.5 секунды между сменами
   }
 
 function rebuildMenu() {
