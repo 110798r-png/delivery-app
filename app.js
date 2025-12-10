@@ -633,7 +633,168 @@ function OrderView(){
     goToIndex(+b.dataset.idx, { animate: true });
   });
 
-   
+  // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
+  function renderPromoStrip(categories) {
+    const strip = root.querySelector('#promoStrip');
+    const inner = root.querySelector('#promoStripInner');
+    if (!strip || !inner) return;
+
+    // глушим старый таймер, если был
+    if (promoTimer) {
+      clearInterval(promoTimer);
+      promoTimer = null;
+    }
+
+    inner.innerHTML = '';
+    promoSlides = [];
+    promoIndex  = 0;
+    promoDir    = 1;
+
+    // берём promo: массив ссылок для каждой категории
+    (categories || []).forEach((cat, idx) => {
+      if (!cat || !Array.isArray(cat.promo)) return;
+      const urls = cat.promo.filter(Boolean); // сколько есть, столько и будет
+
+      urls.forEach(url => {
+        promoSlides.push({
+          idx,               // индекс категории
+          title: cat.title || '',
+          url
+        });
+      });
+    });
+
+    if (!promoSlides.length) {
+      strip.classList.add('hidden');
+      return;
+    }
+
+    strip.classList.remove('hidden');
+
+    promoSlides.forEach((p, i) => {
+      const slide = el(`
+        <button type="button" class="promo-slide">
+          <img
+            src="${p.url}"
+            alt="${p.title}"
+            loading="lazy"
+            class="w-full h-32 sm:h-40 object-cover"
+          >
+        </button>
+      `);
+
+      // КЛИК по слайду → перейти в категорию (никаких скроллов, просто смена)
+      slide.addEventListener('click', () => {
+        promoIndex = i;
+        goToIndex(p.idx, { animate: true });
+      });
+
+      inner.appendChild(slide);
+    });
+
+    // делаем "настоящий" свайп через transform, а не scrollLeft
+    inner.style.display    = 'flex';
+    inner.style.willChange = 'transform';
+    inner.style.transform  = 'translate3d(0,0,0)';
+    inner.style.transition = 'transform 0.25s ease-out';
+
+    const getWidth = () => strip.getBoundingClientRect().width || 1;
+
+    function setTranslate(x, withAnim) {
+      inner.style.transition = withAnim ? 'transform 0.25s ease-out' : 'none';
+      inner.style.transform  = `translate3d(${x}px,0,0)`;
+    }
+
+    function snapToCurrent(withAnim = true) {
+      const w = getWidth();
+      const x = -promoIndex * w;
+      setTranslate(x, withAnim);
+    }
+
+    // ---- ручной свайп ----
+    let dragging       = false;
+    let startX         = 0;
+    let startTranslate = 0;
+    let lastTranslate  = 0;
+
+    inner.onpointerdown = (e) => {
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+      dragging = true;
+      startX   = e.clientX;
+
+      const w = getWidth();
+      startTranslate = -promoIndex * w;
+      lastTranslate  = startTranslate;
+
+      setTranslate(startTranslate, false);
+      inner.setPointerCapture?.(e.pointerId);
+
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+    };
+
+    inner.onpointermove = (e) => {
+      if (!dragging) return;
+      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
+      const dx = e.clientX - startX;
+      lastTranslate = startTranslate + dx;
+      setTranslate(lastTranslate, false);
+      e.preventDefault();
+    };
+
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+
+      const w = getWidth();
+      const moved = startTranslate - lastTranslate;
+      const threshold = w * 0.2; // на сколько нужно "дёрнуть", чтобы перелистнуть
+
+      if (Math.abs(moved) > threshold) {
+        if (moved > 0 && promoIndex < promoSlides.length - 1) {
+          promoIndex++;
+        } else if (moved < 0 && promoIndex > 0) {
+          promoIndex--;
+        }
+      }
+
+      snapToCurrent(true);
+      startPromoTimer();
+    };
+
+    inner.onpointerup     = finishDrag;
+    inner.onpointercancel = finishDrag;
+    inner.onpointerleave  = finishDrag;
+
+    // --- автосвайп "маятником" ---
+    function startPromoTimer() {
+      if (promoTimer) {
+        clearInterval(promoTimer);
+        promoTimer = null;
+      }
+      if (!promoSlides.length) return;
+
+      promoTimer = setInterval(() => {
+        if (dragging) return;
+
+        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
+          promoDir = -1;
+        } else if (promoDir < 0 && promoIndex <= 0) {
+          promoDir = 1;
+        }
+
+        promoIndex += promoDir;
+        snapToCurrent(true);
+      }, 4500);
+    }
+
+    snapToCurrent(false);
+    startPromoTimer();
+  }  
 
 function rebuildMenu() {
   catPager.innerHTML = '';
@@ -2152,168 +2313,6 @@ function BuilderView(){
   return root;
 }
 
-  // --- Карусель акций над меню (свайп + автосвайп, клик → категория) ---
-  function renderPromoStrip(categories) {
-    const strip = root.querySelector('#promoStrip');
-    const inner = root.querySelector('#promoStripInner');
-    if (!strip || !inner) return;
-
-    // глушим старый таймер, если был
-    if (promoTimer) {
-      clearInterval(promoTimer);
-      promoTimer = null;
-    }
-
-    inner.innerHTML = '';
-    promoSlides = [];
-    promoIndex  = 0;
-    promoDir    = 1;
-
-    // берём promo: массив ссылок для каждой категории
-    (categories || []).forEach((cat, idx) => {
-      if (!cat || !Array.isArray(cat.promo)) return;
-      const urls = cat.promo.filter(Boolean); // сколько есть, столько и будет
-
-      urls.forEach(url => {
-        promoSlides.push({
-          idx,               // индекс категории
-          title: cat.title || '',
-          url
-        });
-      });
-    });
-
-    if (!promoSlides.length) {
-      strip.classList.add('hidden');
-      return;
-    }
-
-    strip.classList.remove('hidden');
-
-    promoSlides.forEach((p, i) => {
-      const slide = el(`
-        <button type="button" class="promo-slide">
-          <img
-            src="${p.url}"
-            alt="${p.title}"
-            loading="lazy"
-            class="w-full h-32 sm:h-40 object-cover"
-          >
-        </button>
-      `);
-
-      // КЛИК по слайду → перейти в категорию (никаких скроллов, просто смена)
-      slide.addEventListener('click', () => {
-        promoIndex = i;
-        goToIndex(p.idx, { animate: true });
-      });
-
-      inner.appendChild(slide);
-    });
-
-    // делаем "настоящий" свайп через transform, а не scrollLeft
-    inner.style.display    = 'flex';
-    inner.style.willChange = 'transform';
-    inner.style.transform  = 'translate3d(0,0,0)';
-    inner.style.transition = 'transform 0.25s ease-out';
-
-    const getWidth = () => strip.getBoundingClientRect().width || 1;
-
-    function setTranslate(x, withAnim) {
-      inner.style.transition = withAnim ? 'transform 0.25s ease-out' : 'none';
-      inner.style.transform  = `translate3d(${x}px,0,0)`;
-    }
-
-    function snapToCurrent(withAnim = true) {
-      const w = getWidth();
-      const x = -promoIndex * w;
-      setTranslate(x, withAnim);
-    }
-
-    // ---- ручной свайп ----
-    let dragging       = false;
-    let startX         = 0;
-    let startTranslate = 0;
-    let lastTranslate  = 0;
-
-    inner.onpointerdown = (e) => {
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-
-      dragging = true;
-      startX   = e.clientX;
-
-      const w = getWidth();
-      startTranslate = -promoIndex * w;
-      lastTranslate  = startTranslate;
-
-      setTranslate(startTranslate, false);
-      inner.setPointerCapture?.(e.pointerId);
-
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-    };
-
-    inner.onpointermove = (e) => {
-      if (!dragging) return;
-      if (e.pointerType && e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
-
-      const dx = e.clientX - startX;
-      lastTranslate = startTranslate + dx;
-      setTranslate(lastTranslate, false);
-      e.preventDefault();
-    };
-
-    const finishDrag = () => {
-      if (!dragging) return;
-      dragging = false;
-
-      const w = getWidth();
-      const moved = startTranslate - lastTranslate;
-      const threshold = w * 0.2; // на сколько нужно "дёрнуть", чтобы перелистнуть
-
-      if (Math.abs(moved) > threshold) {
-        if (moved > 0 && promoIndex < promoSlides.length - 1) {
-          promoIndex++;
-        } else if (moved < 0 && promoIndex > 0) {
-          promoIndex--;
-        }
-      }
-
-      snapToCurrent(true);
-      startPromoTimer();
-    };
-
-    inner.onpointerup     = finishDrag;
-    inner.onpointercancel = finishDrag;
-    inner.onpointerleave  = finishDrag;
-
-    // --- автосвайп "маятником" ---
-    function startPromoTimer() {
-      if (promoTimer) {
-        clearInterval(promoTimer);
-        promoTimer = null;
-      }
-      if (!promoSlides.length) return;
-
-      promoTimer = setInterval(() => {
-        if (dragging) return;
-
-        if (promoDir > 0 && promoIndex >= promoSlides.length - 1) {
-          promoDir = -1;
-        } else if (promoDir < 0 && promoIndex <= 0) {
-          promoDir = 1;
-        }
-
-        promoIndex += promoDir;
-        snapToCurrent(true);
-      }, 4500);
-    }
-
-    snapToCurrent(false);
-    startPromoTimer();
-  }
 
 /* ===== 4-тап зона ===== */
 function bindTabloTapZone(){
