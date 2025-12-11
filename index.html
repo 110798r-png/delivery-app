@@ -16,25 +16,23 @@
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <link rel="icon" href="data:,">
-  <style>
+   <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
-    
     html, body{
-  height: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
+      height: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
 
     .bottom-spacer{
-  height: 120px;     /* запас под нижнюю панель */
-}
+      height: 120px;     /* запас под нижнюю панель */
+    }
+    @media (min-width: 640px){
+      .bottom-spacer{
+        height: 140px;
+      }
+    }
 
-@media (min-width: 640px){
-  .bottom-spacer{
-    height: 140px;
-  }
-}
-    
     *, *::before, *::after { box-sizing:border-box; }
     img { max-width:100%; display:block; }
     .hidden{ display:none }
@@ -53,24 +51,24 @@
 
     #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
     
-      /* Внешний контейнер просто обрезает лишнее */
-#promoStrip{
-  overflow: hidden;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pinch-zoom;
-}
+    /* Внешний контейнер просто обрезает лишнее */
+    #promoStrip{
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pinch-zoom;
+    }
 
-/* Внутренний реально скроллится по X */
-#promoStripInner{
-  display: flex;
-  overflow-x: auto;      /* ВАЖНО */
-  scroll-behavior: auto; /* анимацию делаем сами */
-}
+    /* Внутренний реально скроллится по X */
+    #promoStripInner{
+      display: flex;
+      overflow-x: auto;
+      scroll-behavior: auto;
+    }
 
-/* Один слайд = 100% ширины экрана */
-.promo-slide{
-  flex: 0 0 100%;
-}
+    /* Один слайд = 100% ширины экрана */
+    .promo-slide{
+      flex: 0 0 100%;
+    }
 
     .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
     .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
@@ -99,214 +97,6 @@
     .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
     .brand-wrap{ display:flex; align-items:center; gap:10px; }
 
-    /* Обёртка под иконку — без чёрного фона */
-.sushi-icon{
-  width:48px;              /* размер области под иконку, можно менять */
-  height:48px;
-  display:grid;
-  place-items:center;
-  background:transparent;  /* убираем чёрный круг */
-  border-radius:0;         /* можно оставить 0, чтобы не было круглой маски */
-}
-
-/* Размер самой иконки стакана */
-#brandIcon{
-  width:45px;              /* увеличивай/уменьшай под себя */
-  height:45px;
-  object-fit:contain;
-}
-    
-    .header-row{ padding:10px 12px; }
-    .header-ghost{ height:8px; }
-    /* Отключаем выделение текста у основных интерактивов */
-button, a, svg, .brand-strip, .header-row {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  user-select: none;
-}
-
-    /* Делаем кнопку профиля невидимой, но оставляем активной */
-#profileBtn {
-  opacity: 0;
-}
-    
-/* Убираем рамку фокуса с кнопок/ссылок (чтобы не "залипала" после тапов) */
-button:focus, a:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-    /* Увеличиваем кнопки + и - */
-button[data-act="dec"],
-button[data-act="inc"]{
-  width:50px !important;    /* можно 70-80, если нужно ещё больше */
-  height:50px !important;
-  font-size:2rem;           /* размер знака +/- */
-  border-radius:18px;       /* более скруглённые */
-}
-
-   /* Карточка заказа на табло */
-.order-card{
-  min-height: 240px;          /* базовая высота как на макете */
-  display: flex;
-  flex-direction: column;
-}
-
-/* Блок с позициями внутри карточки */
-.order-card-items{
-  flex: 1 1 auto;             /* растягивается, выталкивает низ вниз */
-  min-height: 0;
-  overflow-y: hidden;         /* ничего не вылезает поверх Итого */
-}
-
-
-/* Сетка с заказами – по центру, от края до края в разумных пределах */
-#list {
-  width: 100%;
-}
-
-    /* Печатная часть карточки по умолчанию скрыта */
-.order-card-print {
-  display: none;
-}
-
-/* Основная часть карточки (экранная) */
-.order-card-main {
-  display: block;
-}
-
-/* Настройки страницы для термопринтера (примерно 11.5 × 7.5 см) */
-@page {
-  size: 75mm 115mm;   /* можно поиграться: 75×115, 80×120 и т.п. */
-  margin: 3mm;
-}
-
-@media print {
-  /* прячем всё на странице */
-  body * {
-    visibility: hidden;
-  }
-
-  /* показываем только список ордеров */
-  #list,
-  #list * {
-    visibility: visible;
-  }
-
-  /* сам список – с самого верха страницы */
-  #list {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 0;
-    max-width: 75mm;       /* ширина чека */
-  }
-
-  /* то, что помечено no-print – не выводим */
-  .no-print {
-    display: none !important;
-  }
-
-  /* у каждой карточки свой “листочек” */
-  .order-card {
-    page-break-after: always;
-    break-after: page;
-    border-radius: 0;
-    border-width: 0;
-    box-shadow: none;
-    padding: 4mm 3mm;
-  }
-
-  /* на печати показываем только компактный вариант */
-  .order-card-main {
-    display: none !important;
-  }
-  .order-card-print {
-    display: block !important;
-  }
-
-  body {
-    background: #fff !important;
-  }
-}
-    
-    <style>
-    html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
-    html, body{
-      height: 100%;
-      max-width: 100%;
-      overflow-x: hidden;
-    }
-
-    .bottom-spacer{
-      height: 120px;
-    }
-    @media (min-width: 640px){
-      .bottom-spacer{
-        height: 140px;
-      }
-    }
-
-    *, *::before, *::after { box-sizing:border-box; }
-    img { max-width:100%; display:block; }
-    .hidden{ display:none }
-    .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
-
-    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
-
-    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
-    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
-    .sticky-top{ position:sticky; top:.5rem; z-index:30 }
-
-    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:var(--card-radius, 1.25rem); padding:1rem; min-height:var(--card-min-h, 6.4rem) }
-    .menu-card-img{ width:var(--img-w,110px); height:var(--img-h,70px); border-radius:var(--img-radius,.75rem); background:#eee; object-fit:cover }
-
-    .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
-
-    #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
-
-    #promoStrip{
-      overflow: hidden;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-x pinch-zoom;
-    }
-    #promoStripInner{
-      display: flex;
-      overflow-x: auto;
-      scroll-behavior: auto;
-    }
-    .promo-slide{
-      flex: 0 0 100%;
-    }
-
-    .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
-    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
-    
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
-    .modal.open{ display:flex }
-
-    .app-header{ position:sticky; top:0; z-index:100; }
-
-    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
-    .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
-    .badge.red{ background:#fee2e2; color:#991b1b }
-
-    .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
-    .card-tall{ min-height: 164px; }
-    .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
-
-    #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
-    #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
-
-    .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
-
-    .brand-strip{ background:#c3af96; color:#fff; }
-    .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
-    .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
-    .brand-wrap{ display:flex; align-items:center; gap:10px; }
-
     .sushi-icon{
       width:48px;
       height:48px;
@@ -315,6 +105,7 @@ button[data-act="inc"]{
       background:transparent;
       border-radius:0;
     }
+
     #brandIcon{
       width:45px;
       height:45px;
@@ -329,6 +120,7 @@ button[data-act="inc"]{
       -webkit-touch-callout: none;
       user-select: none;
     }
+
     #profileBtn { opacity: 0; }
 
     button:focus, a:focus {
@@ -344,24 +136,48 @@ button[data-act="inc"]{
       border-radius:18px;
     }
 
+    /* Карточка заказа на табло */
     .order-card{
       min-height: 240px;
       display: flex;
       flex-direction: column;
     }
+
+    /* Блок с позициями внутри карточки */
     .order-card-items{
       flex: 1 1 auto;
       min-height: 0;
       overflow-y: hidden;
     }
 
+    /* Сетка с заказами – по центру, от края до края в разумных пределах */
     #list {
       width: 100%;
     }
 
-    /* === ПРАВИЛА ДЛЯ ПЕЧАТИ ОРДЕРОВ === */
+    /* Печатная часть карточки по умолчанию скрыта */
+    .order-card-print {
+      display: none;
+    }
+
+    /* Основная часть карточки (экранная) */
+    .order-card-main {
+      display: block;
+    }
+
+    /* Формат под чек: ~75×115 мм */
+    @page {
+      size: 75mm 115mm;        /* при 80-мм принтере можно 80mm x 120mm */
+      margin: 2mm;             /* минимальные поля */
+    }
+
     @media print {
-      /* прячем всё на странице */
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+
+      /* прячем всё */
       body * {
         visibility: hidden;
       }
@@ -372,7 +188,6 @@ button[data-act="inc"]{
         visibility: visible;
       }
 
-      /* сам список – с самого верха страницы */
       #list {
         position: absolute;
         top: 0;
@@ -380,17 +195,32 @@ button[data-act="inc"]{
         right: 0;
         margin: 0;
         padding: 0;
+        max-width: 75mm;
       }
 
-      /* всё, что помечено .no-print (кнопки) – убрать */
+      /* “экранные” элементы (кнопки и т.п.) */
       .no-print {
         display: none !important;
       }
 
-      /* каждый ордер с новой "квитанции" */
+      /* каждый заказ — отдельный чек */
       .order-card {
         page-break-after: always;
         break-after: page;
+        border-radius: 0;
+        border-width: 0;
+        box-shadow: none;
+        padding: 2mm 1mm;
+      }
+
+      /* на печати показываем только компактную версию */
+      .order-card-main {
+        display: none !important;
+      }
+      .order-card-print {
+        display: block !important;
+        font-size: 11px;
+        line-height: 1.25;
       }
 
       body {
@@ -398,6 +228,7 @@ button[data-act="inc"]{
       }
     }
   </style>
+
 
 </head>
 <body>
