@@ -1706,7 +1706,10 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
+<div
+  id="list"
+  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch w-full"
+></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1829,8 +1832,10 @@ if (exportPdfBtn) {
   }
 };
 
-function orderCard(o){
-  const clientTotal = (o.items || []).reduce(
+function orderCard(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+
+  const clientTotal = items.reduce(
     (s, i) => s + (i.price || 0) * (i.qty || 0),
     0
   );
@@ -1847,7 +1852,11 @@ function orderCard(o){
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  const itemsHtml = (o.items || []).map(i => `
+  const MAX_INLINE  = 3;
+  const hasMore     = items.length > MAX_INLINE;
+  const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
+
+  const itemsHtml = inlineItems.map(i => `
     <div class="flex justify-between">
       <div class="mr-2">${i.name}</div>
       <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
@@ -1863,36 +1872,53 @@ function orderCard(o){
   const card = el(`
     <div
       class="
-             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+        h-full p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+        flex flex-col justify-between gap-2
+        transition-transform hover:scale-[1.01] hover:shadow-md"
       data-id="${o.id}"
     >
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-          ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+      <!-- ВЕРХНЯЯ ЧАСТЬ КАРТОЧКИ -->
+      <div class="flex flex-col gap-2 flex-1">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+            ${o.status || 'новый'}
+          </span>
         </div>
-        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-          ${o.status || 'новый'}
-        </span>
+
+        <div class="text-gray-600 text-xs mt-1">
+          ${created.toLocaleString()}
+        </div>
+
+        ${etaBlock}
+
+        <div class="mt-2 grid gap-1 text-sm">
+          ${itemsHtml || '—'}
+        </div>
+
+        ${
+          hasMore
+            ? `<button
+                 type="button"
+                 class="mt-1 text-xs text-blue-700 underline"
+                 data-act="showAll"
+               >
+                 Посмотреть весь список заказов
+               </button>`
+            : ''
+        }
+
+        <div class="mt-2 flex items-center justify-between text-lg font-bold">
+          <div>Итого:</div>
+          <div>${total} ₽</div>
+        </div>
       </div>
 
-      <div class="text-gray-600 text-xs mt-1">
-        ${created.toLocaleString()}
-      </div>
-
-      ${etaBlock}
-
-      <div class="mt-2 grid gap-1 text-sm">
-        ${itemsHtml || '—'}
-      </div>
-
-      <div class="mt-2 flex items-center justify-between text-lg font-bold">
-        <div>Итого:</div>
-        <div>${total} ₽</div>
-      </div>
-
-      <div class="mt-2 flex flex-wrap gap-2 items-center">
+      <!-- НИЖНИЙ БЛОК С КНОПКАМИ -->
+      <div class="mt-3 flex flex-wrap gap-2 items-center">
         <button
           type="button"
           class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
@@ -1911,22 +1937,23 @@ function orderCard(o){
     </div>
   `);
 
-  // --- размеры карточки ---
-  card.style.flex = '0 1 320px';
-  card.style.maxWidth = '320px';
-  card.style.minWidth = '300px';
-
+  // === обработчики кнопок ===
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
 
-    if (act === 'ready'){
+    if (act === 'showAll') {
+      openOrderOverlay(o);
+      return;
+    }
+
+    if (act === 'ready') {
       const nowTs = Date.now();
       const patch = { status: 'готов', readyAt: nowTs };
 
       const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-      if (i >= 0){
+      if (i >= 0) {
         dashOrders[i] = { ...dashOrders[i], ...patch };
         saveDash(dashOrders);
         syncOrderStatus(o.id, patch.status);
@@ -1935,10 +1962,7 @@ function orderCard(o){
       }
 
       try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-
-        } else if (act === 'delete') {
-
-      // первый клик — спросить подтверждение
+    } else if (act === 'delete') {
       if (!card.dataset.confirm) {
         card.dataset.confirm = '1';
         btn.textContent = 'Точно удалить?';
@@ -1951,16 +1975,13 @@ function orderCard(o){
         return;
       }
 
-      // второй клик — реально убираем с табло
       delete card.dataset.confirm;
 
-      // локально просто убираем заказ из табло
       dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
       saveDash(dashOrders);
       card.remove();
       showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
 
-      // на сервере МЕНЯЕМ статус, но НЕ удаляем заказ
       const nowTs = Date.now();
       const patch = { status: 'завершён', finishedAt: nowTs };
 
