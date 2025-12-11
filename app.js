@@ -1706,7 +1706,10 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
+<div
+  id="list"
+  class="flex flex-wrap gap-4 justify-start items-start"
+></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1881,10 +1884,21 @@ function orderCard(o){
         ${created.toLocaleString()}
       </div>
 
-      ${etaBlock}
+            ${etaBlock}
 
-      <div class="mt-2 grid gap-1 text-sm">
-        ${itemsHtml || '—'}
+      <div class="mt-2">
+        <div
+          class="text-xs text-gray-500 cursor-pointer select-none"
+          data-toggle-items
+        >
+          Показать состав заказа
+        </div>
+        <div
+          class="mt-1 grid gap-1 text-sm"
+          data-items-box
+        >
+          ${itemsHtml || '—'}
+        </div>
       </div>
 
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
@@ -1916,10 +1930,82 @@ function orderCard(o){
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
 
-  card.addEventListener('click', (e) => {
+    // --- внутренняя прокрутка списка позиций + сворачивание по клику ---
+  const itemsBox   = card.querySelector('[data-items-box]');
+  const toggleText = card.querySelector('[data-toggle-items]');
+
+  if (itemsBox) {
+    const EXPANDED_MAX = 180; // высота видимой области с позициями
+
+    // начальное состояние — скрыто
+    itemsBox.style.maxHeight   = '0px';
+    itemsBox.style.overflowY   = 'hidden';
+    itemsBox.style.transition  = 'max-height 0.2s ease';
+    card.dataset.expanded      = '0';
+
+    function setExpanded(on) {
+      if (on) {
+        itemsBox.style.maxHeight = EXPANDED_MAX + 'px';
+        itemsBox.style.overflowY = 'auto';
+        if (toggleText) toggleText.textContent = 'Скрыть состав заказа';
+        card.dataset.expanded = '1';
+      } else {
+        itemsBox.style.maxHeight = '0px';
+        itemsBox.style.overflowY = 'hidden';
+        if (toggleText) toggleText.textContent = 'Показать состав заказа';
+        card.dataset.expanded = '0';
+      }
+    }
+
+    setExpanded(false); // изначально свёрнуто
+
+    // отдельный клик только по тексту "Показать состав заказа"
+    if (toggleText) {
+      toggleText.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const on = card.dataset.expanded === '1';
+        setExpanded(!on);
+      });
+    }
+
+    // общий клик по карточке (но не по кнопкам готов/удалить)
+    card.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (btn) return; // для кнопок обработка ниже
+
+      const on = card.dataset.expanded === '1';
+      setExpanded(!on);
+    });
+  }
+
+  // --- эффект "выделения" карточки при наведении ---
+  const baseFlex   = '0 1 320px';
+  const baseMaxW   = '320px';
+  const baseShadow = card.style.boxShadow || '';
+
+  card.addEventListener('mouseenter', () => {
+    card.style.flex       = '0 1 340px';              // чуть шире → сдвигает соседей
+    card.style.maxWidth   = '340px';
+    card.style.transform  = 'translateY(-4px)';
+    card.style.boxShadow  = '0 14px 30px rgba(15,23,42,0.18)';
+    card.style.zIndex     = '10';
+    card.style.transition = 'all 0.18s ease-out';
+  });
+
+  card.addEventListener('mouseleave', () => {
+    card.style.flex      = baseFlex;
+    card.style.maxWidth  = baseMaxW;
+    card.style.transform = 'none';
+    card.style.boxShadow = baseShadow;
+    card.style.zIndex    = '1';
+  });
+
+
+   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
+    if (!btn) return; // остальное (расширение) обрабатывается другими слушателями
     const act = btn.dataset.act;
+
 
     if (act === 'ready'){
       const nowTs = Date.now();
