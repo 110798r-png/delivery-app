@@ -1675,6 +1675,7 @@ const root = el(`
       <div class="flex items-center gap-2">
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
           <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
+            <button id="printOrdersBtn" class="px-3 py-2 rounded-xl border bg-white">Печать ордеров</button>
         <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
         <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
       </div>
@@ -1721,6 +1722,14 @@ const root = el(`
 const exportPdfBtn = root.querySelector('#exportPdfBtn');
 if (exportPdfBtn) {
   exportPdfBtn.onclick = () => exportReportPdf();
+}
+
+// Кнопка “Печать ордеров”
+const printOrdersBtn = root.querySelector('#printOrdersBtn');
+if (printOrdersBtn) {
+  printOrdersBtn.onclick = () => {
+    window.print(); // откроется стандартное окно печати браузера
+  };
 }
   
    const list       = root.querySelector('#list');
@@ -2010,7 +2019,7 @@ function orderCard(o) {
       </div>
 
       <!-- Низ карточки: кнопки по центру одна под другой -->
-      <div class="mt-3 flex flex-col items-center gap-2">
+      <div class="mt-3 flex flex-col items-center gap-2 no-print">
         <button
           type="button"
           class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
