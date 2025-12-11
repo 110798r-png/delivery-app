@@ -2018,11 +2018,6 @@ function orderCard(o){
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
 
-  // hover-эффект
-  const baseFlex   = '0 1 320px';
-  const baseMaxW   = '320px';
-  const baseShadow = card.style.boxShadow || '';
-
   card.addEventListener('mouseenter', () => {
     card.style.flex       = '0 1 340px';
     card.style.maxWidth   = '340px';
