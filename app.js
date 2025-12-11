@@ -1706,9 +1706,9 @@ const root = el(`
       </div>
     </div>
 
-    <div
+        <div
       id="list"
-      class="grid gap-4 auto-rows-[220px] grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-5xl mx-auto"
+      class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-5xl mx-auto"
     ></div>
 
     <div>
@@ -1853,15 +1853,15 @@ function orderCard(o) {
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
   const MAX_INLINE  = 3;
-  const hasMore     = items.length > MAX_INLINE;
+  const hasMore     = items.length > MAX_INLINE;              // > 3 – есть ещё
   const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
   const itemsHtml = inlineItems.map(i => `
-    <div class="flex justify-between">
-      <div class="mr-2">${i.name}</div>
-      <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
-    </div>
-  `).join('');
+      <div class="flex justify-between">
+        <div class="mr-2">${i.name}</div>
+        <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+      </div>
+    `).join('');
 
   const etaBlock = o.etaUntil
     ? `<div class="text-sm text-gray-700 mt-1">
@@ -1869,82 +1869,83 @@ function orderCard(o) {
        </div>`
     : '';
 
-      const card = el(`
-      <div
-        class="
-          order-card
-          p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-          flex flex-col gap-2
-          transition-transform hover:scale-[1.01] hover:shadow-md
-        "
-        data-id="${o.id}"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
-          </div>
-          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-            ${o.status || 'новый'}
-          </span>
+  const card = el(`
+    <div
+      class="
+        order-card
+        p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+        flex flex-col gap-2
+        transition-transform hover:scale-[1.01] hover:shadow-md
+      "
+      data-id="${o.id}"
+    >
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
         </div>
-
-        <div class="text-gray-600 text-xs mt-1">
-          ${created.toLocaleString()}
-        </div>
-
-        ${etaBlock}
-
-        <!-- список позиций, занимает всё свободное место -->
-        <div class="order-card-items mt-2 grid gap-1 text-sm">
-          ${itemsHtml || '—'}
-        </div>
-
-        <!-- блок Итого + Ещё -->
-        <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <div class="flex items-center gap-2">
-            <span>Итого:</span>
-            ${
-              hasMore
-                ? `<button
-                     type="button"
-                     class="text-xs font-normal text-blue-700 underline"
-                     data-act="showAll"
-                   >
-                     Ещё
-                   </button>`
-                : ''
-            }
-          </div>
-          <div>${total} ₽</div>
-        </div>
-
-        <!-- кнопки всегда прижаты к самому низу карточки -->
-        <div class="mt-2 flex flex-wrap gap-2 items-center">
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-            data-act="ready"
-          >
-            Готово
-          </button>
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
-            data-act="delete"
-          >
-            Удалить
-          </button>
-        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+          ${o.status || 'новый'}
+        </span>
       </div>
-    `);
 
-  // === обработчики кнопок ===
+      <div class="text-gray-600 text-xs mt-1">
+        ${created.toLocaleString()}
+      </div>
+
+      ${etaBlock}
+
+      <!-- список позиций, занимает всё свободное место -->
+      <div class="order-card-items mt-2 grid gap-1 text-sm">
+        ${itemsHtml || '—'}
+      </div>
+
+      <!-- Итого + кнопка "Ещё" -->
+      <div class="mt-2 flex items-center justify-between text-lg font-bold">
+        <div class="flex items-center gap-2">
+          <span>Итого:</span>
+          ${
+            hasMore
+              ? `<button
+                   type="button"
+                   class="text-xs font-normal text-blue-700 underline"
+                   data-act="showAll"
+                 >
+                   Ещё
+                 </button>`
+              : ''
+          }
+        </div>
+        <div>${total} ₽</div>
+      </div>
+
+      <!-- Низ карточки (всегда снизу) -->
+      <div class="mt-2 flex flex-wrap gap-2 items-center">
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+          data-act="ready"
+        >
+          Готово
+        </button>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+          data-act="delete"
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
+  `);
+
+  // === Клик по кнопкам в карточке ===
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
 
+    // Кнопка "Ещё" — открыть модалку с полным списком
     if (act === 'showAll') {
       openOrderOverlay(o);
       return;
@@ -1964,7 +1965,10 @@ function orderCard(o) {
       }
 
       try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-    } else if (act === 'delete') {
+      return;
+    }
+
+    if (act === 'delete') {
       if (!card.dataset.confirm) {
         card.dataset.confirm = '1';
         btn.textContent = 'Точно удалить?';
