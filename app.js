@@ -2048,15 +2048,30 @@ function orderCard(o) {
         </div>
       </div>
 
-      <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
-      <div class="order-card-print text-sm">
-        <div class="text-base font-extrabold mb-1">#${o.id || '—'}</div>
-        ${o.table ? `<div class="mb-1">Столик: №${o.table}</div>` : ''}
-        <div class="mt-1 pt-1 border-t border-gray-300">
-          ${itemsHtmlPrint}
+            <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
+      <div class="order-card-print">
+        <div class="order-print-header">
+          <div class="order-print-id">#${o.id || '—'}</div>
+          ${
+            o.table
+              ? `<div class="order-print-table">Столик: №${o.table}</div>`
+              : ''
+          }
+        </div>
+
+        <div class="order-print-items">
+          ${
+            items.length
+              ? items.map(i => `
+                  <div class="flex justify-between">
+                    <div class="mr-2">${i.name}</div>
+                    <div class="whitespace-nowrap">× ${i.qty}</div>
+                  </div>
+                `).join('')
+              : '<div class="text-sm text-gray-400">Нет позиций</div>'
+          }
         </div>
       </div>
-    </div>
   `);
 
   // обработка кликов по карточке
