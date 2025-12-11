@@ -144,6 +144,25 @@ button[data-act="inc"]{
   font-size:2rem;           /* размер знака +/- */
   border-radius:18px;       /* более скруглённые */
 }
+
+    /* Карточка заказа на табло – фиксированная высота */
+.order-card {
+  min-height: 220px;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Область с позиций внутри карточки */
+.order-card-items {
+  flex: 1 1 auto;      /* растягивается и выталкивает низ вниз */
+  min-height: 0;
+}
+
+/* Сетка с заказами – по центру, от края до края в разумных пределах */
+#list {
+  width: 100%;
+}
     
   </style>
 </head>
