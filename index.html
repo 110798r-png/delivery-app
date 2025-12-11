@@ -164,6 +164,27 @@ button[data-act="inc"]{
 #list {
   width: 100%;
 }
+
+    <style>
+  /* Правила только для печати */
+  @media print {
+    /* Всё, что помечено no-print, не выводим на чек */
+    .no-print {
+      display: none !important;
+    }
+
+    /* Каждый ордер — с новой страницы (если несколько штук печатаешь сразу) */
+    .order-card {
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /* Можно чуть упростить фон для принтера */
+    body {
+      background: #fff !important;
+    }
+  }
+</style>
     
   </style>
 </head>
