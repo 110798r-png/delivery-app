@@ -1933,12 +1933,6 @@ if (exportPdfBtn) {
   });
 
   // ====== /ОВЕРЛЕЙ ======
-
-function orderCard(o) {
-  const items = Array.isArray(o.items) ? o.items : [];
-  // ...
-}
-
   
 function orderCard(o) {
   const items = Array.isArray(o.items) ? o.items : [];
@@ -2008,22 +2002,9 @@ function orderCard(o) {
         ${itemsHtml || '—'}
       </div>
 
-      <!-- Итого + Ещё -->
+            <!-- Итоговая сумма -->
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
-        <div class="flex items-center gap-2">
-          <span>Итого:</span>
-          ${
-            hasMore
-              ? `<button
-                   type="button"
-                   class="text-xs font-normal text-blue-700 underline"
-                   data-act="showAll"
-                 >
-                   Ещё
-                 </button>`
-              : ''
-          }
-        </div>
+        <span>Итого:</span>
         <div>${total} ₽</div>
       </div>
 
@@ -2047,65 +2028,68 @@ function orderCard(o) {
     </div>
   `);
 
-  // обработка кликов по кнопкам
+    // обработка кликов по карточке
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
 
-    if (act === 'showAll') {
-      openOrderOverlay(o);
-      return;
-    }
+    // 1) Если клик по кнопкам "Готово" или "Удалить" — работаем как раньше
+    if (btn) {
+      const act = btn.dataset.act;
 
-    if (act === 'ready') {
-      const nowTs = Date.now();
-      const patch = { status: 'готов', readyAt: nowTs };
+      if (act === 'ready') {
+        const nowTs = Date.now();
+        const patch = { status: 'готов', readyAt: nowTs };
 
-      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-      if (i >= 0) {
-        dashOrders[i] = { ...dashOrders[i], ...patch };
-        saveDash(dashOrders);
-        syncOrderStatus(o.id, patch.status);
-        showToast(`Заказ #${o.id} отмечен как готов`);
-        renderOrders();
-      }
+        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+        if (i >= 0) {
+          dashOrders[i] = { ...dashOrders[i], ...patch };
+          saveDash(dashOrders);
+          syncOrderStatus(o.id, patch.status);
+          showToast(`Заказ #${o.id} отмечен как готов`);
+          renderOrders();
+        }
 
-      try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-      return;
-    }
-
-    if (act === 'delete') {
-      if (!card.dataset.confirm) {
-        card.dataset.confirm = '1';
-        btn.textContent = 'Точно удалить?';
-        setTimeout(() => {
-          if (card && card.dataset.confirm === '1') {
-            delete card.dataset.confirm;
-            btn.textContent = 'Удалить';
-          }
-        }, 3000);
+        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
         return;
       }
 
-      delete card.dataset.confirm;
+      if (act === 'delete') {
+        if (!card.dataset.confirm) {
+          card.dataset.confirm = '1';
+          btn.textContent = 'Точно удалить?';
+          setTimeout(() => {
+            if (card && card.dataset.confirm === '1') {
+              delete card.dataset.confirm;
+              btn.textContent = 'Удалить';
+            }
+          }, 3000);
+          return;
+        }
 
-      dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
-      saveDash(dashOrders);
-      card.remove();
-      showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+        delete card.dataset.confirm;
 
-      const nowTs = Date.now();
-      const patch = { status: 'завершён', finishedAt: nowTs };
+        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+        saveDash(dashOrders);
+        card.remove();
+        showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
 
-      try {
-        rpc({ op: 'update', id: o.id, patch }).catch(() => {});
-      } catch {}
+        const nowTs = Date.now();
+        const patch = { status: 'завершён', finishedAt: nowTs };
+
+        try {
+          rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+        } catch {}
+        return;
+      }
+
+      // других act уже нет
+      return;
     }
+
+    // 2) Если кликнули НЕ по кнопкам — открываем модалку с полным списком позиций
+    openOrderOverlay(o);
   });
 
-  return card;
-}
 
   function renderOrders(){
     const unique = new Map();
