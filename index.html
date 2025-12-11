@@ -144,50 +144,6 @@ button[data-act="inc"]{
   font-size:2rem;           /* размер знака +/- */
   border-radius:18px;       /* более скруглённые */
 }
-
-    /* Базовый вид карточек заказа */
-.order-card {
-  flex: 0 1 320px;
-  max-width: 320px;
-  min-width: 300px;
-  position: relative;
-  z-index: 1;
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-}
-
-/* Первые две карточки — при hover чуть сдвигаем влево и поднимаем */
-#list > .order-card:nth-child(-n+2):hover {
-  transform: translateX(-14px) translateY(-2px);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
-  z-index: 3;
-}
-
-/* Затемнение фона при раскрытой карточке */
-body.order-card-overlay-open::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  z-index: 40;
-}
-
-/* Раскрытая карточка по центру экрана */
-.order-card-expanded {
-  position: fixed !important;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) !important;
-  width: 380px;
-  max-width: 90vw;
-  max-height: 80vh;
-  z-index: 41 !important;
-}
-
-/* Внутри раскрытой карточки список позиций скроллится */
-.order-card-expanded [data-items-full] {
-  max-height: 60vh;
-  overflow-y: auto;
-}
     
   </style>
 </head>
