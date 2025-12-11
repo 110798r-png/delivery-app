@@ -1869,6 +1869,9 @@ if (exportPdfBtn) {
         </div>
       </div>
     `);
+
+      root.dataset.layout = 'wide';
+    
     document.body.appendChild(detailsModal);
   }
 
@@ -2547,11 +2550,21 @@ function bindTabloTapZone(){
 /* ===== Router ===== */
 function mount(view){
   const app = document.getElementById('app');
+
+  // зачистка старого экрана
   if (app.firstChild && typeof app.firstChild.cleanup === 'function') {
     try { app.firstChild.cleanup(); } catch {}
   }
   app.innerHTML = '';
-  app.classList.add('phone-shell');
+
+  // для обычных экранов — телефонная «оболочка»
+  // для табло (layout="wide") — полноразмерный контейнер
+  if (view && view.dataset && view.dataset.layout === 'wide') {
+    app.classList.remove('phone-shell');
+  } else {
+    app.classList.add('phone-shell');
+  }
+
   app.appendChild(view);
 }
 
