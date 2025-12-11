@@ -1805,95 +1805,99 @@ if (exportPdfBtn) {
   }
 };
 
+function orderCard(o){
+  const clientTotal = (o.items || []).reduce(
+    (s, i) => s + (i.price || 0) * (i.qty || 0),
+    0
+  );
+  const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
+  const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
-  function orderCard(o){
-    const clientTotal = (o.items || []).reduce(
-      (s, i) => s + (i.price || 0) * (i.qty || 0),
-      0
-    );
-    const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
-    const created = o.createdAt ? new Date(o.createdAt) : new Date();
+  const colorMap = {
+    'новый':     'bg-yellow-50 border-yellow-300',
+    'готовится': 'bg-blue-50 border-blue-300',
+    'в пути':    'bg-purple-50 border-purple-300',
+    'готов':     'bg-green-50 border-green-300',
+    'завершён':  'bg-gray-100 border-gray-300',
+    'отменён':   'bg-red-50 border-red-300'
+  };
+  const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-    const colorMap = {
-      'новый':     'bg-yellow-50 border-yellow-300',
-      'готовится': 'bg-blue-50 border-blue-300',
-      'в пути':    'bg-purple-50 border-purple-300',
-      'готов':     'bg-green-50 border-green-300',
-      'завершён':  'bg-gray-100 border-gray-300',
-      'отменён':   'bg-red-50 border-red-300'
-    };
-    const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+  const itemsHtml = (o.items || []).map(i => `
+    <div class="flex justify-between">
+      <div class="mr-2">${i.name}</div>
+      <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+    </div>
+  `).join('');
 
-        const itemsHtml = (o.items || []).map(i => `
-      <div class="flex justify-between">
-        <div class="mr-2">${i.name}</div>
-        <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+  const etaBlock = o.etaUntil
+    ? `<div class="text-sm text-gray-700 mt-1">
+         Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+       </div>`
+    : '';
+
+  const card = el(`
+    <div
+      class="
+             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+      data-id="${o.id}"
+    >
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+          ${o.status || 'новый'}
+        </span>
       </div>
-    `).join('');
 
-    const etaBlock = o.etaUntil
-      ? `<div class="text-sm text-gray-700 mt-1">
-           Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-         </div>`
-      : '';
-
-          const card = el(`
-      <div
-        class="w-full
-               p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-               flex flex-col gap-2 transition-transform hover:scale-[1.01]"
-        data-id="${o.id}"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
-          </div>
-          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-            ${o.status || 'новый'}
-          </span>
-        </div>
-
-        <div class="text-gray-600 text-xs mt-1">
-          ${created.toLocaleString()}
-        </div>
-
-        ${etaBlock}
-
-        <div class="mt-2 grid gap-1 text-sm max-h-40 overflow-y-auto pr-1">
-          ${itemsHtml || '—'}
-        </div>
-
-        <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <div>Итого:</div>
-          <div>${total} ₽</div>
-        </div>
-
-        <div class="mt-2 flex flex-wrap gap-2 items-center">
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-            data-act="ready"
-          >
-            Готово
-          </button>
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
-            data-act="delete"
-          >
-            Удалить
-          </button>
-        </div>
+      <div class="text-gray-600 text-xs mt-1">
+        ${created.toLocaleString()}
       </div>
-    `);
-    
-    card.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-act]');
-      if (!btn) return;
-      const act = btn.dataset.act;
 
-               if (act === 'ready'){
+      ${etaBlock}
+
+      <div class="mt-2 grid gap-1 text-sm">
+        ${itemsHtml || '—'}
+      </div>
+
+      <div class="mt-2 flex items-center justify-between text-lg font-bold">
+        <div>Итого:</div>
+        <div>${total} ₽</div>
+      </div>
+
+      <div class="mt-2 flex flex-wrap gap-2 items-center">
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+          data-act="ready"
+        >
+          Готово
+        </button>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+          data-act="delete"
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
+  `);
+
+  // --- размеры карточки ---
+  card.style.flex = '0 1 320px';
+  card.style.maxWidth = '320px';
+  card.style.minWidth = '300px';
+
+  card.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+
+    if (act === 'ready'){
       const nowTs = Date.now();
       const patch = { status: 'готов', readyAt: nowTs };
 
@@ -1910,29 +1914,29 @@ if (exportPdfBtn) {
 
     } else if (act === 'delete'){
 
-        if (!card.dataset.confirm){
-          card.dataset.confirm = '1';
-          btn.textContent = 'Точно удалить?';
-          setTimeout(() => {
-            if (card && card.dataset.confirm === '1'){
-              delete card.dataset.confirm;
-              btn.textContent = 'Удалить';
-            }
-          }, 3000);
-          return;
-        }
-
-        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
-        saveDash(dashOrders);
-        card.remove();
-        showToast(`Заказ #${o.id} удалён`);
-
-        try { rpc({ op: 'delete', id: o.id }).catch(()=>{}); } catch {}
+      if (!card.dataset.confirm){
+        card.dataset.confirm = '1';
+        btn.textContent = 'Точно удалить?';
+        setTimeout(() => {
+          if (card && card.dataset.confirm === '1'){
+            delete card.dataset.confirm;
+            btn.textContent = 'Удалить';
+          }
+        }, 3000);
+        return;
       }
-    });
 
-    return card;
-  }
+      dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+      saveDash(dashOrders);
+      card.remove();
+      showToast(`Заказ #${o.id} удалён`);
+
+      try { rpc({ op: 'delete', id: o.id }).catch(()=>{}); } catch {}
+    }
+  });
+
+  return card;
+}
 
   function renderOrders(){
     const unique = new Map();
