@@ -1963,12 +1963,12 @@ function orderCard(o) {
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  // --- экранная версия: максимум 3 позиции ---
+  // показываем максимум 3 позиции, остальные в модалке
   const MAX_INLINE  = 3;
   const hasMore     = items.length > MAX_INLINE;
   const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
-  const itemsHtmlScreen = inlineItems.map(i => `
+  const itemsHtml = inlineItems.map(i => `
       <div class="flex justify-between">
         <div class="mr-2">${i.name}</div>
         <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
@@ -1981,14 +1981,6 @@ function orderCard(o) {
        </div>`
     : '';
 
-  // --- печатная версия: ВСЕ позиции, только название + qty ---
-  const itemsHtmlPrint = items.map(i => `
-      <div class="flex justify-between text-sm">
-        <div class="mr-2">${i.name}</div>
-        <div class="whitespace-nowrap">× ${i.qty}</div>
-      </div>
-    `).join('') || '<div class="text-sm text-gray-400">Нет позиций</div>';
-
   const card = el(`
     <div
       class="
@@ -1999,79 +1991,51 @@ function orderCard(o) {
       "
       data-id="${o.id}"
     >
-      <!-- ЭКРАННАЯ ЧАСТЬ -->
-      <div class="order-card-main">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
-          </div>
-          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-            ${o.status || 'новый'}
-          </span>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
         </div>
-
-        <div class="text-gray-600 text-xs mt-1">
-          ${created.toLocaleString()}
-        </div>
-
-        ${etaBlock}
-
-        <!-- список позиций (кратко) -->
-        <div class="order-card-items mt-2 grid gap-1 text-sm">
-          ${itemsHtmlScreen || '—'}
-          ${hasMore ? `<div class="text-xs text-blue-700 mt-1">…ещё позиций</div>` : ''}
-        </div>
-
-        <!-- Итоговая сумма -->
-        <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <span>Итого:</span>
-          <div>${total} ₽</div>
-        </div>
-
-        <!-- Кнопки управления, только на экране -->
-        <div class="mt-3 flex flex-col items-center gap-2 no-print">
-          <button
-            type="button"
-            class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-            data-act="ready"
-          >
-            Готово
-          </button>
-          <button
-            type="button"
-            class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
-            data-act="delete"
-          >
-            Удалить
-          </button>
-        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+          ${o.status || 'новый'}
+        </span>
       </div>
 
-            <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
-      <div class="order-card-print">
-        <div class="order-print-header">
-          <div class="order-print-id">#${o.id || '—'}</div>
-          ${
-            o.table
-              ? `<div class="order-print-table">Столик: №${o.table}</div>`
-              : ''
-          }
-        </div>
-
-        <div class="order-print-items">
-          ${
-            items.length
-              ? items.map(i => `
-                  <div class="flex justify-between">
-                    <div class="mr-2">${i.name}</div>
-                    <div class="whitespace-nowrap">× ${i.qty}</div>
-                  </div>
-                `).join('')
-              : '<div class="text-sm text-gray-400">Нет позиций</div>'
-          }
-        </div>
+      <div class="text-gray-600 text-xs mt-1">
+        ${created.toLocaleString()}
       </div>
+
+      ${etaBlock}
+
+      <!-- список позиций -->
+      <div class="order-card-items mt-2 grid gap-1 text-sm">
+        ${itemsHtml || '—'}
+      </div>
+
+      <!-- Итоговая сумма -->
+      <div class="mt-2 flex items-center justify-between text-lg font-bold">
+        <span>Итого:</span>
+        <div>${total} ₽</div>
+      </div>
+
+      <!-- Низ карточки: кнопки по центру одна под другой -->
+      <div class="mt-3 flex flex-col items-center gap-2 no-print">
+        <button
+          type="button"
+          class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+          data-act="ready"
+        >
+          Готово
+        </button>
+        <button
+          type="button"
+          class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
+          data-act="delete"
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
   `);
 
   // обработка кликов по карточке
@@ -2128,16 +2092,17 @@ function orderCard(o) {
         return;
       }
 
-      return;
+      return; // на всякий случай
     }
 
-    // 2) Клик по самой карточке (не по кнопкам) – можно при желании
-    //    оставить открытие модалки с полным описанием:
+    // 2) Клик не по кнопкам — открываем модалку
     openOrderOverlay(o);
   });
 
   return card;
 }
+
+
 
   function renderOrders(){
     const unique = new Map();
