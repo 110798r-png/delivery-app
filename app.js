@@ -1920,7 +1920,9 @@ if (exportPdfBtn) {
   });
   
 function orderCard(o){
-  const clientTotal = (o.items || []).reduce(
+  const items = Array.isArray(o.items) ? o.items : [];
+
+  const clientTotal = items.reduce(
     (s, i) => s + (i.price || 0) * (i.qty || 0),
     0
   );
@@ -1937,10 +1939,10 @@ function orderCard(o){
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  const items = Array.isArray(o.items) ? o.items : [];
-  const MAX_INLINE = 5; // сколько позиций показываем прямо на карточке
-  const inlineItems = items.slice(0, MAX_INLINE);
-  const hasMore = items.length > MAX_INLINE;
+  // сколько позиций показываем прямо в карточке
+  const MAX_INLINE   = 5;
+  const inlineItems  = items.slice(0, MAX_INLINE);
+  const hasMore      = items.length > MAX_INLINE;
 
   const itemsHtml = inlineItems.map(i => `
     <div class="flex justify-between">
@@ -1958,8 +1960,9 @@ function orderCard(o){
   const card = el(`
     <div
       class="
-             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+        p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+        flex flex-col gap-2 transition-transform
+      "
       data-id="${o.id}"
     >
       <div class="flex items-center justify-between">
@@ -1976,13 +1979,16 @@ function orderCard(o){
         ${created.toLocaleString()}
       </div>
 
-                 ${etaBlock}
+      ${etaBlock}
 
       <div class="mt-2 grid gap-1 text-sm">
         ${itemsHtml || '—'}
         ${
           hasMore
-            ? `<div class="text-xs text-blue-600 cursor-pointer underline mt-1" data-show-details>
+            ? `<div
+                 class="text-xs text-blue-600 cursor-pointer underline mt-1"
+                 data-show-details
+               >
                  Показать состав заказа (${items.length})
                </div>`
             : ''
@@ -2013,83 +2019,18 @@ function orderCard(o){
     </div>
   `);
 
-  // --- размеры карточки ---
-  card.style.flex = '0 1 320px';
+  // --- размеры карточки и базовое состояние ---
+  card.style.flex     = '0 1 320px';
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
 
-  card.addEventListener('mouseenter', () => {
-    card.style.flex       = '0 1 340px';
-    card.style.maxWidth   = '340px';
-    card.style.transform  = 'translateY(-3px)';
-    card.style.boxShadow  = '0 12px 24px rgba(15,23,42,0.18)';
-    card.style.zIndex     = '5';
-    card.style.transition = 'all 0.15s ease-out';
-  });
-
-  card.addEventListener('mouseleave', () => {
-    card.style.flex      = baseFlex;
-    card.style.maxWidth  = baseMaxW;
-    card.style.transform = 'none';
-    card.style.boxShadow = baseShadow;
-    card.style.zIndex    = '1';
-  });
-
-    // --- внутренняя прокрутка списка позиций + сворачивание по клику ---
-  const itemsBox   = card.querySelector('[data-items-box]');
-  const toggleText = card.querySelector('[data-toggle-items]');
-
-  if (itemsBox) {
-    const EXPANDED_MAX = 180; // высота видимой области с позициями
-
-    // начальное состояние — скрыто
-    itemsBox.style.maxHeight   = '0px';
-    itemsBox.style.overflowY   = 'hidden';
-    itemsBox.style.transition  = 'max-height 0.2s ease';
-    card.dataset.expanded      = '0';
-
-    function setExpanded(on) {
-      if (on) {
-        itemsBox.style.maxHeight = EXPANDED_MAX + 'px';
-        itemsBox.style.overflowY = 'auto';
-        if (toggleText) toggleText.textContent = 'Скрыть состав заказа';
-        card.dataset.expanded = '1';
-      } else {
-        itemsBox.style.maxHeight = '0px';
-        itemsBox.style.overflowY = 'hidden';
-        if (toggleText) toggleText.textContent = 'Показать состав заказа';
-        card.dataset.expanded = '0';
-      }
-    }
-
-    setExpanded(false); // изначально свёрнуто
-
-    // отдельный клик только по тексту "Показать состав заказа"
-    if (toggleText) {
-      toggleText.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const on = card.dataset.expanded === '1';
-        setExpanded(!on);
-      });
-    }
-
-    // общий клик по карточке (но не по кнопкам готов/удалить)
-    card.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-act]');
-      if (btn) return; // для кнопок обработка ниже
-
-      const on = card.dataset.expanded === '1';
-      setExpanded(!on);
-    });
-  }
-
-  // --- эффект "выделения" карточки при наведении ---
   const baseFlex   = '0 1 320px';
   const baseMaxW   = '320px';
   const baseShadow = card.style.boxShadow || '';
 
+  // hover-эффект: карточка чуть расширяется и двигает соседей
   card.addEventListener('mouseenter', () => {
-    card.style.flex       = '0 1 340px';              // чуть шире → сдвигает соседей
+    card.style.flex       = '0 1 340px';
     card.style.maxWidth   = '340px';
     card.style.transform  = 'translateY(-4px)';
     card.style.boxShadow  = '0 14px 30px rgba(15,23,42,0.18)';
@@ -2105,15 +2046,15 @@ function orderCard(o){
     card.style.zIndex    = '1';
   });
 
-
-     card.addEventListener('click', (e) => {
+  // обработка кликов
+  card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
 
-    // если нажали на Готово / Удалить
+    // клик по кнопкам "Готово / Удалить"
     if (btn) {
       const act = btn.dataset.act;
 
-      if (act === 'ready'){
+      if (act === 'ready') {
         const nowTs = Date.now();
         const patch = { status: 'готов', readyAt: nowTs };
 
@@ -2131,7 +2072,6 @@ function orderCard(o){
       }
 
       if (act === 'delete') {
-        // первый клик — спросить подтверждение
         if (!card.dataset.confirm) {
           card.dataset.confirm = '1';
           btn.textContent = 'Точно удалить?';
@@ -2144,7 +2084,6 @@ function orderCard(o){
           return;
         }
 
-        // второй клик — реально убираем с табло
         delete card.dataset.confirm;
 
         dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
@@ -2164,12 +2103,11 @@ function orderCard(o){
       return;
     }
 
-    // сюда попадаем, если кликнули НЕ по кнопкам
-    // — либо по тексту "Показать состав заказа", либо по пустому месту карточки
+    // клик не по кнопкам → открываем модалку
     openOrderModal(o);
   });
 
-  // если хотим, чтобы "Показать состав заказа" ОДНОЗНАЧНО открывал модалку:
+  // чтобы "Показать состав заказа" всегда открывал модалку
   const moreLink = card.querySelector('[data-show-details]');
   if (moreLink) {
     moreLink.addEventListener('click', (e) => {
@@ -2178,6 +2116,8 @@ function orderCard(o){
     });
   }
 
+  return card;
+}
 
   function renderOrders(){
     const unique = new Map();
