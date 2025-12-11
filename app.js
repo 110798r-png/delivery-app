@@ -1706,7 +1706,7 @@ function DashboardView() {
 
     <div
   id="list"
-  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 auto-rows-min"
+  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch"
 ></div>
 
 
@@ -1953,12 +1953,13 @@ function DashboardView() {
       : '';
 
     const card = el(`
-      <div
-        class="
-          p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-          flex flex-col gap-2 transition-transform hover:scale-[1.01] hover:shadow-md"
-        data-id="${o.id}"
-      >
+  <div
+    class="
+      p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+      flex flex-col gap-2 h-full
+      transition-transform hover:scale-[1.01] hover:shadow-md"
+    data-id="${o.id}"
+  >
         <div class="flex items-center justify-between">
           <div>
             <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1973,7 +1974,7 @@ function DashboardView() {
           ${created.toLocaleString()}
         </div>
 
-        ${etaBlock}
+                ${etaBlock}
 
         <div class="mt-2 grid gap-1 text-sm">
           ${itemsHtml || '—'}
@@ -1991,26 +1992,29 @@ function DashboardView() {
             : ''
         }
 
-                <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <div>Итого:</div>
-          <div>${total} ₽</div>
-        </div>
+        <!-- НИЖНИЙ БЛОК, ПРИЖАТЫЙ К ДНУ -->
+        <div class="mt-auto pt-2 border-t">
+          <div class="flex items-center justify-between text-lg font-bold">
+            <div>Итого:</div>
+            <div>${total} ₽</div>
+          </div>
 
-        <div class="mt-2 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-            data-act="ready"
-          >
-            Готово
-          </button>
-          <button
-            type="button"
-            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
-            data-act="delete"
-          >
-            Удалить
-          </button>
+          <div class="mt-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+              data-act="ready"
+            >
+              Готово
+            </button>
+            <button
+              type="button"
+              class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
+              data-act="delete"
+            >
+              Удалить
+            </button>
+          </div>
         </div>
       </div>
     `);
