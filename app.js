@@ -1706,7 +1706,10 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="flex flex-wrap gap-4 justify-start"></div>
+<div
+  id="list"
+  class="flex flex-wrap gap-4 justify-start items-start"
+></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1915,9 +1918,6 @@ function orderCard(o){
   card.style.flex = '0 1 320px';
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
-    card.style.height = 'auto';
-  card.style.alignSelf = 'flex-start';
-
 
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
