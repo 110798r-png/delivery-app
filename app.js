@@ -1832,6 +1832,114 @@ if (exportPdfBtn) {
   }
 };
 
+  // ====== ОВЕРЛЕЙ ДЛЯ "ЕЩЁ" ======
+
+  // создаём оверлей, если его ещё нет в DOM
+  let overlay = document.getElementById('orderOverlay');
+  if (!overlay) {
+    overlay = el(`
+      <div
+        id="orderOverlay"
+        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40"
+      >
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 p-5 relative">
+          <button
+            id="orderOverlayClose"
+            type="button"
+            class="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
+          >
+            ✕
+          </button>
+          <div id="orderOverlayContent"></div>
+        </div>
+      </div>
+    `);
+    document.body.appendChild(overlay);
+  }
+
+  const overlayClose = overlay.querySelector('#orderOverlayClose');
+  const overlayBody  = overlay.querySelector('#orderOverlayContent');
+
+  // открыть модалку с полным списком позиций
+  function openOrderOverlay(order) {
+    if (!overlay || !overlayBody) return;
+
+    const items   = Array.isArray(order.items) ? order.items : [];
+    const created = order.createdAt ? new Date(order.createdAt) : null;
+
+    const clientTotal = items.reduce(
+      (s, i) => s + (i.price || 0) * (i.qty || 0),
+      0
+    );
+    const total = Math.max(
+      typeof order.total === 'number' ? order.total : 0,
+      clientTotal
+    );
+
+    overlayBody.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <div class="text-xl font-extrabold">#${order.id || '—'}</div>
+          ${order.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${order.table}</div>` : ''}
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/60">
+          ${order.status || 'новый'}
+        </span>
+      </div>
+
+      <div class="text-xs text-gray-500 mb-2">
+        ${created ? created.toLocaleString() : ''}
+      </div>
+
+      <div class="border rounded-2xl p-2 mb-3 max-h-[50vh] overflow-y-auto">
+        ${
+          items.length
+            ? items.map(i => `
+                <div class="flex justify-between text-sm py-0.5">
+                  <div class="mr-2">${i.name}</div>
+                  <div class="whitespace-nowrap">${i.qty} × ${i.price}</div>
+                </div>
+              `).join('')
+            : '<div class="text-sm text-gray-400">Нет позиций</div>'
+        }
+      </div>
+
+      <div class="flex items-center justify-between font-semibold">
+        <div>Итого:</div>
+        <div>${total} ₽</div>
+      </div>
+    `;
+
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  // закрыть модалку
+  function closeOrderOverlay() {
+    if (!overlay) return;
+    overlay.classList.add('hidden');
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  if (overlayClose) {
+    overlayClose.onclick = () => closeOrderOverlay();
+  }
+
+  // клик по тёмному фону – тоже закрывает
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeOrderOverlay();
+  });
+
+  // ====== /ОВЕРЛЕЙ ======
+
+function orderCard(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  // ...
+}
+
+  
 function orderCard(o) {
   const items = Array.isArray(o.items) ? o.items : [];
 
@@ -1853,7 +1961,7 @@ function orderCard(o) {
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
   const MAX_INLINE  = 3;
-  const hasMore     = items.length > MAX_INLINE;              // > 3 – есть ещё
+  const hasMore     = items.length > MAX_INLINE;
   const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
   const itemsHtml = inlineItems.map(i => `
@@ -1895,12 +2003,12 @@ function orderCard(o) {
 
       ${etaBlock}
 
-      <!-- список позиций, занимает всё свободное место -->
+      <!-- список позиций, растягивается до низа -->
       <div class="order-card-items mt-2 grid gap-1 text-sm">
         ${itemsHtml || '—'}
       </div>
 
-      <!-- Итого + кнопка "Ещё" -->
+      <!-- Итого + Ещё -->
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
         <div class="flex items-center gap-2">
           <span>Итого:</span>
@@ -1919,18 +2027,18 @@ function orderCard(o) {
         <div>${total} ₽</div>
       </div>
 
-      <!-- Низ карточки (всегда снизу) -->
-      <div class="mt-2 flex flex-wrap gap-2 items-center">
+      <!-- Низ карточки: кнопки по центру одна под другой -->
+      <div class="mt-3 flex flex-col items-center gap-2">
         <button
           type="button"
-          class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+          class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
           data-act="ready"
         >
           Готово
         </button>
         <button
           type="button"
-          class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+          class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
           data-act="delete"
         >
           Удалить
@@ -1939,13 +2047,12 @@ function orderCard(o) {
     </div>
   `);
 
-  // === Клик по кнопкам в карточке ===
+  // обработка кликов по кнопкам
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
 
-    // Кнопка "Ещё" — открыть модалку с полным списком
     if (act === 'showAll') {
       openOrderOverlay(o);
       return;
