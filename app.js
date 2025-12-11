@@ -1706,7 +1706,7 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
+<div id="list" class="flex flex-wrap gap-4 justify-start"></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
