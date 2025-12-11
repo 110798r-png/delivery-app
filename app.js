@@ -569,37 +569,38 @@ function OrderView(){
     );
   });
 
-    // аккуратно подсвечиваем активную категорию
+    // аккуратно подсечиваем активную категориюв
   // и принудительно ПРОКРУЧИВАЕМ полоску категорий
-  function highlightChip(idx) {
-    const buttons = categoryBar.querySelectorAll('button');
-    buttons.forEach((b, i) => {
-      const on = i === idx;
-      b.classList.toggle('bg-black', on);
-      b.classList.toggle('text-white', on);
-      b.classList.toggle('border-black', on);
-    });
+function highlightChip(idx) {
+  const buttons = categoryBar.querySelectorAll('button');
+  if (!buttons.length) return;
 
-    // отдельно крутим сам скролл categoryBar,
-    // чтобы активный чип был примерно по центру
-    const activeBtn = buttons[idx];
-    if (!activeBtn) return;
+  // переключаем стили активной/неактивной кнопки
+  buttons.forEach((b, i) => {
+    const on = i === idx;
+    b.classList.toggle('bg-black', on);
+    b.classList.toggle('text-white', on);
+    b.classList.toggle('border-black', on);
+  });
 
-    const barRect = categoryBar.getBoundingClientRect();
-    const btnRect = activeBtn.getBoundingClientRect();
+  const activeBtn = buttons[idx];
+  if (!activeBtn) return;
 
-    // насколько нужно сдвинуть полоску
-    const offset =
-      (btnRect.left - barRect.left) - // текущая позиция кнопки внутри бара
-      (barRect.width - btnRect.width) / 2; // хотим по центру
+  // --- РУЧНОЙ автоскролл ряда категорий ---
+  const bar      = categoryBar;
+  const barWidth = bar.clientWidth;
+  const btnLeft  = activeBtn.offsetLeft;
+  const btnWidth = activeBtn.offsetWidth;
 
-    const targetLeft = categoryBar.scrollLeft + offset;
+  // хотим, чтобы активная кнопка была примерно по центру
+  let targetScroll = btnLeft - (barWidth - btnWidth) / 2;
+  if (targetScroll < 0) targetScroll = 0;
 
-    categoryBar.scrollTo({
-      left: targetLeft,
-      behavior: 'smooth'
-    });
-  }
+  bar.scrollTo({
+    left: targetScroll,
+    behavior: 'smooth'
+  });
+}
 
   function goToIndex(idx, { animate = true } = {}){
     const cfg = loadConfig();
