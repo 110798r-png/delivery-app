@@ -569,16 +569,35 @@ function OrderView(){
     );
   });
 
-  function highlightChip(idx){
+    // аккуратно подсвечиваем активную категорию
+  // и принудительно ПРОКРУЧИВАЕМ полоску категорий
+  function highlightChip(idx) {
     const buttons = categoryBar.querySelectorAll('button');
     buttons.forEach((b, i) => {
       const on = i === idx;
       b.classList.toggle('bg-black', on);
       b.classList.toggle('text-white', on);
       b.classList.toggle('border-black', on);
-      if (on){
-        b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-      }
+    });
+
+    // отдельно крутим сам скролл categoryBar,
+    // чтобы активный чип был примерно по центру
+    const activeBtn = buttons[idx];
+    if (!activeBtn) return;
+
+    const barRect = categoryBar.getBoundingClientRect();
+    const btnRect = activeBtn.getBoundingClientRect();
+
+    // насколько нужно сдвинуть полоску
+    const offset =
+      (btnRect.left - barRect.left) - // текущая позиция кнопки внутри бара
+      (barRect.width - btnRect.width) / 2; // хотим по центру
+
+    const targetLeft = categoryBar.scrollLeft + offset;
+
+    categoryBar.scrollTo({
+      left: targetLeft,
+      behavior: 'smooth'
     });
   }
 
