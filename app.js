@@ -1706,10 +1706,25 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
+<div id="list" class="flex flex-wrap gap-4 justify-center items-start"></div>
 
-    <div>
-      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
+<!-- Оверлей для просмотра полного списка товаров -->
+<div id="orderOverlay"
+     class="fixed inset-0 bg-black/40 flex items-center justify-center z-40 hidden">
+  <div class="bg-white rounded-3xl max-w-lg w-[90%] max-h-[80vh] p-4 shadow-xl relative">
+    <button type="button"
+            id="orderOverlayClose"
+            class="absolute top-3 right-3 text-sm text-gray-500">
+      ✕
+    </button>
+    <div id="orderOverlayContent"></div>
+  </div>
+</div>
+
+    <div class="mt-3 flex justify-center">
+      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">
+        Назад
+      </button>
     </div>
   </div>
 `);
@@ -1725,6 +1740,79 @@ if (exportPdfBtn) {
   const stockPanel = root.querySelector('#stockPanel');
   const stockToggle= root.querySelector('#stockToggle');
   const stockArrow = root.querySelector('#stockArrow');
+    const overlay      = root.querySelector('#orderOverlay');
+  const overlayClose = root.querySelector('#orderOverlayClose');
+  const overlayBody  = root.querySelector('#orderOverlayContent');
+
+  function openOrderOverlay(order) {
+    if (!overlay || !overlayBody) return;
+
+    const items   = Array.isArray(order.items) ? order.items : [];
+    const created = order.createdAt ? new Date(order.createdAt) : null;
+
+    const clientTotal = items.reduce(
+      (s, i) => s + (i.price || 0) * (i.qty || 0),
+      0
+    );
+    const total = Math.max(
+      typeof order.total === 'number' ? order.total : 0,
+      clientTotal
+    );
+
+    overlayBody.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <div class="text-xl font-extrabold">#${order.id || '—'}</div>
+          ${order.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${order.table}</div>` : ''}
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/60">
+          ${order.status || 'новый'}
+        </span>
+      </div>
+
+      <div class="text-xs text-gray-500 mb-2">
+        ${created ? created.toLocaleString() : ''}
+      </div>
+
+      <div class="border rounded-2xl p-2 mb-3 max-h-[50vh] overflow-y-auto">
+        ${
+          items.length
+            ? items.map(i => `
+                <div class="flex justify-between text-sm py-0.5">
+                  <div class="mr-2">${i.name}</div>
+                  <div class="whitespace-nowrap">${i.qty} × ${i.price}</div>
+                </div>
+              `).join('')
+            : '<div class="text-sm text-gray-400">Нет позиций</div>'
+        }
+      </div>
+
+      <div class="flex items-center justify-between font-semibold">
+        <div>Итого:</div>
+        <div>${total} ₽</div>
+      </div>
+    `;
+
+    overlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeOrderOverlay() {
+    if (!overlay) return;
+    overlay.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  if (overlayClose) {
+    overlayClose.onclick = () => closeOrderOverlay();
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      // клик по затемнённому фону — закрытие
+      if (e.target === overlay) closeOrderOverlay();
+    });
+  }
 
   if (!list || !stockList || !stockPanel || !stockToggle || !stockArrow) {
     console.error('DashboardView: missing containers', { list, stockList, stockPanel, stockToggle, stockArrow });
@@ -1829,25 +1917,20 @@ if (exportPdfBtn) {
   }
 };
 
-function orderCard(o){
-  const clientTotal = (o.items || []).reduce(
+  const items   = Array.isArray(o.items) ? o.items : [];
+
+  const clientTotal = items.reduce(
     (s, i) => s + (i.price || 0) * (i.qty || 0),
     0
   );
   const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
   const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
-  const colorMap = {
-    'новый':     'bg-yellow-50 border-yellow-300',
-    'готовится': 'bg-blue-50 border-blue-300',
-    'в пути':    'bg-purple-50 border-purple-300',
-    'готов':     'bg-green-50 border-green-300',
-    'завершён':  'bg-gray-100 border-gray-300',
-    'отменён':   'bg-red-50 border-red-300'
-  };
-  const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+  const MAX_INLINE = 5;                 // сколько позиций показываем прямо в карточке
+  const hasMore    = items.length > MAX_INLINE;
+  const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
-  const itemsHtml = (o.items || []).map(i => `
+  const itemsHtml = inlineItems.map(i => `
     <div class="flex justify-between">
       <div class="mr-2">${i.name}</div>
       <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
@@ -1862,9 +1945,9 @@ function orderCard(o){
 
   const card = el(`
     <div
-      class="
-             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+        class="
+     p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+     flex flex-col gap-2 transition-transform hover:scale-[1.01] hover:shadow-md"
       data-id="${o.id}"
     >
       <div class="flex items-center justify-between">
@@ -1886,6 +1969,18 @@ function orderCard(o){
       <div class="mt-2 grid gap-1 text-sm">
         ${itemsHtml || '—'}
       </div>
+
+      ${
+        hasMore
+          ? `<button
+               type="button"
+               class="mt-1 text-xs text-blue-700 underline"
+               data-act="showAll"
+             >
+               Посмотреть весь список заказов
+             </button>`
+          : ''
+      }
 
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
         <div>Итого:</div>
@@ -1916,10 +2011,16 @@ function orderCard(o){
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
 
-  card.addEventListener('click', (e) => {
+   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const act = btn.dataset.act;
+
+    // 1) открыть оверлей с полным списком
+    if (act === 'showAll') {
+      openOrderOverlay(o);
+      return;
+    }
 
     if (act === 'ready'){
       const nowTs = Date.now();
@@ -2087,9 +2188,10 @@ async function loadOrdersFromCloud(){
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 3000);
 
-  root.cleanup = () => {
+   root.cleanup = () => {
     if (pollTimer) clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    closeOrderOverlay();
   };
 
   return root;
