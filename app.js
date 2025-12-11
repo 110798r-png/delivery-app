@@ -1664,8 +1664,8 @@ async function exportReportPdf() {
 }
 
 /* ===== Табло ===== */
-function DashboardView() {
-  const root = el(`
+function DashboardView(){ 
+const root = el(`
   <div class="grid gap-4 max-w-6xl pb-24">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center gap-2">
@@ -1674,13 +1674,14 @@ function DashboardView() {
       </div>
       <div class="flex items-center gap-2">
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
-        <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
+          <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
         <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
         <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
       </div>
     </div>
 
-    <div class="p-4 rounded-2xl bg-white border">
+        <div class="p-4 rounded-2xl bg-white border">
+      <!-- Кнопка-шапка шторки -->
       <button
         id="stockToggle"
         class="w-full flex items-center justify-between gap-2 text-left"
@@ -1690,6 +1691,7 @@ function DashboardView() {
         <span id="stockArrow" class="text-lg leading-none">▼</span>
       </button>
 
+      <!-- Содержимое, по умолчанию скрыто -->
       <div id="stockPanel" class="mt-3 hidden">
         <p class="text-sm text-gray-500 mb-3">
           Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
@@ -1704,53 +1706,25 @@ function DashboardView() {
       </div>
     </div>
 
-    <div
-  id="list"
-  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch"
-></div>
+<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
 
-
-       <!-- Оверлей развёрнутого заказа -->
-    <div
-      id="orderOverlay"
-      class="fixed inset-0 flex items-center justify-center z-40 hidden"
-      style="background: rgba(0,0,0,0.45);"
-    >
-      <div
-        class="bg-white rounded-3xl w-full max-w-3xl p-6 shadow-xl relative"
-        style="max-height: 88vh; overflow-y: auto;"
-      >
-        <button
-          type="button"
-          id="orderOverlayClose"
-          class="absolute top-3 right-3 text-sm text-gray-500"
-        >
-          ✕
-        </button>
-        <div id="orderOverlayContent"></div>
-      </div>
-    </div>
-
-    <div class="mt-3 flex justify-center">
+    <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
     </div>
   </div>
 `);
 
-  const exportPdfBtn = root.querySelector('#exportPdfBtn');
-  if (exportPdfBtn) {
-    exportPdfBtn.onclick = () => exportReportPdf();
-  }
-
-  const list        = root.querySelector('#list');
-  const stockList   = root.querySelector('#stockList');
-  const stockPanel  = root.querySelector('#stockPanel');
-  const stockToggle = root.querySelector('#stockToggle');
-  const stockArrow  = root.querySelector('#stockArrow');
-
-  const overlay      = root.querySelector('#orderOverlay');
-  const overlayClose = root.querySelector('#orderOverlayClose');
-  const overlayBody  = root.querySelector('#orderOverlayContent');
+     // Кнопка “Выгрузить PDF”
+const exportPdfBtn = root.querySelector('#exportPdfBtn');
+if (exportPdfBtn) {
+  exportPdfBtn.onclick = () => exportReportPdf();
+}
+  
+   const list       = root.querySelector('#list');
+  const stockList  = root.querySelector('#stockList');
+  const stockPanel = root.querySelector('#stockPanel');
+  const stockToggle= root.querySelector('#stockToggle');
+  const stockArrow = root.querySelector('#stockArrow');
 
   if (!list || !stockList || !stockPanel || !stockToggle || !stockArrow) {
     console.error('DashboardView: missing containers', { list, stockList, stockPanel, stockToggle, stockArrow });
@@ -1758,98 +1732,33 @@ function DashboardView() {
     return root;
   }
 
-  // Открыть/закрыть шторку наличия
+  // Открыть/закрыть шторку
   stockToggle.onclick = () => {
-    const isHidden = stockPanel.classList.toggle('hidden');
+    const isHidden = stockPanel.classList.toggle('hidden'); // toggle вернёт true, если теперь скрыто
     stockArrow.textContent = isHidden ? '▼' : '▲';
   };
-
-  // --- управление оверлеем заказа ---
-  function openOrderOverlay(order) {
-    if (!overlay || !overlayBody) return;
-
-    const items   = Array.isArray(order.items) ? order.items : [];
-    const created = order.createdAt ? new Date(order.createdAt) : null;
-
-    const clientTotal = items.reduce(
-      (s, i) => s + (i.price || 0) * (i.qty || 0),
-      0
-    );
-    const total = Math.max(
-      typeof order.total === 'number' ? order.total : 0,
-      clientTotal
-    );
-
-    overlayBody.innerHTML = `
-      <div class="flex items-center justify-between mb-2">
-        <div>
-          <div class="text-xl font-extrabold">#${order.id || '—'}</div>
-          ${order.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${order.table}</div>` : ''}
-        </div>
-        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/60">
-          ${order.status || 'новый'}
-        </span>
-      </div>
-
-      <div class="text-xs text-gray-500 mb-2">
-        ${created ? created.toLocaleString() : ''}
-      </div>
-
-      <div class="border rounded-2xl p-2 mb-3 max-h-[50vh] overflow-y-auto">
-        ${
-          items.length
-            ? items.map(i => `
-                <div class="flex justify-between text-sm py-0.5">
-                  <div class="mr-2">${i.name}</div>
-                  <div class="whitespace-nowrap">${i.qty} × ${i.price}</div>
-                </div>
-              `).join('')
-            : '<div class="text-sm text-gray-400">Нет позиций</div>'
-        }
-      </div>
-
-      <div class="flex items-center justify-between font-semibold">
-        <div>Итого:</div>
-        <div>${total} ₽</div>
-      </div>
-    `;
-
-    overlay.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeOrderOverlay() {
-    if (!overlay) return;
-    overlay.classList.add('hidden');
-    document.body.style.overflow = '';
-  }
-
-  if (overlayClose) {
-    overlayClose.onclick = () => closeOrderOverlay();
-  }
-  if (overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeOrderOverlay();
-    });
-  }
-
+ 
   let unavailable = new Set(loadUnavailable());
 
+  // когда последний раз очищали табло (только локально)
   const clearedAfterTs = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+
+  // подгружаем локальное табло с учётом этого времени
   let dashOrders = loadDash().filter(o => {
     if (!clearedAfterTs) return true;
     const t = Number(o.createdAt || 0);
+    // если нет createdAt — оставляем, иначе сравниваем
     return !t || t >= clearedAfterTs;
   });
-
+   // на табло показываем только не завершённые и не отменённые
   dashOrders = dashOrders.filter(o =>
     o.status !== 'завершён' && o.status !== 'отменён'
   );
-
   window.__dashOrders = dashOrders;
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
   const ding         = document.getElementById('orderDing');
+  
   const soundBtn     = root.querySelector('#soundToggle');
   let hiddenNewCount = 0;
   let pollTimer      = null;
@@ -1864,15 +1773,15 @@ function DashboardView() {
   setSound(soundOn());
   soundBtn.onclick = () => setSound(!soundOn());
 
-  function handleVisibilityChange() {
-    if (document.visibilityState === 'visible' && hiddenNewCount > 0) {
+  function handleVisibilityChange(){
+    if (document.visibilityState === 'visible' && hiddenNewCount > 0){
       showToast(`Новых заказов: ${hiddenNewCount}`);
       hiddenNewCount = 0;
     }
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  function renderStock() {
+  function renderStock(){
     stockList.innerHTML = '';
     loadConfig().menu.forEach(cat =>
       cat.items.forEach(item => {
@@ -1898,185 +1807,173 @@ function DashboardView() {
 
     window.dispatchEvent(new CustomEvent('stock:updated'));
     await pushUnavailableRemote(checked);
-  };
-
-  root.querySelector('#resetStock').onclick = async () => {
-    saveUnavailable([]);
-    unavailable = new Set();
-    renderStock();
-    window.dispatchEvent(new CustomEvent('stock:updated'));
-
-    try {
-      await pushUnavailableRemote([]);
-      showToast('Все товары в наличии');
-    } catch (e) {
-      console.warn('resetStock error', e);
-      showToast('Не удалось отправить на сервер, но локально всё в наличии');
-    }
-  };
-
-  function orderCard(o) {
-    const items = Array.isArray(o.items) ? o.items : [];
-
-    const clientTotal = items.reduce(
-      (s, i) => s + (i.price || 0) * (i.qty || 0),
-      0
-    );
-    const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
-    const created = o.createdAt ? new Date(o.createdAt) : new Date();
-
-    const colorMap = {
-      'новый':     'bg-yellow-50 border-yellow-300',
-      'готовится': 'bg-blue-50 border-blue-300',
-      'в пути':    'bg-purple-50 border-purple-300',
-      'готов':     'bg-green-50 border-green-300',
-      'завершён':  'bg-gray-100 border-gray-300',
-      'отменён':   'bg-red-50 border-red-300'
     };
-    const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+  root.querySelector('#resetStock').onclick = async () => {
+  // Локально считаем, что всё в наличии
+  saveUnavailable([]);
+  unavailable = new Set();
 
-    const MAX_INLINE  = 3;
-    const hasMore     = items.length > MAX_INLINE;
-    const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
+  // Обновляем свой UI (чтоб галочки снялись)
+  renderStock();
 
-    const itemsHtml = inlineItems.map(i => `
-      <div class="flex justify-between">
-        <div class="mr-2">${i.name}</div>
-        <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+  // Сообщаем другим экранам этого же браузера
+  window.dispatchEvent(new CustomEvent('stock:updated'));
+
+  // Пишем на сервер пустой список, чтобы другие устройства при синке тоже обнулили
+  try {
+    await pushUnavailableRemote([]);
+    showToast('Все товары в наличии');
+  } catch (e) {
+    console.warn('resetStock error', e);
+    showToast('Не удалось отправить на сервер, но локально всё в наличии');
+  }
+};
+
+function orderCard(o){
+  const clientTotal = (o.items || []).reduce(
+    (s, i) => s + (i.price || 0) * (i.qty || 0),
+    0
+  );
+  const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
+  const created = o.createdAt ? new Date(o.createdAt) : new Date();
+
+  const colorMap = {
+    'новый':     'bg-yellow-50 border-yellow-300',
+    'готовится': 'bg-blue-50 border-blue-300',
+    'в пути':    'bg-purple-50 border-purple-300',
+    'готов':     'bg-green-50 border-green-300',
+    'завершён':  'bg-gray-100 border-gray-300',
+    'отменён':   'bg-red-50 border-red-300'
+  };
+  const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+
+  const itemsHtml = (o.items || []).map(i => `
+    <div class="flex justify-between">
+      <div class="mr-2">${i.name}</div>
+      <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+    </div>
+  `).join('');
+
+  const etaBlock = o.etaUntil
+    ? `<div class="text-sm text-gray-700 mt-1">
+         Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+       </div>`
+    : '';
+
+  const card = el(`
+    <div
+      class="
+             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+      data-id="${o.id}"
+    >
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+          ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+          ${o.status || 'новый'}
+        </span>
       </div>
-    `).join('');
 
-    const etaBlock = o.etaUntil
-      ? `<div class="text-sm text-gray-700 mt-1">
-           Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-         </div>`
-      : '';
-
-    const card = el(`
-  <div
-    class="
-      p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-      flex flex-col gap-2 h-full
-      transition-transform hover:scale-[1.01] hover:shadow-md"
-    data-id="${o.id}"
-  >
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
-          </div>
-          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-            ${o.status || 'новый'}
-          </span>
-        </div>
-
-        <div class="text-gray-600 text-xs mt-1">
-          ${created.toLocaleString()}
-        </div>
-
-                ${etaBlock}
-
-        <div class="mt-2 grid gap-1 text-sm">
-          ${itemsHtml || '—'}
-        </div>
-
-        ${
-          hasMore
-            ? `<button
-                 type="button"
-                 class="mt-1 text-xs text-blue-700 underline"
-                 data-act="showAll"
-               >
-                 Посмотреть весь список заказов
-               </button>`
-            : ''
-        }
-
-        <!-- НИЖНИЙ БЛОК, ПРИЖАТЫЙ К ДНУ -->
-        <div class="mt-auto pt-2 border-t">
-          <div class="flex items-center justify-between text-lg font-bold">
-            <div>Итого:</div>
-            <div>${total} ₽</div>
-          </div>
-
-          <div class="mt-2 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-              data-act="ready"
-            >
-              Готово
-            </button>
-            <button
-              type="button"
-              class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
-              data-act="delete"
-            >
-              Удалить
-            </button>
-          </div>
-        </div>
+      <div class="text-gray-600 text-xs mt-1">
+        ${created.toLocaleString()}
       </div>
-    `);
 
+      ${etaBlock}
 
-    card.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-act]');
-      if (!btn) return;
-      const act = btn.dataset.act;
+      <div class="mt-2 grid gap-1 text-sm">
+        ${itemsHtml || '—'}
+      </div>
 
-      if (act === 'showAll') {
-        openOrderOverlay(o);
+      <div class="mt-2 flex items-center justify-between text-lg font-bold">
+        <div>Итого:</div>
+        <div>${total} ₽</div>
+      </div>
+
+      <div class="mt-2 flex flex-wrap gap-2 items-center">
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+          data-act="ready"
+        >
+          Готово
+        </button>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+          data-act="delete"
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
+  `);
+
+  // --- размеры карточки ---
+  card.style.flex = '0 1 320px';
+  card.style.maxWidth = '320px';
+  card.style.minWidth = '300px';
+
+  card.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+
+    if (act === 'ready'){
+      const nowTs = Date.now();
+      const patch = { status: 'готов', readyAt: nowTs };
+
+      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+      if (i >= 0){
+        dashOrders[i] = { ...dashOrders[i], ...patch };
+        saveDash(dashOrders);
+        syncOrderStatus(o.id, patch.status);
+        showToast(`Заказ #${o.id} отмечен как готов`);
+        renderOrders();
+      }
+
+      try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
+
+        } else if (act === 'delete') {
+
+      // первый клик — спросить подтверждение
+      if (!card.dataset.confirm) {
+        card.dataset.confirm = '1';
+        btn.textContent = 'Точно удалить?';
+        setTimeout(() => {
+          if (card && card.dataset.confirm === '1') {
+            delete card.dataset.confirm;
+            btn.textContent = 'Удалить';
+          }
+        }, 3000);
         return;
       }
 
-      if (act === 'ready') {
-        const nowTs = Date.now();
-        const patch = { status: 'готов', readyAt: nowTs };
+      // второй клик — реально убираем с табло
+      delete card.dataset.confirm;
 
-        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-        if (i >= 0) {
-          dashOrders[i] = { ...dashOrders[i], ...patch };
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, patch.status);
-          showToast(`Заказ #${o.id} отмечен как готов`);
-          renderOrders();
-        }
+      // локально просто убираем заказ из табло
+      dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+      saveDash(dashOrders);
+      card.remove();
+      showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
 
-        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-      } else if (act === 'delete') {
-        if (!card.dataset.confirm) {
-          card.dataset.confirm = '1';
-          btn.textContent = 'Точно удалить?';
-          setTimeout(() => {
-            if (card && card.dataset.confirm === '1') {
-              delete card.dataset.confirm;
-              btn.textContent = 'Удалить';
-            }
-          }, 3000);
-          return;
-        }
+      // на сервере МЕНЯЕМ статус, но НЕ удаляем заказ
+      const nowTs = Date.now();
+      const patch = { status: 'завершён', finishedAt: nowTs };
 
-        delete card.dataset.confirm;
+      try {
+        rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+      } catch {}
+    }
+  });
 
-        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
-        saveDash(dashOrders);
-        card.remove();
-        showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+  return card;
+}
 
-        const nowTs = Date.now();
-        const patch = { status: 'завершён', finishedAt: nowTs };
-
-        try {
-          rpc({ op: 'update', id: o.id, patch }).catch(() => {});
-        } catch {}
-      }
-    });
-
-    return card;
-  }
-
-  function renderOrders() {
+  function renderOrders(){
     const unique = new Map();
     dashOrders.forEach(o => unique.set(String(o.id), o));
     const orders = [...unique.values()];
@@ -2084,32 +1981,33 @@ function DashboardView() {
     orders.forEach(o => list.appendChild(orderCard(o)));
   }
 
-  function load() {
+  function load(){
     const unique = new Map();
     dashOrders.forEach(o => unique.set(String(o.id), o));
 
     const incoming = [...unique.keys()].filter(id => !knownIds.has(id));
 
-    if (incoming.length) {
-      if (document.visibilityState === 'visible' && soundOn()) {
+    if (incoming.length){
+      if (document.visibilityState === 'visible' && soundOn()){
         try {
           ding.currentTime = 0;
           ding.play().catch(()=>{});
         } catch {}
-      } else if (document.visibilityState === 'hidden') {
+      } else if (document.visibilityState === 'hidden'){
         hiddenNewCount += incoming.length;
       }
     }
 
-    knownIds  = new Set(unique.keys());
+    knownIds = new Set(unique.keys());
     dashOrders = [...unique.values()];
     renderOrders();
   }
 
-  root.querySelector('#btnClearAll').onclick = async () => {
+    root.querySelector('#btnClearAll').onclick = async () => {
     if (!confirm('Очистить только табло (заказы останутся в истории и отчётах)?')) return;
 
     const now = Date.now();
+    // запоминаем, что все заказы до этого момента — "старые", их не показываем
     localStorage.setItem(DASH_CLEARED_AFTER_KEY, String(now));
 
     dashOrders = [];
@@ -2121,10 +2019,14 @@ function DashboardView() {
     showToast('Табло очищено. Все заказы остались на сервере.');
   };
 
-  root.querySelector('#btnClearHistory').onclick = async () => {
+    root.querySelector('#btnClearHistory').onclick = async () => {
     const pin = prompt('Введите PIN для очистки истории:');
 
-    if (pin === null) return;
+    if (pin === null) {
+      // нажал "Отмена"
+      return;
+    }
+
     if (pin !== '65Vafuza') {
       showToast('Неверный PIN');
       return;
@@ -2137,6 +2039,7 @@ function DashboardView() {
     try {
       await rpc({ op: 'clear' });
 
+      // локально тоже всё обнуляем
       dashOrders = [];
       saveDash(dashOrders);
       window.__dashOrders = dashOrders;
@@ -2151,32 +2054,35 @@ function DashboardView() {
     }
   };
 
-  async function loadOrdersFromCloud() {
-    try {
-      const res = await rpc({ op:'list' });
-      if (Array.isArray(res.orders)) {
-        let serverOrders = res.orders.filter(o =>
-          o.status !== 'завершён' && o.status !== 'отменён'
-        );
+async function loadOrdersFromCloud(){
+  try{
+    const res = await rpc({ op:'list' });
+    if (Array.isArray(res.orders)){
+      // берём только активные заказы:
+      // не показываем завершённые и отменённые
+      let serverOrders = res.orders.filter(o =>
+        o.status !== 'завершён' && o.status !== 'отменён'
+      );
 
-        const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
-        if (clearedAfter) {
-          serverOrders = serverOrders.filter(o => {
-            const t = Number(o.createdAt || 0);
-            return !t || t >= clearedAfter;
-          });
-        }
-
-        saveDash(serverOrders);
-        dashOrders = serverOrders.slice();
-        window.__dashOrders = dashOrders;
-        load();
+      // фильтруем по моменту последней очистки табло
+      const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+      if (clearedAfter) {
+        serverOrders = serverOrders.filter(o => {
+          const t = Number(o.createdAt || 0);
+          return !t || t >= clearedAfter;
+        });
       }
-    } catch (e) {
-      console.warn('loadOrdersFromCloud', e);
-    }
-  }
 
+      saveDash(serverOrders);
+      dashOrders = serverOrders.slice();
+      window.__dashOrders = dashOrders;
+      load();
+    }
+  } catch(e){
+    console.warn('loadOrdersFromCloud', e);
+  }
+}
+  
   load();
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 3000);
@@ -2184,7 +2090,6 @@ function DashboardView() {
   root.cleanup = () => {
     if (pollTimer) clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
-    closeOrderOverlay();
   };
 
   return root;
