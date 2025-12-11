@@ -1706,10 +1706,10 @@ const root = el(`
       </div>
     </div>
 
-<div
-  id="list"
-  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch w-full"
-></div>
+    <div
+      id="list"
+      class="grid gap-4 auto-rows-[220px] grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-5xl mx-auto"
+    ></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1869,16 +1869,16 @@ function orderCard(o) {
        </div>`
     : '';
 
-  const card = el(`
-    <div
-      class="
-        h-full p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-        flex flex-col justify-between gap-2
-        transition-transform hover:scale-[1.01] hover:shadow-md"
-      data-id="${o.id}"
-    >
-      <!-- ВЕРХНЯЯ ЧАСТЬ КАРТОЧКИ -->
-      <div class="flex flex-col gap-2 flex-1">
+      const card = el(`
+      <div
+        class="
+          order-card
+          p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+          flex flex-col gap-2
+          transition-transform hover:scale-[1.01] hover:shadow-md
+        "
+        data-id="${o.id}"
+      >
         <div class="flex items-center justify-between">
           <div>
             <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
@@ -1895,47 +1895,49 @@ function orderCard(o) {
 
         ${etaBlock}
 
-        <div class="mt-2 grid gap-1 text-sm">
+        <!-- список позиций, занимает всё свободное место -->
+        <div class="order-card-items mt-2 grid gap-1 text-sm">
           ${itemsHtml || '—'}
         </div>
 
-        ${
-          hasMore
-            ? `<button
-                 type="button"
-                 class="mt-1 text-xs text-blue-700 underline"
-                 data-act="showAll"
-               >
-                 Посмотреть весь список заказов
-               </button>`
-            : ''
-        }
-
+        <!-- блок Итого + Ещё -->
         <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <div>Итого:</div>
+          <div class="flex items-center gap-2">
+            <span>Итого:</span>
+            ${
+              hasMore
+                ? `<button
+                     type="button"
+                     class="text-xs font-normal text-blue-700 underline"
+                     data-act="showAll"
+                   >
+                     Ещё
+                   </button>`
+                : ''
+            }
+          </div>
           <div>${total} ₽</div>
         </div>
-      </div>
 
-      <!-- НИЖНИЙ БЛОК С КНОПКАМИ -->
-      <div class="mt-3 flex flex-wrap gap-2 items-center">
-        <button
-          type="button"
-          class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-          data-act="ready"
-        >
-          Готово
-        </button>
-        <button
-          type="button"
-          class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
-          data-act="delete"
-        >
-          Удалить
-        </button>
+        <!-- кнопки всегда прижаты к самому низу карточки -->
+        <div class="mt-2 flex flex-wrap gap-2 items-center">
+          <button
+            type="button"
+            class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+            data-act="ready"
+          >
+            Готово
+          </button>
+          <button
+            type="button"
+            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+            data-act="delete"
+          >
+            Удалить
+          </button>
+        </div>
       </div>
-    </div>
-  `);
+    `);
 
   // === обработчики кнопок ===
   card.addEventListener('click', (e) => {
