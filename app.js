@@ -1750,6 +1750,10 @@ if (exportPdfBtn) {
     // если нет createdAt — оставляем, иначе сравниваем
     return !t || t >= clearedAfterTs;
   });
+   // на табло показываем только не завершённые и не отменённые
+  dashOrders = dashOrders.filter(o =>
+    o.status !== 'завершён' && o.status !== 'отменён'
+  );
   window.__dashOrders = dashOrders;
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
@@ -1932,13 +1936,14 @@ function orderCard(o){
 
       try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
 
-    } else if (act === 'delete'){
+        } else if (act === 'delete') {
 
-      if (!card.dataset.confirm){
+      // первый клик — спросить подтверждение
+      if (!card.dataset.confirm) {
         card.dataset.confirm = '1';
         btn.textContent = 'Точно удалить?';
         setTimeout(() => {
-          if (card && card.dataset.confirm === '1'){
+          if (card && card.dataset.confirm === '1') {
             delete card.dataset.confirm;
             btn.textContent = 'Удалить';
           }
@@ -1946,12 +1951,22 @@ function orderCard(o){
         return;
       }
 
+      // второй клик — реально убираем с табло
+      delete card.dataset.confirm;
+
+      // локально просто убираем заказ из табло
       dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
       saveDash(dashOrders);
       card.remove();
-      showToast(`Заказ #${o.id} удалён`);
+      showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
 
-      try { rpc({ op: 'delete', id: o.id }).catch(()=>{}); } catch {}
+      // на сервере МЕНЯЕМ статус, но НЕ удаляем заказ
+      const nowTs = Date.now();
+      const patch = { status: 'завершён', finishedAt: nowTs };
+
+      try {
+        rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+      } catch {}
     }
   });
 
