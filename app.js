@@ -1918,6 +1918,9 @@ function orderCard(o){
   card.style.flex = '0 1 320px';
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
+    // карточка сама по себе, не растягиваем её
+  card.style.height = 'auto';
+  card.style.alignSelf = 'flex-start';
 
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
