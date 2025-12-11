@@ -165,48 +165,173 @@ button[data-act="inc"]{
   width: 100%;
 }
 
-   <style>
-  @media print {
-    /* 1. По умолчанию скрываем вообще всё содержимое страницы */
-    body * {
-      visibility: hidden;
+    <style>
+    html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
+    html, body{
+      height: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
     }
 
-    /* 2. Показываем только блок с ордерами и всё, что внутри него */
-    #list,
-    #list * {
-      visibility: visible;
+    .bottom-spacer{
+      height: 120px;
+    }
+    @media (min-width: 640px){
+      .bottom-spacer{
+        height: 140px;
+      }
     }
 
-    /* 3. Размещаем список ордеров от самого верха страницы */
-    #list {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      margin: 0;
-      padding: 0;
+    *, *::before, *::after { box-sizing:border-box; }
+    img { max-width:100%; display:block; }
+    .hidden{ display:none }
+    .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
+
+    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
+
+    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
+    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
+    .sticky-top{ position:sticky; top:.5rem; z-index:30 }
+
+    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:var(--card-radius, 1.25rem); padding:1rem; min-height:var(--card-min-h, 6.4rem) }
+    .menu-card-img{ width:var(--img-w,110px); height:var(--img-h,70px); border-radius:var(--img-radius,.75rem); background:#eee; object-fit:cover }
+
+    .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
+
+    #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
+
+    #promoStrip{
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pinch-zoom;
+    }
+    #promoStripInner{
+      display: flex;
+      overflow-x: auto;
+      scroll-behavior: auto;
+    }
+    .promo-slide{
+      flex: 0 0 100%;
     }
 
-    /* 4. Низ карточки (кнопки) всё равно скрываем */
-    .no-print {
-      display: none !important;
-    }
-
-    /* 5. Каждый ордер — с новой страницы / новым чеком */
-    .order-card {
-      page-break-after: always;
-      break-after: page;
-    }
-
-    /* Фон делаем белым, чтобы не тянуть шапку */
-    body {
-      background: #fff !important;
-    }
-  }
-</style>
+    .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
+    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
     
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
+    .modal.open{ display:flex }
+
+    .app-header{ position:sticky; top:0; z-index:100; }
+
+    button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
+    .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
+    .badge.red{ background:#fee2e2; color:#991b1b }
+
+    .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
+    .card-tall{ min-height: 164px; }
+    .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
+
+    #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
+    #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
+
+    .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
+
+    .brand-strip{ background:#c3af96; color:#fff; }
+    .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
+    .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
+    .brand-wrap{ display:flex; align-items:center; gap:10px; }
+
+    .sushi-icon{
+      width:48px;
+      height:48px;
+      display:grid;
+      place-items:center;
+      background:transparent;
+      border-radius:0;
+    }
+    #brandIcon{
+      width:45px;
+      height:45px;
+      object-fit:contain;
+    }
+    
+    .header-row{ padding:10px 12px; }
+    .header-ghost{ height:8px; }
+
+    button, a, svg, .brand-strip, .header-row {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    #profileBtn { opacity: 0; }
+
+    button:focus, a:focus {
+      outline: none;
+      box-shadow: none;
+    }
+
+    button[data-act="dec"],
+    button[data-act="inc"]{
+      width:50px !important;
+      height:50px !important;
+      font-size:2rem;
+      border-radius:18px;
+    }
+
+    .order-card{
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+    }
+    .order-card-items{
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: hidden;
+    }
+
+    #list {
+      width: 100%;
+    }
+
+    /* === ПРАВИЛА ДЛЯ ПЕЧАТИ ОРДЕРОВ === */
+    @media print {
+      /* прячем всё на странице */
+      body * {
+        visibility: hidden;
+      }
+
+      /* показываем только список ордеров */
+      #list,
+      #list * {
+        visibility: visible;
+      }
+
+      /* сам список – с самого верха страницы */
+      #list {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* всё, что помечено .no-print (кнопки) – убрать */
+      .no-print {
+        display: none !important;
+      }
+
+      /* каждый ордер с новой "квитанции" */
+      .order-card {
+        page-break-after: always;
+        break-after: page;
+      }
+
+      body {
+        background: #fff !important;
+      }
+    }
   </style>
+
 </head>
 <body>
   <div class="w-full">
