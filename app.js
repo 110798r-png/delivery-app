@@ -1710,13 +1710,21 @@ function DashboardView() {
 ></div>
 
 
-    <!-- Оверлей развёрнутого заказа -->
-    <div id="orderOverlay"
-         class="fixed inset-0 bg-black/40 flex items-center justify-center z-40 hidden">
-      <div class="bg-white rounded-3xl max-w-lg w-[90%] max-h-[80vh] p-4 shadow-xl relative">
-        <button type="button"
-                id="orderOverlayClose"
-                class="absolute top-3 right-3 text-sm text-gray-500">
+       <!-- Оверлей развёрнутого заказа -->
+    <div
+      id="orderOverlay"
+      class="fixed inset-0 flex items-center justify-center z-40 hidden"
+      style="background: rgba(0,0,0,0.45);"
+    >
+      <div
+        class="bg-white rounded-3xl w-full max-w-3xl p-6 shadow-xl relative"
+        style="max-height: 88vh; overflow-y: auto;"
+      >
+        <button
+          type="button"
+          id="orderOverlayClose"
+          class="absolute top-3 right-3 text-sm text-gray-500"
+        >
           ✕
         </button>
         <div id="orderOverlayContent"></div>
@@ -1983,12 +1991,12 @@ function DashboardView() {
             : ''
         }
 
-        <div class="mt-2 flex items-center justify-between text-lg font-bold">
+                <div class="mt-2 flex items-center justify-between text-lg font-bold">
           <div>Итого:</div>
           <div>${total} ₽</div>
         </div>
 
-        <div class="mt-2 flex flex-wrap gap-2 items-center">
+        <div class="mt-2 flex items-center justify-between gap-2">
           <button
             type="button"
             class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
@@ -1998,7 +2006,7 @@ function DashboardView() {
           </button>
           <button
             type="button"
-            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm ml-auto"
+            class="px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
             data-act="delete"
           >
             Удалить
