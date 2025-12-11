@@ -2054,31 +2054,35 @@ function orderCard(o){
     }
   };
 
-   async function loadOrdersFromCloud(){
-    try{
-      const res = await rpc({ op:'list' });
-      if (Array.isArray(res.orders)){
-        let serverOrders = res.orders.slice();
+async function loadOrdersFromCloud(){
+  try{
+    const res = await rpc({ op:'list' });
+    if (Array.isArray(res.orders)){
+      // берём только активные заказы:
+      // не показываем завершённые и отменённые
+      let serverOrders = res.orders.filter(o =>
+        o.status !== 'завершён' && o.status !== 'отменён'
+      );
 
-        // фильтруем по моменту последней очистки табло
-        const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
-        if (clearedAfter) {
-          serverOrders = serverOrders.filter(o => {
-            const t = Number(o.createdAt || 0);
-            return !t || t >= clearedAfter;
-          });
-        }
-
-        saveDash(serverOrders);
-        dashOrders = serverOrders.slice();
-        window.__dashOrders = dashOrders;
-        load();
+      // фильтруем по моменту последней очистки табло
+      const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+      if (clearedAfter) {
+        serverOrders = serverOrders.filter(o => {
+          const t = Number(o.createdAt || 0);
+          return !t || t >= clearedAfter;
+        });
       }
-    } catch(e){
-      console.warn('loadOrdersFromCloud', e);
-    }
-  }
 
+      saveDash(serverOrders);
+      dashOrders = serverOrders.slice();
+      window.__dashOrders = dashOrders;
+      load();
+    }
+  } catch(e){
+    console.warn('loadOrdersFromCloud', e);
+  }
+}
+  
   load();
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 3000);
