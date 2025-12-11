@@ -165,6 +165,73 @@ button[data-act="inc"]{
   width: 100%;
 }
 
+    /* Печатная часть карточки по умолчанию скрыта */
+.order-card-print {
+  display: none;
+}
+
+/* Основная часть карточки (экранная) */
+.order-card-main {
+  display: block;
+}
+
+/* Настройки страницы для термопринтера (примерно 11.5 × 7.5 см) */
+@page {
+  size: 75mm 115mm;   /* можно поиграться: 75×115, 80×120 и т.п. */
+  margin: 3mm;
+}
+
+@media print {
+  /* прячем всё на странице */
+  body * {
+    visibility: hidden;
+  }
+
+  /* показываем только список ордеров */
+  #list,
+  #list * {
+    visibility: visible;
+  }
+
+  /* сам список – с самого верха страницы */
+  #list {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 0;
+    max-width: 75mm;       /* ширина чека */
+  }
+
+  /* то, что помечено no-print – не выводим */
+  .no-print {
+    display: none !important;
+  }
+
+  /* у каждой карточки свой “листочек” */
+  .order-card {
+    page-break-after: always;
+    break-after: page;
+    border-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+    padding: 4mm 3mm;
+  }
+
+  /* на печати показываем только компактный вариант */
+  .order-card-main {
+    display: none !important;
+  }
+  .order-card-print {
+    display: block !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+}
+    
     <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
     html, body{
