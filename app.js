@@ -1674,13 +1674,13 @@ const root = el(`
       </div>
       <div class="flex items-center gap-2">
         <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
-          <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
+        <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
         <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
         <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
       </div>
     </div>
 
-        <div class="p-4 rounded-2xl bg-white border">
+    <div class="p-4 rounded-2xl bg-white border">
       <!-- Кнопка-шапка шторки -->
       <button
         id="stockToggle"
@@ -1706,11 +1706,13 @@ const root = el(`
       </div>
     </div>
 
-<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
-
-    <div>
+    <!-- Кнопка Назад теперь сразу над списком -->
+    <div class="flex justify-between items-center">
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
     </div>
+
+    <!-- Список заказов: грид, карточки по центру -->
+    <div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min justify-items-center"></div>
   </div>
 `);
 
@@ -1829,6 +1831,71 @@ if (exportPdfBtn) {
   }
 };
 
+    // --- Раскрытие карточки заказа как модалки ---
+  let expandedCard = null;
+
+  function collapseExpandedCard() {
+    if (!expandedCard) return;
+
+    const card     = expandedCard;
+    const shortBox = card.querySelector('[data-items-short]');
+    const fullBox  = card.querySelector('[data-items-full]');
+    const toggle   = card.querySelector('[data-toggle-items]');
+
+    card.classList.remove('order-card-expanded');
+    document.body.classList.remove('order-card-overlay-open');
+
+    if (shortBox) shortBox.classList.remove('hidden');
+    if (fullBox) {
+      fullBox.classList.add('hidden');
+      fullBox.style.maxHeight = '192px';
+      fullBox.scrollTop = 0;
+    }
+    if (toggle) toggle.textContent = 'Показать список заказов';
+
+    expandedCard = null;
+  }
+
+  function expandOrderCard(card) {
+    if (expandedCard === card) {
+      // повторный клик по той же — свернуть
+      collapseExpandedCard();
+      return;
+    }
+
+    // сначала сворачиваем то, что было раскрыто
+    collapseExpandedCard();
+
+    const shortBox = card.querySelector('[data-items-short]');
+    const fullBox  = card.querySelector('[data-items-full]');
+    const toggle   = card.querySelector('[data-toggle-items]');
+
+    if (shortBox) shortBox.classList.add('hidden');
+    if (fullBox) {
+      fullBox.classList.remove('hidden');
+      fullBox.style.maxHeight = '60vh';
+    }
+    if (toggle) toggle.textContent = 'Скрыть список заказов';
+
+    card.classList.add('order-card-expanded');
+    document.body.classList.add('order-card-overlay-open');
+    expandedCard = card;
+  }
+
+  const onOverlayDocClick = (e) => {
+    if (!expandedCard) return;
+    if (e.target.closest('.order-card-expanded')) return;
+    // кликнули вне раскрытой карточки
+    collapseExpandedCard();
+  };
+
+  const onOverlayKeyDown = (e) => {
+    if (e.key === 'Escape') collapseExpandedCard();
+  };
+
+  document.addEventListener('click', onOverlayDocClick);
+  window.addEventListener('keydown', onOverlayKeyDown);
+  
 function orderCard(o){
   const clientTotal = (o.items || []).reduce(
     (s, i) => s + (i.price || 0) * (i.qty || 0),
@@ -1847,7 +1914,19 @@ function orderCard(o){
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  const itemsHtml = (o.items || []).map(i => `
+  const items = Array.isArray(o.items) ? o.items : [];
+  const MAX_INLINE = 6;                 // сколько позиций показываем в «узком» режиме
+  const shortItems = items.slice(0, MAX_INLINE);
+  const hasMore    = items.length > MAX_INLINE;
+
+  const shortHtml = shortItems.map(i => `
+    <div class="flex justify-between">
+      <div class="mr-2">${i.name}</div>
+      <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
+    </div>
+  `).join('');
+
+  const fullHtml = items.map(i => `
     <div class="flex justify-between">
       <div class="mr-2">${i.name}</div>
       <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
@@ -1863,8 +1942,10 @@ function orderCard(o){
   const card = el(`
     <div
       class="
-             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
+        order-card
+        p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+        flex flex-col gap-2
+      "
       data-id="${o.id}"
     >
       <div class="flex items-center justify-between">
@@ -1883,8 +1964,29 @@ function orderCard(o){
 
       ${etaBlock}
 
-      <div class="mt-2 grid gap-1 text-sm">
-        ${itemsHtml || '—'}
+      <div class="mt-2 text-sm">
+        <div data-items-short>
+          ${shortHtml || '—'}
+        </div>
+
+        <div
+          data-items-full
+          class="hidden mt-1 grid gap-1 text-sm"
+          style="max-height:192px; overflow-y:auto;"
+        >
+          ${fullHtml || '—'}
+        </div>
+
+        ${
+          hasMore
+            ? `<div
+                 class="mt-1 text-xs text-blue-600 cursor-pointer underline"
+                 data-toggle-items
+               >
+                 Показать список заказов
+               </div>`
+            : ''
+        }
       </div>
 
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
@@ -1911,62 +2013,75 @@ function orderCard(o){
     </div>
   `);
 
-  // --- размеры карточки ---
-  card.style.flex = '0 1 320px';
-  card.style.maxWidth = '320px';
-  card.style.minWidth = '300px';
+  // клик по тексту "Показать / Скрыть список заказов"
+  const toggleLink = card.querySelector('[data-toggle-items]');
+  if (toggleLink) {
+    toggleLink.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expandOrderCard(card);
+    });
+  }
 
+  // общий клик по карточке
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
+    if (btn) {
+      const act = btn.dataset.act;
 
-    if (act === 'ready'){
-      const nowTs = Date.now();
-      const patch = { status: 'готов', readyAt: nowTs };
+      if (act === 'ready'){
+        const nowTs = Date.now();
+        const patch = { status: 'готов', readyAt: nowTs };
 
-      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-      if (i >= 0){
-        dashOrders[i] = { ...dashOrders[i], ...patch };
-        saveDash(dashOrders);
-        syncOrderStatus(o.id, patch.status);
-        showToast(`Заказ #${o.id} отмечен как готов`);
-        renderOrders();
-      }
+        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+        if (i >= 0){
+          dashOrders[i] = { ...dashOrders[i], ...patch };
+          saveDash(dashOrders);
+          syncOrderStatus(o.id, patch.status);
+          showToast(`Заказ #${o.id} отмечен как готов`);
+          renderOrders();
+        }
 
-      try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-
-        } else if (act === 'delete') {
-
-      // первый клик — спросить подтверждение
-      if (!card.dataset.confirm) {
-        card.dataset.confirm = '1';
-        btn.textContent = 'Точно удалить?';
-        setTimeout(() => {
-          if (card && card.dataset.confirm === '1') {
-            delete card.dataset.confirm;
-            btn.textContent = 'Удалить';
-          }
-        }, 3000);
+        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
         return;
       }
 
-      // второй клик — реально убираем с табло
-      delete card.dataset.confirm;
+      if (act === 'delete') {
+        // первый клик — спросить подтверждение
+        if (!card.dataset.confirm) {
+          card.dataset.confirm = '1';
+          btn.textContent = 'Точно удалить?';
+          setTimeout(() => {
+            if (card && card.dataset.confirm === '1') {
+              delete card.dataset.confirm;
+              btn.textContent = 'Удалить';
+            }
+          }, 3000);
+          return;
+        }
 
-      // локально просто убираем заказ из табло
-      dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
-      saveDash(dashOrders);
-      card.remove();
-      showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+        // второй клик — реально убираем с табло
+        delete card.dataset.confirm;
 
-      // на сервере МЕНЯЕМ статус, но НЕ удаляем заказ
-      const nowTs = Date.now();
-      const patch = { status: 'завершён', finishedAt: nowTs };
+        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+        saveDash(dashOrders);
+        card.remove();
+        showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
 
-      try {
-        rpc({ op: 'update', id: o.id, patch }).catch(() => {});
-      } catch {}
+        const nowTs = Date.now();
+        const patch = { status: 'завершён', finishedAt: nowTs };
+
+        try {
+          rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+        } catch {}
+        return;
+      }
+
+      return;
+    }
+
+    // клик не по кнопкам — раскрываем/сворачиваем как модалку
+    if (!e.target.closest('[data-toggle-items]')) {
+      expandOrderCard(card);
     }
   });
 
@@ -2087,9 +2202,11 @@ async function loadOrdersFromCloud(){
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 3000);
 
-  root.cleanup = () => {
+   root.cleanup = () => {
     if (pollTimer) clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('click', onOverlayDocClick);
+    window.removeEventListener('keydown', onOverlayKeyDown);
   };
 
   return root;
