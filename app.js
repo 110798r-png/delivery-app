@@ -1704,7 +1704,11 @@ function DashboardView() {
       </div>
     </div>
 
-    <div id="list" class="flex flex-wrap gap-4 justify-center items-start"></div>
+    <div
+  id="list"
+  class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 auto-rows-min"
+></div>
+
 
     <!-- Оверлей развёрнутого заказа -->
     <div id="orderOverlay"
@@ -1923,7 +1927,7 @@ function DashboardView() {
     };
     const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-    const MAX_INLINE  = 5;
+    const MAX_INLINE  = 3;
     const hasMore     = items.length > MAX_INLINE;
     const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
@@ -2003,9 +2007,6 @@ function DashboardView() {
       </div>
     `);
 
-    card.style.flex    = '0 1 320px';
-    card.style.maxWidth = '320px';
-    card.style.minWidth = '300px';
 
     card.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-act]');
