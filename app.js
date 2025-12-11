@@ -1954,6 +1954,7 @@ function orderCard(o) {
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
+  // показываем максимум 3 позиции, остальные в модалке
   const MAX_INLINE  = 3;
   const hasMore     = items.length > MAX_INLINE;
   const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
@@ -1997,12 +1998,12 @@ function orderCard(o) {
 
       ${etaBlock}
 
-      <!-- список позиций, растягивается до низа -->
+      <!-- список позиций -->
       <div class="order-card-items mt-2 grid gap-1 text-sm">
         ${itemsHtml || '—'}
       </div>
 
-            <!-- Итоговая сумма -->
+      <!-- Итоговая сумма -->
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
         <span>Итого:</span>
         <div>${total} ₽</div>
@@ -2028,11 +2029,11 @@ function orderCard(o) {
     </div>
   `);
 
-    // обработка кликов по карточке
+  // обработка кликов по карточке
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
 
-    // 1) Если клик по кнопкам "Готово" или "Удалить" — работаем как раньше
+    // 1) Клик по кнопкам "Готово" / "Удалить"
     if (btn) {
       const act = btn.dataset.act;
 
@@ -2049,7 +2050,7 @@ function orderCard(o) {
           renderOrders();
         }
 
-        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
+        try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
         return;
       }
 
@@ -2082,13 +2083,16 @@ function orderCard(o) {
         return;
       }
 
-      // других act уже нет
-      return;
+      return; // на всякий случай
     }
 
-    // 2) Если кликнули НЕ по кнопкам — открываем модалку с полным списком позиций
+    // 2) Клик не по кнопкам — открываем модалку
     openOrderOverlay(o);
   });
+
+  return card;
+}
+
 
 
   function renderOrders(){
