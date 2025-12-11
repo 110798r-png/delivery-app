@@ -1706,10 +1706,7 @@ const root = el(`
       </div>
     </div>
 
-<div
-  id="list"
-  class="flex flex-wrap gap-4 items-start"
-></div>
+<div id="list" class="grid gap-4 grid-cols-1 md:grid-cols-3 auto-rows-min"></div>
 
     <div>
       <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
@@ -1832,100 +1829,8 @@ if (exportPdfBtn) {
   }
 };
 
-    // ----- модалка состава заказа -----
-  let detailsModal = document.getElementById('orderDetailsModal');
-  if (!detailsModal) {
-    detailsModal = el(`
-      <div
-        id="orderDetailsModal"
-        class="fixed inset-0 bg-black/40 z-40 hidden items-center justify-center px-4"
-      >
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] p-4 flex flex-col">
-          <div class="flex items-center justify-between gap-2">
-            <div>
-              <div class="text-lg font-bold" data-md-id>#—</div>
-              <div class="text-xs text-gray-500 mt-0.5" data-md-created></div>
-              <div class="text-xs text-gray-600 mt-0.5" data-md-table></div>
-              <div class="mt-1 inline-block px-2 py-0.5 text-xs rounded-full border bg-gray-50" data-md-status></div>
-            </div>
-            <button
-              type="button"
-              class="px-3 py-1.5 rounded-xl border text-sm"
-              data-md-close
-            >
-              Закрыть
-            </button>
-          </div>
-
-          <div
-            class="mt-3 flex-1 overflow-y-auto border-t pt-2 text-sm grid gap-1"
-            data-md-items
-          ></div>
-
-          <div class="mt-3 border-t pt-2 flex items-center justify-between">
-            <div class="font-semibold">Итого:</div>
-            <div class="text-lg font-bold" data-md-total>0 ₽</div>
-          </div>
-        </div>
-      </div>
-    `);
-
-      root.dataset.layout = 'wide';
-    
-    document.body.appendChild(detailsModal);
-  }
-
-  const mdId      = detailsModal.querySelector('[data-md-id]');
-  const mdCreated = detailsModal.querySelector('[data-md-created]');
-  const mdTable   = detailsModal.querySelector('[data-md-table]');
-  const mdStatus  = detailsModal.querySelector('[data-md-status]');
-  const mdItems   = detailsModal.querySelector('[data-md-items]');
-  const mdTotal   = detailsModal.querySelector('[data-md-total]');
-  const mdClose   = detailsModal.querySelector('[data-md-close]');
-
-  function openOrderModal(o) {
-    const created = o.createdAt ? new Date(o.createdAt) : new Date();
-    const items   = Array.isArray(o.items) ? o.items : [];
-
-    mdId.textContent = `#${o.id || '—'}`;
-    mdCreated.textContent = created.toLocaleString();
-    mdTable.textContent = o.table ? `Столик: №${o.table}` : '';
-    mdStatus.textContent = o.status || 'новый';
-
-    const clientTotal = items.reduce(
-      (s, i) => s + (i.price || 0) * (i.qty || 0),
-      0
-    );
-    const total = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
-    mdTotal.textContent = `${total} ₽`;
-
-    mdItems.innerHTML = items.map(i => `
-      <div class="flex justify-between gap-2">
-        <div class="mr-2">${i.name}</div>
-        <div class="whitespace-nowrap font-semibold">
-          ${i.qty} × ${i.price} ₽
-        </div>
-      </div>
-    `).join('') || '<div class="text-xs text-gray-400">Нет позиций.</div>';
-
-    detailsModal.classList.remove('hidden');
-    detailsModal.classList.add('flex');
-  }
-
-  function closeOrderModal() {
-    detailsModal.classList.add('hidden');
-    detailsModal.classList.remove('flex');
-  }
-
-  mdClose.addEventListener('click', closeOrderModal);
-  detailsModal.addEventListener('click', (e) => {
-    if (e.target === detailsModal) closeOrderModal();
-  });
-  
 function orderCard(o){
-  const items = Array.isArray(o.items) ? o.items : [];
-
-  const clientTotal = items.reduce(
+  const clientTotal = (o.items || []).reduce(
     (s, i) => s + (i.price || 0) * (i.qty || 0),
     0
   );
@@ -1942,12 +1847,7 @@ function orderCard(o){
   };
   const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  // сколько позиций показываем прямо в карточке
-  const MAX_INLINE   = 5;
-  const inlineItems  = items.slice(0, MAX_INLINE);
-  const hasMore      = items.length > MAX_INLINE;
-
-  const itemsHtml = inlineItems.map(i => `
+  const itemsHtml = (o.items || []).map(i => `
     <div class="flex justify-between">
       <div class="mr-2">${i.name}</div>
       <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
@@ -1963,9 +1863,8 @@ function orderCard(o){
   const card = el(`
     <div
       class="
-        p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-        flex flex-col gap-2 transition-transform
-      "
+             p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+             flex flex-col gap-2 transition-transform hover:scale-[1.01]"
       data-id="${o.id}"
     >
       <div class="flex items-center justify-between">
@@ -1986,16 +1885,6 @@ function orderCard(o){
 
       <div class="mt-2 grid gap-1 text-sm">
         ${itemsHtml || '—'}
-        ${
-          hasMore
-            ? `<div
-                 class="text-xs text-blue-600 cursor-pointer underline mt-1"
-                 data-show-details
-               >
-                 Показать состав заказа (${items.length})
-               </div>`
-            : ''
-        }
       </div>
 
       <div class="mt-2 flex items-center justify-between text-lg font-bold">
@@ -2022,102 +1911,64 @@ function orderCard(o){
     </div>
   `);
 
-  // --- размеры карточки и базовое состояние ---
-  card.style.flex     = '0 1 320px';
+  // --- размеры карточки ---
+  card.style.flex = '0 1 320px';
   card.style.maxWidth = '320px';
   card.style.minWidth = '300px';
 
-  const baseFlex   = '0 1 320px';
-  const baseMaxW   = '320px';
-  const baseShadow = card.style.boxShadow || '';
-
-  // hover-эффект: карточка чуть расширяется и двигает соседей
-  card.addEventListener('mouseenter', () => {
-    card.style.flex       = '0 1 340px';
-    card.style.maxWidth   = '340px';
-    card.style.transform  = 'translateY(-4px)';
-    card.style.boxShadow  = '0 14px 30px rgba(15,23,42,0.18)';
-    card.style.zIndex     = '10';
-    card.style.transition = 'all 0.18s ease-out';
-  });
-
-  card.addEventListener('mouseleave', () => {
-    card.style.flex      = baseFlex;
-    card.style.maxWidth  = baseMaxW;
-    card.style.transform = 'none';
-    card.style.boxShadow = baseShadow;
-    card.style.zIndex    = '1';
-  });
-
-  // обработка кликов
   card.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
 
-    // клик по кнопкам "Готово / Удалить"
-    if (btn) {
-      const act = btn.dataset.act;
+    if (act === 'ready'){
+      const nowTs = Date.now();
+      const patch = { status: 'готов', readyAt: nowTs };
 
-      if (act === 'ready') {
-        const nowTs = Date.now();
-        const patch = { status: 'готов', readyAt: nowTs };
-
-        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-        if (i >= 0){
-          dashOrders[i] = { ...dashOrders[i], ...patch };
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, patch.status);
-          showToast(`Заказ #${o.id} отмечен как готов`);
-          renderOrders();
-        }
-
-        try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
-        return;
-      }
-
-      if (act === 'delete') {
-        if (!card.dataset.confirm) {
-          card.dataset.confirm = '1';
-          btn.textContent = 'Точно удалить?';
-          setTimeout(() => {
-            if (card && card.dataset.confirm === '1') {
-              delete card.dataset.confirm;
-              btn.textContent = 'Удалить';
-            }
-          }, 3000);
-          return;
-        }
-
-        delete card.dataset.confirm;
-
-        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+      const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+      if (i >= 0){
+        dashOrders[i] = { ...dashOrders[i], ...patch };
         saveDash(dashOrders);
-        card.remove();
-        showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+        syncOrderStatus(o.id, patch.status);
+        showToast(`Заказ #${o.id} отмечен как готов`);
+        renderOrders();
+      }
 
-        const nowTs = Date.now();
-        const patch = { status: 'завершён', finishedAt: nowTs };
+      try { rpc({ op: 'update', id: o.id, patch }).catch(()=>{}); } catch {}
 
-        try {
-          rpc({ op: 'update', id: o.id, patch }).catch(() => {});
-        } catch {}
+        } else if (act === 'delete') {
+
+      // первый клик — спросить подтверждение
+      if (!card.dataset.confirm) {
+        card.dataset.confirm = '1';
+        btn.textContent = 'Точно удалить?';
+        setTimeout(() => {
+          if (card && card.dataset.confirm === '1') {
+            delete card.dataset.confirm;
+            btn.textContent = 'Удалить';
+          }
+        }, 3000);
         return;
       }
 
-      return;
+      // второй клик — реально убираем с табло
+      delete card.dataset.confirm;
+
+      // локально просто убираем заказ из табло
+      dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+      saveDash(dashOrders);
+      card.remove();
+      showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+
+      // на сервере МЕНЯЕМ статус, но НЕ удаляем заказ
+      const nowTs = Date.now();
+      const patch = { status: 'завершён', finishedAt: nowTs };
+
+      try {
+        rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+      } catch {}
     }
-
-    // клик не по кнопкам → открываем модалку
-    openOrderModal(o);
   });
-
-  // чтобы "Показать состав заказа" всегда открывал модалку
-  const moreLink = card.querySelector('[data-show-details]');
-  if (moreLink) {
-    moreLink.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openOrderModal(o);
-    });
-  }
 
   return card;
 }
@@ -2550,21 +2401,11 @@ function bindTabloTapZone(){
 /* ===== Router ===== */
 function mount(view){
   const app = document.getElementById('app');
-
-  // зачистка старого экрана
   if (app.firstChild && typeof app.firstChild.cleanup === 'function') {
     try { app.firstChild.cleanup(); } catch {}
   }
   app.innerHTML = '';
-
-  // для обычных экранов — телефонная «оболочка»
-  // для табло (layout="wide") — полноразмерный контейнер
-  if (view && view.dataset && view.dataset.layout === 'wide') {
-    app.classList.remove('phone-shell');
-  } else {
-    app.classList.add('phone-shell');
-  }
-
+  app.classList.add('phone-shell');
   app.appendChild(view);
 }
 
