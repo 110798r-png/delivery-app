@@ -807,7 +807,10 @@ function rebuildMenu() {
   src="${it.img || 'https://placehold.co/110x70?text=food'}"
   class="menu-card-img"
   alt=""
-  loading="lazy">
+  loading="lazy"
+  decoding="async"
+  >
+  
         </div>
       `);
       list.appendChild(row);
@@ -2291,41 +2294,46 @@ function BuilderView(){
       cat.promo = cat.promo.slice(0, 5);
 
       const catCard = el(`
-        <div class="border rounded-2xl p-3 bg-white">
-          <div class="flex items-center justify-between">
-            <input
-              value="${cat.title}"
-              class="border rounded-xl p-2 font-semibold w-1/2"
-              data-k="title"
-            >
-            <div class="flex gap-2">
-              <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
-              <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
-              <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">
-                Удалить
-              </button>
-            </div>
-          </div>
+  <details class="border rounded-2xl p-3 bg-white" data-cat="${cat.key}">
+    <summary class="flex items-center justify-between cursor-pointer select-none">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="font-semibold truncate">${cat.title}</span>
+        <span class="text-xs text-gray-500">(${cat.items.length})</span>
+      </div>
+      <span class="text-gray-500">▼</span>
+    </summary>
 
-          <div class="text-xs text-gray-500 mt-1">
-            key: <code>${cat.key}</code>
-          </div>
-
-          <!-- Блок акций: до 5 URL -->
-          <div class="mt-2">
-            <div class="text-xs text-gray-600 mb-1">
-              Акции (до 5 картинок для карусели)
-            </div>
-            <div class="grid gap-1" data-promo-box></div>
-          </div>
-
-          <div class="mt-3">
-            <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
-          </div>
-
-          <div class="mt-3 grid gap-2" data-items></div>
+    <div class="mt-3">
+      <div class="flex items-center justify-between">
+        <input
+          value="${cat.title}"
+          class="border rounded-xl p-2 font-semibold w-1/2"
+          data-k="title"
+        >
+        <div class="flex gap-2">
+          <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
+          <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
+          <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
         </div>
-      `);
+      </div>
+
+      <div class="text-xs text-gray-500 mt-1">
+        key: <code>${cat.key}</code>
+      </div>
+
+      <div class="mt-2">
+        <div class="text-xs text-gray-600 mb-1">Акции (до 5 картинок для карусели)</div>
+        <div class="grid gap-1" data-promo-box></div>
+      </div>
+
+      <div class="mt-3">
+        <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
+      </div>
+
+      <div class="mt-3 grid gap-2" data-items></div>
+    </div>
+  </details>
+`);
 
       // ===== РИСУЕМ ДО 5 URL акций =====
       const promoBox = catCard.querySelector('[data-promo-box]');
@@ -2483,6 +2491,14 @@ function BuilderView(){
       });
 
       catsBox.appendChild(catCard);
+
+      catCard.addEventListener('toggle', () => {
+  if (!catCard.open) return;
+  catsBox.querySelectorAll('details').forEach(d => {
+    if (d !== catCard) d.open = false;
+  });
+});
+
     });
   }
 
@@ -2618,16 +2634,13 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   initTableIdFromUrl();
 
-  // 1) СНАЧАЛА тянем конфиг и наличие с сервера
-  await fetchRemoteConfig().catch(() => {});
-  await fetchUnavailableRemote().catch(() => {});
+ router(); // сразу показать UI
 
-  // 2) Теперь можно смело рисовать нужный экран
-  try {
-    router();
-  } catch (e) {
-    console.error(e);
-  }
+// а синк — после первого кадра
+requestAnimationFrame(() => {
+  fetchRemoteConfig().catch(()=>{});
+  fetchUnavailableRemote().catch(()=>{});
+});
 
   // кнопка "Назад" в шапке идёт всегда на /order
   const backButton = document.getElementById('backBtn');
