@@ -36,7 +36,7 @@ if (typeof window.CSS.escape !== 'function') {
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
-const BRAND_TITLE = 'BELISSIMO';  // изменишь тут — поменяется в шапке и во вкладке
+const BRAND_TITLE = 'ZM TIME';  // изменишь тут — поменяется в шапке и во вкладке
 // === PUSH / VAPID ===
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
 
