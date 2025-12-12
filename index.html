@@ -4,256 +4,335 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>ZM TIME — локальный стенд</title>
-  
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#c3af96">
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#c3af96">
 
   <!-- PWA / iOS full-screen -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ZM TIME">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ZM TIME">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <link rel="icon" href="data:,">
+
   <style>
-    html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
-    
-    html, body{
-  height: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      background: #f9fafb;
+    }
 
-    .bottom-spacer{
-  height: 120px;     /* запас под нижнюю панель */
-}
+    *, *::before, *::after { box-sizing: border-box; }
+    img { max-width: 100%; display: block; }
+    .hidden { display: none; }
 
-@media (min-width: 640px){
-  .bottom-spacer{
-    height: 140px;
-  }
-}
-    
-    *, *::before, *::after { box-sizing:border-box; }
-    img { max-width:100%; display:block; }
-    .hidden{ display:none }
-    .phone-shell{ width:min(100vw,540px); margin:0 auto; padding:0 .35rem; }
+    .phone-shell { width: min(100vw, 540px); margin: 0 auto; padding: 0 .35rem; }
 
-    .toast{ position:fixed; right:1rem; bottom:1rem; background:#111; color:#fff; padding:.75rem 1rem; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.2); opacity:.95; z-index:9999 }
+    .bottom-spacer { height: 120px; }
+    @media (min-width: 640px) {
+      .bottom-spacer { height: 140px; }
+    }
 
-    .glass-panel{ background:radial-gradient(circle at 10% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.45) 45%, rgba(255,255,255,.25) 100%); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.4); box-shadow:0 14px 40px rgba(15,23,42,.12) }
-    .no-scrollbar::-webkit-scrollbar{ display:none } .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none }
-    .sticky-top{ position:sticky; top:.5rem; z-index:30 }
+    .toast {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      background: #111;
+      color: #fff;
+      padding: .75rem 1rem;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.2);
+      opacity: .95;
+      z-index: 9999;
+    }
 
-    .menu-card{ display:flex; gap:.75rem; align-items:center; background:#fff; border:1px solid #edf2f7; border-radius:var(--card-radius, 1.25rem); padding:1rem; min-height:var(--card-min-h, 6.4rem) }
-    .menu-card-img{ width:var(--img-w,110px); height:var(--img-h,70px); border-radius:var(--img-radius,.75rem); background:#eee; object-fit:cover }
+    .glass-panel{
+      background: radial-gradient(circle at 10% 20%,
+        rgba(255,255,255,.85) 0%,
+        rgba(255,255,255,.45) 45%,
+        rgba(255,255,255,.25) 100%);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,.4);
+      box-shadow: 0 14px 40px rgba(15,23,42,.12);
+    }
 
-    .confirm-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:min(540px, 100%); background:#fff; border-top:1px solid #e5e7eb; padding:.6rem .9rem; z-index:50; box-shadow:0 -10px 25px rgba(15,23,42,.06) }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    #catPager{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action: pan-x pinch-zoom; }
-    
-      /* Внешний контейнер просто обрезает лишнее */
-#promoStrip{
-  overflow: hidden;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pinch-zoom;
-}
+    .sticky-top { position: sticky; top: .5rem; z-index: 30; }
 
-/* Внутренний реально скроллится по X */
-#promoStripInner{
-  display: flex;
-  overflow-x: auto;      /* ВАЖНО */
-  scroll-behavior: auto; /* анимацию делаем сами */
-}
+    .menu-card{
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #edf2f7;
+      border-radius: var(--card-radius, 1.25rem);
+      padding: 1rem;
+      min-height: var(--card-min-h, 6.4rem);
+    }
 
-/* Один слайд = 100% ширины экрана */
-.promo-slide{
-  flex: 0 0 100%;
-}
+    .menu-card-img{
+      width: var(--img-w, 110px);
+      height: var(--img-h, 70px);
+      border-radius: var(--img-radius, .75rem);
+      background: #eee;
+      object-fit: cover;
+    }
 
-    .cat-panel{ flex:0 0 100%; scroll-snap-align:start; scroll-snap-stop: always; padding:0; }
-    .v-scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action: pan-y; }
-    
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); z-index:90 }
-    .modal.open{ display:flex }
+    .confirm-bar{
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 0;
+      width: min(540px, 100%);
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      padding: .6rem .9rem;
+      z-index: 50;
+      box-shadow: 0 -10px 25px rgba(15,23,42,.06);
+    }
 
-    .app-header{ position:sticky; top:0; z-index:100; }
+    #catPager{
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pinch-zoom;
+    }
+
+    /* Внешний контейнер просто обрезает лишнее */
+    #promoStrip{
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pinch-zoom;
+    }
+
+    /* Внутренний реально скроллится по X */
+    #promoStripInner{
+      display: flex;
+      overflow-x: auto;
+      scroll-behavior: auto;
+    }
+
+    /* Один слайд = 100% ширины экрана */
+    .promo-slide { flex: 0 0 100%; }
+
+    .cat-panel{
+      flex: 0 0 100%;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      padding: 0;
+    }
+
+    .v-scroll{
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+    }
+
+    .modal{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.45);
+      z-index: 90;
+    }
+    .modal.open{ display: flex; }
+
+    .app-header{ position: sticky; top: 0; z-index: 100; }
 
     button[data-act], #profileBtn, #payOk, #payCancel, #backBtn { touch-action: manipulation; }
-    .badge{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.6rem; padding:.15rem .5rem; font-size:.75rem; background:#f1f5f9; color:#334155 }
-    .badge.red{ background:#fee2e2; color:#991b1b }
 
-    .card{ border-radius:1.25rem; background:#fff; border:1px solid #edf2f7; box-shadow:0 8px 24px rgba(15,23,42,.06); }
+    .badge{
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      border-radius: .6rem;
+      padding: .15rem .5rem;
+      font-size: .75rem;
+      background: #f1f5f9;
+      color: #334155;
+    }
+    .badge.red{ background: #fee2e2; color: #991b1b; }
+
+    .card{
+      border-radius: 1.25rem;
+      background: #fff;
+      border: 1px solid #edf2f7;
+      box-shadow: 0 8px 24px rgba(15,23,42,.06);
+    }
     .card-tall{ min-height: 164px; }
-    .rowlink{ background:#fff; border:1px solid #e5e7eb; border-radius:1rem; padding:16px 18px; font-weight:600 }
 
-    #tabloTapZone{ height:64px; display:flex; justify-content:flex-end; align-items:center; }
-    #tabloTapHot{ width:140px; height:52px; border-radius:12px; }
+    .rowlink{
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      padding: 16px 18px;
+      font-weight: 600;
+    }
 
-    .chip{ display:inline-block; padding:.2rem .6rem; border-radius:999px; font-size:.75rem; }
+    #tabloTapZone{
+      height: 64px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    #tabloTapHot{ width: 140px; height: 52px; border-radius: 12px; }
 
-    /* --- Красная шапка --- */
-    .brand-strip{ background:#c3af96; color:#fff; }
-    .brand-title{ font-weight:900; font-size:24px; line-height:1; letter-spacing:.2px; }
-    .brand-sub{ font-size:11px; line-height:1; opacity:.9; margin-top:2px; letter-spacing:.3px }
-    .brand-wrap{ display:flex; align-items:center; gap:10px; }
+    .chip{
+      display: inline-block;
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      font-size: .75rem;
+    }
 
-    /* Обёртка под иконку — без чёрного фона */
-.sushi-icon{
-  width:48px;              /* размер области под иконку, можно менять */
-  height:48px;
-  display:grid;
-  place-items:center;
-  background:transparent;  /* убираем чёрный круг */
-  border-radius:0;         /* можно оставить 0, чтобы не было круглой маски */
-}
+    /* --- Шапка --- */
+    .brand-strip{ background: #c3af96; color: #fff; }
+    .brand-title{ font-weight: 900; font-size: 24px; line-height: 1; letter-spacing: .2px; }
+    .brand-sub{ font-size: 11px; line-height: 1; opacity: .9; margin-top: 2px; letter-spacing: .3px; }
+    .brand-wrap{ display: flex; align-items: center; gap: 10px; }
 
-/* Размер самой иконки стакана */
-#brandIcon{
-  width:45px;              /* увеличивай/уменьшай под себя */
-  height:45px;
-  object-fit:contain;
-}
-    
-    .header-row{ padding:10px 12px; }
-    .header-ghost{ height:8px; }
-    /* Отключаем выделение текста у основных интерактивов */
-button, a, svg, .brand-strip, .header-row {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  user-select: none;
-}
+    .sushi-icon{
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      border-radius: 0;
+    }
+    #brandIcon{
+      width: 45px;
+      height: 45px;
+      object-fit: contain;
+    }
 
-    /* Делаем кнопку профиля невидимой, но оставляем активной */
-#profileBtn {
-  opacity: 0;
-}
-    
-/* Убираем рамку фокуса с кнопок/ссылок (чтобы не "залипала" после тапов) */
-button:focus, a:focus {
-  outline: none;
-  box-shadow: none;
-}
+    .header-row{ padding: 10px 12px; }
+    .header-ghost{ height: 8px; }
+
+    button, a, svg, .brand-strip, .header-row {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+
+    /* Кнопка профиля невидимая, но кликабельная */
+    #profileBtn { opacity: 0; }
+
+    button:focus, a:focus { outline: none; box-shadow: none; }
 
     /* Увеличиваем кнопки + и - */
-button[data-act="dec"],
-button[data-act="inc"]{
-  width:50px !important;    /* можно 70-80, если нужно ещё больше */
-  height:50px !important;
-  font-size:2rem;           /* размер знака +/- */
-  border-radius:18px;       /* более скруглённые */
-}
+    button[data-act="dec"],
+    button[data-act="inc"]{
+      width: 50px !important;
+      height: 50px !important;
+      font-size: 2rem;
+      border-radius: 18px;
+    }
 
-   /* Карточка заказа на табло */
-.order-card{
-  min-height: 240px;          /* базовая высота как на макете */
-  display: flex;
-  flex-direction: column;
-}
+    /* Карточка заказа на табло */
+    .order-card{
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+    }
+    .order-card-items{
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: hidden;
+    }
 
-/* Блок с позициями внутри карточки */
-.order-card-items{
-  flex: 1 1 auto;             /* растягивается, выталкивает низ вниз */
-  min-height: 0;
-  overflow-y: hidden;         /* ничего не вылезает поверх Итого */
-}
-
-
-/* Сетка с заказами – по центру, от края до края в разумных пределах */
-#list {
-  width: 100%;
-}
+    #list { width: 100%; }
 
     /* Печатная часть карточки по умолчанию скрыта */
-.order-card-print {
-  display: none;
-}
+    .order-card-print { display: none; }
+    .order-card-main  { display: block; }
 
-/* Основная часть карточки (экранная) */
-.order-card-main {
-  display: block;
-}
+    /* Настройки страницы для термопринтера */
+    @page { size: 75mm 115mm; margin: 3mm; }
 
-/* Настройки страницы для термопринтера (примерно 11.5 × 7.5 см) */
-@page {
-  size: 75mm 115mm;   /* можно поиграться: 75×115, 80×120 и т.п. */
-  margin: 3mm;
-}
+    @media print {
+      body * { visibility: hidden; }
 
-@media print {
-  /* прячем всё на странице */
-  body * {
-    visibility: hidden;
-  }
+      #list, #list * { visibility: visible; }
 
-  /* показываем только список ордеров */
-  #list,
-  #list * {
-    visibility: visible;
-  }
+      #list{
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        margin: 0;
+        padding: 0;
+        max-width: 75mm;
+      }
 
-  /* сам список – с самого верха страницы */
-  #list {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 0;
-    max-width: 75mm;       /* ширина чека */
-  }
+      .no-print { display: none !important; }
 
-  /* то, что помечено no-print – не выводим */
-  .no-print {
-    display: none !important;
-  }
+      .order-card{
+        page-break-after: always;
+        break-after: page;
+        border-radius: 0;
+        border-width: 0;
+        box-shadow: none;
+        padding: 4mm 3mm;
+      }
 
-  /* у каждой карточки свой “листочек” */
-  .order-card {
-    page-break-after: always;
-    break-after: page;
-    border-radius: 0;
-    border-width: 0;
-    box-shadow: none;
-    padding: 4mm 3mm;
-  }
+      .order-card-main { display: none !important; }
+      .order-card-print { display: block !important; }
 
-  /* на печати показываем только компактный вариант */
-  .order-card-main {
-    display: none !important;
-  }
-  .order-card-print {
-    display: block !important;
-  }
+      body { background: #fff !important; }
 
-  body {
-    background: #fff !important;
-  }
-}
+      /* Базовый шрифт чека */
+      body{
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+      .order-card-print .order-id,
+      .order-card-print h1,
+      .order-card-print h2{
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .order-card-print .order-items,
+      .order-card-print ul,
+      .order-card-print li{
+        font-size: 12.5px;
+        line-height: 1.3;
+      }
+      .order-card-print .qty{ font-weight: 600; }
+    }
 
-    details > summary::-webkit-details-marker { display:none; }
-details[open] > summary .chev {
-  transform: rotate(180deg);
-  display: inline-block;
-}
-    
-
+    /* details/summary */
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] > summary .chev {
+      transform: rotate(180deg);
+      display: inline-block;
+    }
+  </style>
 </head>
+
 <body>
   <div class="w-full">
-    <!-- Красная шапка -->
+    <!-- Шапка -->
     <div class="brand-strip">
       <div class="phone-shell header-row flex items-center justify-between">
         <div class="brand-wrap">
-        <div class="sushi-icon" aria-hidden="true">
-  <img id="brandIcon" src="" alt="">
-</div>
+          <div class="sushi-icon" aria-hidden="true">
+            <img id="brandIcon" src="" alt="">
+          </div>
           <div class="leading-tight">
             <div class="brand-title" id="brandTitle">ZM TIME</div>
             <div class="brand-sub">суши • роллы • фастфуд</div>
           </div>
         </div>
+
         <!-- Профиль со стрелочкой -->
         <a id="profileBtn" href="javascript:void(0)"
            class="px-3 py-2 rounded-xl border bg-white text-black flex items-center gap-1"
@@ -265,19 +344,21 @@ details[open] > summary .chev {
             <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </a>
-        <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white text-black select-none" aria-label="Назад" title="Назад">
+
+        <button id="backBtn" class="hidden px-3 py-2 rounded-xl border bg-white text-black select-none"
+                aria-label="Назад" title="Назад">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
       </div>
     </div>
+
     <div class="header-ghost"></div>
-    
     <main id="app" class="phone-shell"></main>
   </div>
 
-    <!-- Спасибо за заказ -->
+  <!-- Модалка оплаты -->
   <div id="payModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl" role="dialog" aria-modal="true">
       <div id="paySummary" class="text-sm bg-gray-50 border rounded-xl p-3 max-h-48 overflow-auto"></div>
@@ -294,7 +375,7 @@ details[open] > summary .chev {
     </div>
   </div>
 
-    <!-- Короткая модалка "Спасибо" -->
+  <!-- Короткая модалка "Спасибо" -->
   <div id="doneModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs text-center shadow-xl">
       <h3 class="text-lg font-semibold mb-2">Спасибо!</h3>
@@ -302,7 +383,7 @@ details[open] > summary .chev {
     </div>
   </div>
 
-  <!-- Ключ для табло -->
+  <!-- PIN -->
   <div id="pinModal" class="modal">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-center">
       <h3 class="text-lg font-semibold">Введите ключ</h3>
@@ -320,9 +401,7 @@ details[open] > summary .chev {
   <audio id="orderDing" preload="auto">
     <source src="https://storage.yandexcloud.net/audio123/z_uk-budte-vkontakte-s-no_ostyami%20(1).mp3" type="audio/mpeg">
   </audio>
-  
-<script src="app.js" defer></script>
 
-  
+  <script src="app.js" defer></script>
 </body>
 </html>
