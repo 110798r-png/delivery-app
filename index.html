@@ -231,6 +231,9 @@ button[data-act="inc"]{
     background: #fff !important;
   }
 }
+
+    details > summary::-webkit-details-marker { display:none; }
+details[open] > summary span:last-child { transform: rotate(180deg); display:inline-block; }
     
       <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
