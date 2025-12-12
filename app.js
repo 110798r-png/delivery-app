@@ -2536,8 +2536,11 @@ let openCatKey = null; // <<< запоминаем открытую катего
   };
 
   // назад
-  root.querySelector('#backBtn2').onclick =
-    () => history.length ? history.back() : (location.hash = '#/dashboard');
+root.querySelector('#backBtn2').onclick = () => {
+  if (history.length) history.back();
+  else location.hash = '#/dashboard';
+};
+
 
   return root;
 }
@@ -2545,7 +2548,8 @@ let openCatKey = null; // <<< запоминаем открытую катего
 /* ===== 4-тап зона ===== */
 function bindTabloTapZone(){
   const hot = document.getElementById('profileBtn');
-  if (!hot || hot._bound) return; hot._bound = true;
+  if (!hot || hot._bound) return;
+hot._bound = true;
   let taps = 0, first = 0, timer = null;
   const windowMs = 1200;
   function reset(){ taps = 0; first = 0; if (timer){ clearTimeout(timer); timer = null; } }
