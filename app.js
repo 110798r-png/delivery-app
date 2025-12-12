@@ -2251,7 +2251,8 @@ async function loadOrdersFromCloud(){
 /* ===== КОНСТРУКТОР (меню) ===== */
 function BuilderView(){
   const cfg = loadConfig();
-
+let openCatKey = null; // <<< запоминаем открытую категорию
+  
   const root = el(`
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
@@ -2335,6 +2336,8 @@ function BuilderView(){
   </details>
 `);
 
+  if (openCatKey === cat.key) catCard.open = true; // <<< восстановление открытого трея
+      
       // ===== РИСУЕМ ДО 5 URL акций =====
       const promoBox = catCard.querySelector('[data-promo-box]');
       function renderPromos() {
@@ -2493,10 +2496,14 @@ function BuilderView(){
       catsBox.appendChild(catCard);
 
       catCard.addEventListener('toggle', () => {
-  if (!catCard.open) return;
-  catsBox.querySelectorAll('details').forEach(d => {
-    if (d !== catCard) d.open = false;
-  });
+  if (catCard.open) {
+    openCatKey = cat.key; // <<< запомнили открытую
+    catsBox.querySelectorAll('details').forEach(d => {
+      if (d !== catCard) d.open = false;
+    });
+  } else {
+    if (openCatKey === cat.key) openCatKey = null;
+  }
 });
 
     });
