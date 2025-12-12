@@ -233,9 +233,11 @@ button[data-act="inc"]{
 }
 
     details > summary::-webkit-details-marker { display:none; }
-details[open] > summary span:last-child { transform: rotate(180deg); display:inline-block; }
+details[open] > summary .chev {
+  transform: rotate(180deg);
+  display: inline-block;
+}
     
-      <style>
     html, body { width:100%; max-width:100%; overflow-x:hidden; background:#f9fafb; }
     html, body{
       height: 100%;
