@@ -2301,7 +2301,7 @@ let openCatKey = null; // <<< запоминаем открытую катего
         <span class="font-semibold truncate">${cat.title}</span>
         <span class="text-xs text-gray-500">(${cat.items.length})</span>
       </div>
-      <span class="text-gray-500">▼</span>
+      <span class="chev text-gray-500">▼</span>
     </summary>
 
     <div class="mt-3">
@@ -2497,16 +2497,15 @@ let openCatKey = null; // <<< запоминаем открытую катего
 
       catCard.addEventListener('toggle', () => {
   if (catCard.open) {
-    openCatKey = cat.key; // <<< запомнили открытую
+    openCatKey = cat.key;               // запомнили открытую
     catsBox.querySelectorAll('details').forEach(d => {
-      if (d !== catCard) d.open = false;
+      if (d !== catCard) d.open = false; // закрыли остальные
     });
   } else {
     if (openCatKey === cat.key) openCatKey = null;
   }
 });
 
-    });
   }
 
   render();
