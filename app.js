@@ -2505,7 +2505,7 @@ let openCatKey = null; // <<< запоминаем открытую катего
     if (openCatKey === cat.key) openCatKey = null;
   }
 });
-
+}
   render();
 
   // новая категория
