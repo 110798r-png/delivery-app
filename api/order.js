@@ -31,9 +31,9 @@ module.exports = async function handler(req, res) {
 
     // просто прокидываем статус и тело дальше
     res.status(ycRes.status).json(data);
-  } catch (err) {
+   } catch (err) {
     console.error('YC proxy error:', err);
-    // фронт это поймёт и покажет ошибку / сохранит локально
-    res.status(200).json({ error: 'proxy-failed' });
+    // ВАЖНО: не 200, иначе фронт думает что всё ОК
+    res.status(502).json({ error: 'proxy-failed' });
   }
 };
