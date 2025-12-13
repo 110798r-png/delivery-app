@@ -103,19 +103,6 @@ async function rpc(payload){
   return res.json();
 }
 
-/* ===== маршрутизация по умолчанию ===== */
-document.addEventListener('DOMContentLoaded', async () => {
-  // подставляем иконку
-  const iconEl = document.getElementById('brandIcon');
-  if (iconEl && BRAND_ICON_URL) {
-    iconEl.src = BRAND_ICON_URL;
-  }
-
-  if (!location.hash || location.hash==='#' || location.hash==='#/') {
-    location.hash = '#/order';
-  }
-});
-
 /* ===== ключи хранилищ ===== */
 const PROFILE_LS_KEY     = 'client_profile_v1';
 const CLIENT_HISTORY_KEY = 'orders_client_history_v1';
@@ -276,8 +263,8 @@ function applyTheme(theme){
   r.style.setProperty('--img-h',        (theme.imgH||70)+'px');
   r.style.setProperty('--card-min-h',   (theme.cardMinH||104)+'px');
 
-  const title = BRAND_TITLE;
-  const cfg   = loadConfig();
+    const cfg   = loadConfig();
+  const title = (cfg && cfg.brandTitle) ? cfg.brandTitle : BRAND_TITLE;
 
   // Обновляем название в шапке
   document.getElementById('brandTitle').textContent = title;
@@ -2597,8 +2584,6 @@ if (h === '#/dashboard') {
 }
 
 realRouter();
-
-  realRouter();
 }
 
 // реагируем на смену hash
@@ -2610,13 +2595,23 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   initTableIdFromUrl();
 
- router(); // сразу показать UI
+    // подставляем иконку
+  const iconEl = document.getElementById('brandIcon');
+  if (iconEl && BRAND_ICON_URL) {
+    iconEl.src = BRAND_ICON_URL;
+  }
 
-// а синк — после первого кадра
-requestAnimationFrame(() => {
-  fetchRemoteConfig().catch(()=>{});
-  fetchUnavailableRemote().catch(()=>{});
-});
+  // дефолтный роут
+  if (!location.hash || location.hash === '#' || location.hash === '#/') {
+    location.hash = '#/order';
+  }
+
+  // 1) сначала подтягиваем актуальное меню/наличие
+  try { await fetchRemoteConfig(); } catch (e) {}
+  try { await fetchUnavailableRemote(); } catch (e) {}
+
+  // 2) только потом рисуем UI (без “старого меню” на первом запуске)
+  router();
 
   // кнопка "Назад" в шапке идёт всегда на /order
   const backButton = document.getElementById('backBtn');
@@ -2640,23 +2635,22 @@ requestAnimationFrame(() => {
   const pinCancel= document.getElementById('pinCancel');
   const pinInput = document.getElementById('pinInput');
 
- pinOk.onclick = (e) => {
-  e && e.preventDefault();
-  if ((pinInput.value || '').length > 0) {
-    pinM.classList.remove('open');
+  pinOk.onclick = (e) => {
+    e && e.preventDefault();
+    if ((pinInput.value || '').length > 0) {
+      pinM.classList.remove('open');
 
-    if (sessionStorage.getItem(WANT_DASH) === '1') {
-      // разрешаем ОДИН раз зайти на табло
-      sessionStorage.removeItem(WANT_DASH);
-      sessionStorage.setItem(TABLO_PIN_OK, '1');
-      location.hash = '#/dashboard';
+      if (sessionStorage.getItem(WANT_DASH) === '1') {
+        sessionStorage.removeItem(WANT_DASH);
+        sessionStorage.setItem(TABLO_PIN_OK, '1');
+        location.hash = '#/dashboard';
+      } else {
+        router();
+      }
     } else {
-      router();
+      showToast('Введите ключ');
     }
-  } else {
-    showToast('Введите ключ');
-  }
-};
+  };
 
   pinCancel.onclick = () => {
     pinM.classList.remove('open');
@@ -2694,6 +2688,7 @@ requestAnimationFrame(() => {
     }
   }
 });
+
 
   
   window.addEventListener('load', () => {
