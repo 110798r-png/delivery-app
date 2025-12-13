@@ -89,10 +89,31 @@ async function initPushSubscription() {
 async function rpc(payload){
   if (!API_URL) throw new Error('API_URL empty');
 
+  const p = payload || {};
+  const op = p.op;
+
+  // операции, требующие adminKey на бэке
+  const ADMIN_OPS = new Set([
+    'setUnavailable',
+    'stock_set',
+    'config_set',
+    'update',
+    'delete',
+    'clear'
+  ]);
+
+  // если операция админская — подмешиваем ключ из sessionStorage
+  if (ADMIN_OPS.has(op)) {
+    const adminKey = sessionStorage.getItem(ADMIN_KEY_SS) || '';
+    if (adminKey) {
+      p.adminKey = adminKey;
+    }
+  }
+
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'content-type':'application/json' },
-    body: JSON.stringify(payload || {})
+    body: JSON.stringify(p)
   });
 
   if (!res.ok) {
@@ -116,6 +137,7 @@ const CLIENT_ID_KEY      = 'client_id_v1';
 const NAV_HINT_KEY       = 'nav_hint_shown_v1';
 const TABLE_ID_KEY       = 'table_id_v1';
 const DASH_CLEARED_AFTER_KEY = 'dashboard_cleared_after_ts_v1';
+const ADMIN_KEY_SS       = 'ADMIN_KEY_SESSION';
 
 
   // ===== МИГРАЦИЯ ХРАНИЛИЩА =====
@@ -2639,6 +2661,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     e && e.preventDefault();
     if ((pinInput.value || '').length > 0) {
       pinM.classList.remove('open');
+      // сохраняем ключ админки в sessionStorage (для админ-операций на бэке)
+sessionStorage.setItem(ADMIN_KEY_SS, (pinInput.value || '').trim());
 
       if (sessionStorage.getItem(WANT_DASH) === '1') {
         sessionStorage.removeItem(WANT_DASH);
@@ -2654,6 +2678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   pinCancel.onclick = () => {
     pinM.classList.remove('open');
+    sessionStorage.removeItem(ADMIN_KEY_SS);
     sessionStorage.removeItem(WANT_DASH);
     location.hash = '#/order';
   };
