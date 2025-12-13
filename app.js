@@ -2251,8 +2251,8 @@ async function loadOrdersFromCloud(){
 /* ===== КОНСТРУКТОР (меню) ===== */
 function BuilderView(){
   const cfg = loadConfig();
-let openCatKey = null; // <<< запоминаем открытую категорию
-  
+  let openCatKey = null; // запоминаем открытую категорию
+
   const root = el(`
     <div class="grid gap-4 pb-28">
       <div class="flex items-center justify-between">
@@ -2282,68 +2282,63 @@ let openCatKey = null; // <<< запоминаем открытую катего
     catsBox.innerHTML = '';
 
     cfg.menu.forEach((cat, cidx) => {
-      // ---- миграция старого promoUrl → в массив promo ----
+      // миграция старого promoUrl → в массив promo
       if (!Array.isArray(cat.promo)) {
-        if (cat.promoUrl) {
-          cat.promo = [cat.promoUrl];
-        } else {
-          cat.promo = [];
-        }
+        cat.promo = cat.promoUrl ? [cat.promoUrl] : [];
       }
-
-      // максимум 5 URL, остальное отрезаем
+      // максимум 5 URL
       cat.promo = cat.promo.slice(0, 5);
 
       const catCard = el(`
-  <details class="border rounded-2xl p-3 bg-white" data-cat="${cat.key}">
-    <summary class="flex items-center justify-between cursor-pointer select-none">
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="font-semibold truncate">${cat.title}</span>
-        <span class="text-xs text-gray-500">(${cat.items.length})</span>
-      </div>
-      <span class="chev text-gray-500">▼</span>
-    </summary>
+        <details class="border rounded-2xl p-3 bg-white" data-cat="${cat.key}">
+          <summary class="flex items-center justify-between cursor-pointer select-none">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-semibold truncate">${cat.title}</span>
+              <span class="text-xs text-gray-500">(${cat.items.length})</span>
+            </div>
+            <span class="chev text-gray-500">▼</span>
+          </summary>
 
-    <div class="mt-3">
-      <div class="flex items-center justify-between">
-        <input
-          value="${cat.title}"
-          class="border rounded-xl p-2 font-semibold w-1/2"
-          data-k="title"
-        >
-        <div class="flex gap-2">
-          <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
-          <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
-          <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
-        </div>
-      </div>
+          <div class="mt-3">
+            <div class="flex items-center justify-between">
+              <input
+                value="${cat.title}"
+                class="border rounded-xl p-2 font-semibold w-1/2"
+                data-k="title"
+              >
+              <div class="flex gap-2">
+                <button class="px-2 py-1 rounded-lg border" data-act="up">↑</button>
+                <button class="px-2 py-1 rounded-lg border" data-act="down">↓</button>
+                <button class="px-2 py-1 rounded-lg border text-red-600" data-act="del">Удалить</button>
+              </div>
+            </div>
 
-      <div class="text-xs text-gray-500 mt-1">
-        key: <code>${cat.key}</code>
-      </div>
+            <div class="text-xs text-gray-500 mt-1">
+              key: <code>${cat.key}</code>
+            </div>
 
-      <div class="mt-2">
-        <div class="text-xs text-gray-600 mb-1">Акции (до 5 картинок для карусели)</div>
-        <div class="grid gap-1" data-promo-box></div>
-      </div>
+            <div class="mt-2">
+              <div class="text-xs text-gray-600 mb-1">Акции (до 5 картинок для карусели)</div>
+              <div class="grid gap-1" data-promo-box></div>
+            </div>
 
-      <div class="mt-3">
-        <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
-      </div>
+            <div class="mt-3">
+              <button class="px-3 py-2 rounded-xl border" data-act="addItem">+ Товар</button>
+            </div>
 
-      <div class="mt-3 grid gap-2" data-items></div>
-    </div>
-  </details>
-`);
+            <div class="mt-3 grid gap-2" data-items></div>
+          </div>
+        </details>
+      `);
 
-  if (openCatKey === cat.key) catCard.open = true; // <<< восстановление открытого трея
-      
-      // ===== РИСУЕМ ДО 5 URL акций =====
+      // восстановление открытого трея
+      if (openCatKey === cat.key) catCard.open = true;
+
+      // промо (5 строк)
       const promoBox = catCard.querySelector('[data-promo-box]');
-      function renderPromos() {
+      const renderPromos = () => {
         promoBox.innerHTML = '';
 
-        // гарантируем массив длиной ровно 5 (с пустыми строками)
         let promos = Array.isArray(cat.promo) ? cat.promo.slice(0, 5) : [];
         while (promos.length < 5) promos.push('');
         cat.promo = promos;
@@ -2363,39 +2358,35 @@ let openCatKey = null; // <<< запоминаем открытую катего
           const input = line.querySelector('input');
           input.addEventListener('input', (e) => {
             const i = Number(e.target.dataset.promoIdx || 0);
-            cat.promo[i] = e.target.value.trim();
+            cat.promo[i] = (e.target.value || '').trim();
 
-            // для совместимости – первое непустое в promoUrl
+            // совместимость
             const firstNonEmpty = cat.promo.find(u => u && u.trim()) || '';
             cat.promoUrl = firstNonEmpty || '';
           });
 
           promoBox.appendChild(line);
         });
-      }
+      };
       renderPromos();
 
-      // ===== ТОВАРЫ В КАТЕГОРИИ =====
+      // товары
       const itemsBox = catCard.querySelector('[data-items]');
-
       cat.items.forEach((it, iidx) => {
         const row = el(`
           <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
-            <input
-              class="col-span-5 border rounded-lg p-2"
+            <input class="col-span-5 border rounded-lg p-2"
               placeholder="Название"
               value="${it.name || ''}"
               data-k="name"
             >
-            <input
-              class="col-span-2 border rounded-lg p-2"
+            <input class="col-span-2 border rounded-lg p-2"
               type="number"
               placeholder="Цена"
               value="${it.price || 0}"
               data-k="price"
             >
-            <input
-              class="col-span-4 border rounded-lg p-2"
+            <input class="col-span-4 border rounded-lg p-2"
               placeholder="URL фото товара"
               value="${it.img || ''}"
               data-k="img"
@@ -2408,56 +2399,40 @@ let openCatKey = null; // <<< запоминаем открытую катего
           </div>
         `);
 
-        // изменение полей товара
         row.addEventListener('input', (e) => {
           const k = e.target.dataset.k;
           if (!k) return;
-          if (k === 'price') {
-            cat.items[iidx][k] = Number(e.target.value || 0);
-          } else {
-            cat.items[iidx][k] = e.target.value;
-          }
+          if (k === 'price') cat.items[iidx][k] = Number(e.target.value || 0);
+          else cat.items[iidx][k] = e.target.value;
         });
 
-        // кнопки ↑ ↓ ✕ у товаров
         row.addEventListener('click', (e) => {
           const act = e.target.dataset.act;
           if (!act) return;
 
-          if (act === 'iDel') {
-            cat.items.splice(iidx, 1);
-            render();
-            return;
-          }
+          if (act === 'iDel') { cat.items.splice(iidx, 1); render(); return; }
 
           if (act === 'iUp' && iidx > 0) {
-            const t = cat.items[iidx - 1];
-            cat.items[iidx - 1] = cat.items[iidx];
-            cat.items[iidx] = t;
-            render();
-            return;
+            [cat.items[iidx - 1], cat.items[iidx]] = [cat.items[iidx], cat.items[iidx - 1]];
+            render(); return;
           }
 
           if (act === 'iDown' && iidx < cat.items.length - 1) {
-            const t = cat.items[iidx + 1];
-            cat.items[iidx + 1] = cat.items[iidx];
-            cat.items[iidx] = t;
-            render();
-            return;
+            [cat.items[iidx + 1], cat.items[iidx]] = [cat.items[iidx], cat.items[iidx + 1]];
+            render(); return;
           }
         });
 
         itemsBox.appendChild(row);
       });
 
-      // ===== ОБРАБОТКА КАТЕГОРИИ В ЦЕЛОМ =====
+      // изменение названия категории
       catCard.addEventListener('input', (e) => {
         const k = e.target.dataset.k;
-        if (k === 'title') {
-          cat.title = e.target.value;
-        }
+        if (k === 'title') cat.title = e.target.value;
       });
 
+      // кнопки категории
       catCard.addEventListener('click', (e) => {
         const act = e.target.dataset.act;
         if (!act) return;
@@ -2471,41 +2446,36 @@ let openCatKey = null; // <<< запоминаем открытую катего
         }
 
         if (act === 'up' && cidx > 0) {
-          const t = cfg.menu[cidx - 1];
-          cfg.menu[cidx - 1] = cfg.menu[cidx];
-          cfg.menu[cidx] = t;
-          render();
-          return;
+          [cfg.menu[cidx - 1], cfg.menu[cidx]] = [cfg.menu[cidx], cfg.menu[cidx - 1]];
+          render(); return;
         }
 
         if (act === 'down' && cidx < cfg.menu.length - 1) {
-          const t = cfg.menu[cidx + 1];
-          cfg.menu[cidx + 1] = cfg.menu[cidx];
-          cfg.menu[cidx] = t;
-          render();
-          return;
+          [cfg.menu[cidx + 1], cfg.menu[cidx]] = [cfg.menu[cidx], cfg.menu[cidx + 1]];
+          render(); return;
         }
 
         if (act === 'addItem') {
           cat.items.push({ name: 'Новый товар', price: 0, img: '' });
-          render();
-          return;
+          render(); return;
+        }
+      });
+
+      // аккордеон: открыта только одна
+      catCard.addEventListener('toggle', () => {
+        if (catCard.open) {
+          openCatKey = cat.key;
+          catsBox.querySelectorAll('details').forEach(d => { if (d !== catCard) d.open = false; });
+        } else {
+          if (openCatKey === cat.key) openCatKey = null;
         }
       });
 
       catsBox.appendChild(catCard);
-
-      catCard.addEventListener('toggle', () => {
-  if (catCard.open) {
-    openCatKey = cat.key;               // запомнили открытую
-    catsBox.querySelectorAll('details').forEach(d => {
-      if (d !== catCard) d.open = false; // закрыли остальные
     });
-  } else {
-    if (openCatKey === cat.key) openCatKey = null;
   }
-});
 
+  // стартовый рендер
   render();
 
   // новая категория
@@ -2521,7 +2491,6 @@ let openCatKey = null; // <<< запоминаем открытую катего
     applyTheme(cfg.theme);
     MENU_CATEGORIES = cfg.menu.slice();
 
-    // пробуем сохранить на сервере
     try {
       await rpc({ op: 'config_set', config: cfg });
     } catch (e) {
@@ -2536,11 +2505,10 @@ let openCatKey = null; // <<< запоминаем открытую катего
   };
 
   // назад
-root.querySelector('#backBtn2').onclick = () => {
-  if (history.length) history.back();
-  else location.hash = '#/dashboard';
-};
-
+  root.querySelector('#backBtn2').onclick = () => {
+    if (history.length) history.back();
+    else location.hash = '#/dashboard';
+  };
 
   return root;
 }
