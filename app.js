@@ -340,12 +340,19 @@ async function fetchRemoteConfig(){
   // Вариант 2: RPC к нашему бэку — общий конфиг для всех устройств
   try{
     const res = await rpc({ op: 'config_get' });
-    if (res && res.config && Array.isArray(res.config.menu)){
-      saveConfig(res.config);
-      applyTheme(res.config.theme||{});
-      MENU_CATEGORIES = res.config.menu.slice();
-      return res.config;
-    }
+if (res && res.config && typeof res.config === 'object') {
+  const local = loadConfig();
+  const merged = { ...local, ...res.config };
+
+  // menu берём с сервера только если он валидный массив, иначе оставляем локальный
+  if (!Array.isArray(merged.menu)) merged.menu = local.menu || DEFAULT_CONFIG.menu;
+
+  saveConfig(merged);
+  applyTheme(merged.theme || {});
+  MENU_CATEGORIES = (merged.menu || []).slice();
+  return merged;
+}
+
   }catch(e){
     console.warn('fetchRemoteConfig RPC', e);
   }
@@ -2270,6 +2277,20 @@ function BuilderView(){
       </div>
 
       <section class="card p-4">
+        <h3 class="font-semibold mb-2">Настройки</h3>
+
+        <div class="grid gap-2">
+          <label class="text-xs text-gray-500">Название заведения</label>
+          <input
+            id="brandTitleInput"
+            class="border rounded-xl p-3 font-semibold"
+            placeholder="Например: ZM TIME"
+            value="${(cfg.brandTitle || '').replace(/"/g,'&quot;')}"
+          >
+        </div>
+      </section>
+
+      <section class="card p-4">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold">Категории и товары</h3>
           <button id="addCatBtn" class="px-3 py-2 rounded-xl border">+ Категория</button>
@@ -2519,6 +2540,14 @@ function BuilderView(){
     else location.hash = '#/dashboard';
   };
 
+    // --- brandTitle ---
+  const brandTitleInput = root.querySelector('#brandTitleInput');
+  if (brandTitleInput) {
+    brandTitleInput.addEventListener('input', () => {
+      cfg.brandTitle = (brandTitleInput.value || '').trim();
+    });
+  }
+  
   return root;
 }
 
