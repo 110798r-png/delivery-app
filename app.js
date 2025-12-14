@@ -2189,7 +2189,7 @@ function orderCard(o) {
       return;
     }
 
-    if (pin !== '65Vafuza') {
+    if (pin !== 'zamir05') {
       showToast('Неверный PIN');
       return;
     }
