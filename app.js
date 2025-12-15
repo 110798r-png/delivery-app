@@ -1505,6 +1505,103 @@ async function exportReportPdf() {
     return client;
   }
 
+    // ====== 31 ДЕНЬ (08:00–23:00) ======
+  const SHOP_TZ = 'Europe/Moscow';
+
+  function toTZDate(ts) {
+    return new Date(new Date(ts).toLocaleString('en-US', { timeZone: SHOP_TZ }));
+  }
+
+  function ymdKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function startOfDay08(d) {
+    const x = new Date(d);
+    x.setHours(8, 0, 0, 0);
+    return x;
+  }
+
+  function endOfDay23(d) {
+    const x = new Date(d);
+    x.setHours(23, 0, 0, 0);
+    return x;
+  }
+
+  function isAfter23(d) {
+    return d.getHours() >= 23;
+  }
+
+  // Время "сейчас" в МСК
+  const nowTZ = toTZDate(Date.now());
+  const todayClosed = isAfter23(nowTZ);
+
+  // Выручка по дням (YYYY-MM-DD) только 08:00–23:00
+  const dayRevenueMap = new Map();
+
+  // считаем выручку по окну 08:00–23:00
+  allOrders.forEach(o => {
+    const ts = Number(o.createdAt || 0);
+    if (!ts) return;
+
+    const sum = orderTotal(o);
+    const t = toTZDate(ts);
+
+    const dayBase = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const from = startOfDay08(dayBase);
+    const to   = endOfDay23(dayBase);
+
+    if (t >= from && t < to) {
+      const key = ymdKey(t);
+      dayRevenueMap.set(key, (dayRevenueMap.get(key) || 0) + sum);
+    }
+  });
+
+  // готовим 31 строку для PDF
+  const days31 = [];
+  for (let i = 0; i < 31; i++) {
+    const d = new Date(nowTZ);
+    d.setDate(d.getDate() - i);
+
+    const key = ymdKey(d);
+
+    // сегодня показываем только после 23:00
+    const isToday = ymdKey(nowTZ) === key;
+    const rev = (isToday && !todayClosed) ? null : (dayRevenueMap.get(key) || 0);
+
+    const weekday = new Intl.DateTimeFormat('ru-RU', {
+      weekday: 'short',
+      timeZone: SHOP_TZ
+    }).format(d);
+
+    const dateText = new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: SHOP_TZ
+    }).format(d);
+
+    const monthText = new Intl.DateTimeFormat('ru-RU', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: SHOP_TZ
+    }).format(d);
+
+    days31.push({
+      dateText,
+      weekday,
+      monthText,
+      revenueText: (rev === null ? '—' : formatMoneyPlain(rev))
+    });
+  }
+
+  // делаем старые сверху, новые снизу
+  days31.reverse();
+  // ====== /31 ДЕНЬ ======
+
   allOrders.forEach(o => {
     const t = Number(o.createdAt || 0);
     const sum = orderTotal(o);
@@ -1647,6 +1744,27 @@ async function exportReportPdf() {
         },
         layout: 'lightHorizontalLines'
       }
+
+            // ====== СТРАНИЦА 2: 31 ДЕНЬ (08:00–23:00) ======
+      { text: 'Выручка по дням (31 день)', style: 'header', pageBreak: 'before' },
+      {
+        text: 'Окно дня: 08:00–23:00 (МСК). Сегодня появится только после 23:00.',
+        style: 'subheader',
+        margin: [0, 0, 0, 8]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['auto', 'auto', '*', 'auto'],
+          body: [
+            ['Дата', 'День', 'Месяц', 'Выручка'],
+            ...days31.map(r => [r.dateText, r.weekday, r.monthText, r.revenueText])
+          ]
+        },
+        layout: 'lightHorizontalLines'
+      },
+      // ====== /СТРАНИЦА 2 ======
+      
     ],
     styles: {
       header: {
