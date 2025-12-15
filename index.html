@@ -255,6 +255,17 @@
     .order-card-print { display: none; }
     .order-card-main  { display: block; }
 
+    /* === Печать одного выбранного заказа === */
+@media print {
+  /* когда включен режим печати одного ордера */
+  #list.print-one-mode .order-card { display: none !important; }
+  #list.print-one-mode .order-card.print-one {
+    display: block !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}
+
     /* Настройки страницы для термопринтера */
     @page { size: 75mm 115mm; margin: 3mm; }
 
