@@ -84,6 +84,7 @@ async function initPushSubscription() {
   }
 }
 
+const ADMIN_KEY_SS       = 'ADMIN_KEY_SESSION';
 
 /* ===== RPC ===== */
 async function rpc(payload){
@@ -137,7 +138,6 @@ const CLIENT_ID_KEY      = 'client_id_v1';
 const NAV_HINT_KEY       = 'nav_hint_shown_v1';
 const TABLE_ID_KEY       = 'table_id_v1';
 const DASH_CLEARED_AFTER_KEY = 'dashboard_cleared_after_ts_v1';
-const ADMIN_KEY_SS       = 'ADMIN_KEY_SESSION';
 
 
   // ===== МИГРАЦИЯ ХРАНИЛИЩА =====
@@ -2047,23 +2047,33 @@ function orderCard(o) {
           <div>${total} ₽</div>
         </div>
 
-        <!-- Кнопки управления, только на экране -->
-        <div class="mt-3 flex flex-col items-center gap-2 no-print">
-          <button
-            type="button"
-            class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-            data-act="ready"
-          >
-            Готово
-          </button>
-          <button
-            type="button"
-            class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
-            data-act="delete"
-          >
-            Удалить
-          </button>
-        </div>
+      <!-- Кнопки управления, только на экране -->
+<div class="mt-3 flex flex-col items-center gap-2 no-print">
+  <button
+    type="button"
+    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm flex items-center justify-center gap-1"
+    data-act="print"
+    title="Печать этого заказа"
+  >
+    🖨️ Печать
+  </button>
+
+  <button
+    type="button"
+    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+    data-act="ready"
+  >
+    Готово
+  </button>
+
+  <button
+    type="button"
+    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
+    data-act="delete"
+  >
+    Удалить
+  </button>
+</div>
       </div>
 
       <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
@@ -2084,6 +2094,32 @@ function orderCard(o) {
     // 1) Клик по кнопкам "Готово" / "Удалить"
     if (btn) {
       const act = btn.dataset.act;
+
+      if (act === 'print') {
+  // печатаем ТОЛЬКО эту карточку
+  const listEl = document.getElementById('list');
+  if (!listEl) return;
+
+  // включаем режим "одна карточка"
+  listEl.classList.add('print-one-mode');
+
+  // снимаем старые метки
+  listEl.querySelectorAll('.order-card.print-one').forEach(x => x.classList.remove('print-one'));
+
+  // помечаем текущую карточку
+  card.classList.add('print-one');
+
+  // печать
+  window.print();
+
+  // после печати — возвращаем как было
+  setTimeout(() => {
+    card.classList.remove('print-one');
+    listEl.classList.remove('print-one-mode');
+  }, 400);
+
+  return;
+}
 
       if (act === 'ready') {
         const nowTs = Date.now();
