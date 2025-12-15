@@ -1743,7 +1743,7 @@ async function exportReportPdf() {
           ]
         },
         layout: 'lightHorizontalLines'
-      }
+      },
 
             // ====== СТРАНИЦА 2: 31 ДЕНЬ (08:00–23:00) ======
       { text: 'Выручка по дням (31 день)', style: 'header', pageBreak: 'before' },
