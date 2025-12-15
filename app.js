@@ -2110,6 +2110,13 @@ function orderCard(o) {
         return;
       }
 
+      if (act === 'print') {
+  card.classList.add('print-only');
+  window.print();
+  setTimeout(() => card.classList.remove('print-only'), 300);
+  return;
+}
+      
       if (act === 'delete') {
         if (!card.dataset.confirm) {
           card.dataset.confirm = '1';
