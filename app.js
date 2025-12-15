@@ -2181,7 +2181,7 @@ function orderCard(o) {
     class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
     data-act="ready"
   >
-    Готово
+    Оплачено
   </button>
 
   <button
