@@ -2066,14 +2066,6 @@ function orderCard(o) {
         </div>
       </div>
 
-<button
-  type="button"
-  class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white text-sm flex items-center justify-center gap-1"
-  data-act="print"
->
-  🖨️ Печать
-</button>
-
       <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
       <div class="order-card-print text-sm">
         <div class="text-base font-extrabold mb-1">#${o.id || '—'}</div>
@@ -2110,13 +2102,6 @@ function orderCard(o) {
         return;
       }
 
-      if (act === 'print') {
-  card.classList.add('print-only');
-  window.print();
-  setTimeout(() => card.classList.remove('print-only'), 300);
-  return;
-}
-      
       if (act === 'delete') {
         if (!card.dataset.confirm) {
           card.dataset.confirm = '1';
