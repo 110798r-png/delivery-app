@@ -1679,6 +1679,18 @@ async function exportReportPdf() {
   const nowTZ = toTZDate(Date.now());
   const todayClosed = isAfter23(nowTZ);
 
+  // сколько бизнес-дней (08:00–23:00) вообще накоплено
+const availableDaysCount = dayRevenueMap.size;
+
+// период "день" доступен только после 23:00 (закрытие дня)
+const dayReady = todayClosed;
+
+// "неделя" доступна только если есть >=7 дней истории И после 23:00
+const weekReady = todayClosed && (availableDaysCount >= 7);
+
+// "месяц" доступен только если есть >=31 дня истории И после 23:00
+const monthReady = todayClosed && (availableDaysCount >= 31);
+
   // Выручка по дням (YYYY-MM-DD) только 08:00–23:00
   const dayRevenueMap = new Map();
 
@@ -1832,10 +1844,9 @@ async function exportReportPdf() {
           headerRows: 1,
           widths: ['*', 'auto'],
           body: [
-            ['Период', 'Средний чек'],
-            ['День (последние 24 часа)',  avgDay],
-            ['Неделя (последние 7 дней)', avgWeek],
-            ['Месяц (последние 30 дней)', avgMonth],
+          ['День (08:00–23:00)',  dayReady   ? avgDay   : '—'],
+          ['Неделя (7 дней)',     weekReady  ? avgWeek  : '—'],
+          ['Месяц (31 день)',     monthReady ? avgMonth : '—'],
           ]
         },
         layout: 'lightHorizontalLines',
@@ -1853,11 +1864,10 @@ async function exportReportPdf() {
           widths: ['*', 'auto', 'auto'],
           body: [
             ['Позиция', 'Кол-во', 'Выручка'],
-            ...(
-              topWeek.length
-                ? topWeek.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
-                : [['Нет данных', '', '']]
-            )
+            ...(weekReady && topWeek.length
+  ? topWeek.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+  : [['Нет данных', '', '']]
+)
           ]
         },
         layout: 'lightHorizontalLines',
@@ -1875,11 +1885,10 @@ async function exportReportPdf() {
           widths: ['*', 'auto', 'auto'],
           body: [
             ['Позиция', 'Кол-во', 'Выручка'],
-            ...(
-              topMonth.length
-                ? topMonth.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
-                : [['Нет данных', '', '']]
-            )
+           ...(monthReady && topMonth.length
+  ? topMonth.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+  : [['Нет данных', '', '']]
+)
           ]
         },
         layout: 'lightHorizontalLines'
