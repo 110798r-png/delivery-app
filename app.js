@@ -520,6 +520,28 @@ function OrderView(){
 
   const panelW = () => catPager.getBoundingClientRect().width || 1;
 
+    // ====== РАЗМЕРЫ (мал/бол) ======
+  const SIZE_BIG = 'big';
+  const SIZE_SMALL = 'small';
+
+  const sizeKey = (name, size) => `${name}__${size}`;
+
+  function getSelectedSize(name){
+    window.__sizeSel = window.__sizeSel || {};
+    return window.__sizeSel[name] || SIZE_BIG;
+  }
+  function setSelectedSize(name, size){
+    window.__sizeSel = window.__sizeSel || {};
+    window.__sizeSel[name] = size;
+  }
+
+  function priceFor(it, size){
+    // big = it.price, small = it.priceSmall (если нет — fallback на it.price)
+    if (size === SIZE_SMALL) return Number(it.priceSmall || it.price || 0);
+    return Number(it.price || 0);
+  }
+  // ====== /РАЗМЕРЫ ======
+
   function handleStockUpdated(){
     unavailableClient = new Set(loadUnavailable());
     rebuildMenu();
@@ -786,8 +808,18 @@ function rebuildMenu() {
     const list  = el(`<div class="grid gap-3"></div>`);
 
     cat.items.forEach(it => {
-      const q        = (window.__orderCounts?.[it.name] || 0);
+            const isSized  = !!it.sized;
+      const curSize  = isSized ? getSelectedSize(it.name) : null;
+
+      const key      = isSized ? sizeKey(it.name, curSize) : it.name;
+      const q        = (window.__orderCounts?.[key] || 0);
+
       const disabled = unavailableClient.has(it.name);
+      const showPrice = cfg.theme.showPrice;
+
+      const curPrice = isSized ? priceFor(it, curSize) : Number(it.price || 0);
+      const smallP   = isSized ? priceFor(it, 'small') : 0;
+      const bigP     = isSized ? priceFor(it, 'big') : 0;
 
       const row = el(`
         <div class="menu-card ${disabled ? 'opacity-50' : ''}">
@@ -796,20 +828,52 @@ function rebuildMenu() {
               ${it.name}
               ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
             </div>
+           ${
+  showPrice
+    ? (
+        isSized
+          ? `<div class="text-xs text-gray-500 mt-1">
+               ${money(curPrice)}
+               <span class="ml-2 opacity-70">(мал: ${money(smallP)} • бол: ${money(bigP)})</span>
+             </div>`
+          : `<div class="text-xs text-gray-500 mt-1">${money(curPrice)}</div>`
+      )
+    : ''
+}
+
             ${
-              cfg.theme.showPrice
-                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+              isSized
+                ? `<div class="flex items-center gap-2 mt-3">
+                     <button
+                       type="button"
+                       class="px-3 py-1 rounded-full border text-xs ${curSize === 'small' ? 'bg-black text-white border-black' : 'bg-white/60'}"
+                       data-act="size"
+                       data-name="${it.name}"
+                       data-size="small"
+                       ${disabled ? 'disabled' : ''}
+                     >Мал</button>
+                     <button
+                       type="button"
+                       class="px-3 py-1 rounded-full border text-xs ${curSize === 'big' ? 'bg-black text-white border-black' : 'bg-white/60'}"
+                       data-act="size"
+                       data-name="${it.name}"
+                       data-size="big"
+                       ${disabled ? 'disabled' : ''}
+                     >Бол</button>
+                   </div>`
                 : ''
             }
+
             <div class="flex items-center gap-3 mt-3">
               <button
                 type="button"
                 class="w-8 h-8 rounded-xl border"
                 data-name="${it.name}"
                 data-act="dec"
+                data-size="${isSized ? curSize : ''}"
                 ${disabled ? 'disabled' : ''}
               >−</button>
-              <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+              <div class="w-6 text-center text-sm" data-q="${key}">${q}</div>
               <button
                 type="button"
                 class="w-8 h-8 rounded-xl bg-black text-white"
@@ -942,9 +1006,26 @@ function rebuildMenu() {
     if (!btn || btn.disabled) return;
 
     const name  = btn.dataset.name;
-    const delta = btn.dataset.act === 'inc' ? +1 : -1;
+        const act = btn.dataset.act;
 
-    const selector = `[data-q="${escAttr(name)}"]`;
+    // переключение размера
+    if (act === 'size') {
+      const size = btn.dataset.size || 'big';
+      setSelectedSize(name, size);
+      rebuildMenu();
+      recalcTotal();
+      return;
+    }
+        const delta = act === 'inc' ? +1 : -1;
+
+        // если товар sized — считаем по ключу name__size
+    const cfg2 = loadConfig();
+    const it2 = cfg2.menu.flatMap(c => c.items).find(x => x.name === name);
+    const isSized = !!it2?.sized;
+    const curSize = isSized ? (btn.dataset.size || getSelectedSize(name)) : null;
+    const k = isSized ? sizeKey(name, curSize) : name;
+
+    const selector = `[data-q="${escAttr(k)}"]`;
 
     const cur = parseInt(
       catPager.querySelector(selector)?.textContent || '0',
@@ -958,7 +1039,7 @@ function rebuildMenu() {
     });
 
     if (!window.__orderCounts) window.__orderCounts = {};
-    window.__orderCounts[name] = next;
+     window.__orderCounts[k] = next;
     recalcTotal();
   });
 
@@ -1010,14 +1091,18 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
   });
 
   function recalcTotal(){
-    const cfg    = loadConfig();
-    const counts = window.__orderCounts || {};
-    let sum = 0;
-    cfg.menu.forEach(cat =>
-      cat.items.forEach(it => {
+      cfg.menu.forEach(cat =>
+    cat.items.forEach(it => {
+      if (it.sized) {
+        const qb = counts[sizeKey(it.name, 'big')] || 0;
+        const qs = counts[sizeKey(it.name, 'small')] || 0;
+        sum += qb * priceFor(it, 'big');
+        sum += qs * priceFor(it, 'small');
+      } else {
         sum += (counts[it.name] || 0) * (it.price || 0);
-      })
-    );
+      }
+    })
+  );
     totalEl.textContent = money(sum);
     confirmBtn.disabled = sum <= 0;
     return sum;
@@ -1032,8 +1117,16 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
     cfg.menu.forEach(cat =>
       cat.items.forEach(it => {
         const q = (counts[it.name] || 0);
-        if (q > 0){
-          items.push({ name: it.name, qty: q, price: it.price || 0 });
+                if (it.sized) {
+          const qb = counts[sizeKey(it.name, 'big')] || 0;
+          const qs = counts[sizeKey(it.name, 'small')] || 0;
+
+          if (qb > 0) items.push({ name: `${it.name} (бол)`, qty: qb, price: priceFor(it, 'big'), baseName: it.name, size: 'big' });
+          if (qs > 0) items.push({ name: `${it.name} (мал)`, qty: qs, price: priceFor(it, 'small'), baseName: it.name, size: 'small' });
+
+        } else {
+          const q = (counts[it.name] || 0);
+          if (q > 0) items.push({ name: it.name, qty: q, price: Number(it.price || 0) });
         }
       })
     );
@@ -1121,14 +1214,32 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
       let total = 0;
 
       cfg.menu.forEach(cat =>
-        cat.items.forEach(it => {
-          const q = (counts[it.name] || 0);
-          if (q > 0){
-            itemsSel.push({ name: it.name, qty: q, price: it.price || 0 });
-            total += q * (it.price || 0);
-          }
-        })
-      );
+  cat.items.forEach(it => {
+    if (it.sized) {
+      const qb = counts[sizeKey(it.name, 'big')] || 0;
+      const qs = counts[sizeKey(it.name, 'small')] || 0;
+
+      if (qb > 0){
+        const pr = priceFor(it, 'big');
+        itemsSel.push({ name: `${it.name} (бол)`, qty: qb, price: pr, baseName: it.name, size: 'big' });
+        total += qb * pr;
+      }
+      if (qs > 0){
+        const pr = priceFor(it, 'small');
+        itemsSel.push({ name: `${it.name} (мал)`, qty: qs, price: pr, baseName: it.name, size: 'small' });
+        total += qs * pr;
+      }
+
+    } else {
+      const q = (counts[it.name] || 0);
+      if (q > 0){
+        const pr = Number(it.price || 0);
+        itemsSel.push({ name: it.name, qty: q, price: pr });
+        total += q * pr;
+      }
+    }
+  })
+);
 
            if (!itemsSel.length){
         ok.disabled = false;
@@ -2558,24 +2669,40 @@ function BuilderView(){
       const itemsBox = catCard.querySelector('[data-items]');
       cat.items.forEach((it, iidx) => {
         const row = el(`
-          <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
-            <input class="col-span-5 border rounded-lg p-2"
+                    <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
+            <input class="col-span-4 border rounded-lg p-2"
               placeholder="Название"
               value="${it.name || ''}"
               data-k="name"
             >
+
+            <!-- Цена БОЛ (основная) -->
             <input class="col-span-2 border rounded-lg p-2"
               type="number"
-              placeholder="Цена"
+              placeholder="Цена (бол)"
               value="${it.price || 0}"
               data-k="price"
             >
-            <input class="col-span-4 border rounded-lg p-2"
+
+            <!-- Цена МАЛ -->
+            <input class="col-span-2 border rounded-lg p-2"
+              type="number"
+              placeholder="Цена (мал)"
+              value="${it.priceSmall || 0}"
+              data-k="priceSmall"
+            >
+
+            <input class="col-span-3 border rounded-lg p-2"
               placeholder="URL фото товара"
               value="${it.img || ''}"
               data-k="img"
             >
-            <div class="col-span-1 flex items-center gap-1 justify-end">
+
+            <div class="col-span-1 flex flex-col items-end gap-1 justify-start">
+              <label class="text-[10px] leading-none flex items-center gap-1 select-none">
+                <input type="checkbox" data-k="sized" ${it.sized ? 'checked' : ''}>
+                <span>бол/мал</span>
+              </label>
               <button class="px-2 py-1 rounded-md border" data-act="iUp">↑</button>
               <button class="px-2 py-1 rounded-md border" data-act="iDown">↓</button>
               <button class="px-2 py-1 rounded-md border text-red-600" data-act="iDel">✕</button>
@@ -2584,11 +2711,25 @@ function BuilderView(){
         `);
 
         row.addEventListener('input', (e) => {
-          const k = e.target.dataset.k;
-          if (!k) return;
-          if (k === 'price') cat.items[iidx][k] = Number(e.target.value || 0);
-          else cat.items[iidx][k] = e.target.value;
-        });
+  const k = e.target.dataset.k;
+  if (!k) return;
+
+  if (k === 'price' || k === 'priceSmall') {
+    cat.items[iidx][k] = Number(e.target.value || 0);
+    return;
+  }
+
+  if (k === 'sized') {
+    cat.items[iidx].sized = !!e.target.checked;
+    // если включили размеры и не задана priceSmall — подставим копию price
+    if (cat.items[iidx].sized && !cat.items[iidx].priceSmall) {
+      cat.items[iidx].priceSmall = Number(cat.items[iidx].price || 0);
+    }
+    return;
+  }
+
+  cat.items[iidx][k] = e.target.value;
+});
 
         row.addEventListener('click', (e) => {
           const act = e.target.dataset.act;
@@ -2640,7 +2781,7 @@ function BuilderView(){
         }
 
         if (act === 'addItem') {
-          cat.items.push({ name: 'Новый товар', price: 0, img: '' });
+          cat.items.push({ name: 'Новый товар', price: 0, priceSmall: 0, sized: false, img: '' });
           render(); return;
         }
       });
