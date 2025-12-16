@@ -36,7 +36,6 @@ if (typeof window.CSS.escape !== 'function') {
 const API_URL = '/api/order';
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
-const BRAND_PHONE = '+7 9xx xxx-xx-xx'; // поменяй
 const BRAND_TITLE = 'ZM TIME';  // изменишь тут — поменяется в шапке и во вкладке
 // === PUSH / VAPID ===
 const VAPID_PUBLIC = 'BOdctEWx7fxuRtJB65AgcmgftUtHbFTBXX7qnpMCs5Bvh_hCErbrI18SGVzCJC8IoxP5LnMhjasuDlOvkgvbLRg';
@@ -160,50 +159,6 @@ const DASH_CLEARED_AFTER_KEY = 'dashboard_cleared_after_ts_v1';
 const el = (html)=>{ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
 const showToast = (msg)=>{ const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 1800); };
 const money = (x)=> `${x} руб.`;
-/* ===== РАЗМЕРЫ (бол/мал) ===== */
-const SIZE_BIG = 'big';
-const SIZE_SMALL = 'small';
-const SIZE_LABEL = { [SIZE_BIG]:'бол.', [SIZE_SMALL]:'мал.' };
-
-function baseNameFromSized(name){
-  // "Пепперони (мал.)" -> "Пепперони"
-  return String(name || '').replace(/\s*\((бол\.|мал\.)\)\s*$/i, '').trim();
-}
-
-function sizeFromName(name){
-  const s = String(name || '');
-  if (/\(мал\.\)\s*$/i.test(s)) return SIZE_SMALL;
-  if (/\(бол\.\)\s*$/i.test(s)) return SIZE_BIG;
-  return null;
-}
-
-function sizeKey(name, size){ return `${name}||${size}`; }
-
-function getSizeFor(name){
-  window.__orderSize = window.__orderSize || {};
-  return window.__orderSize[name] || SIZE_BIG; // по умолчанию бол.
-}
-function setSizeFor(name, size){
-  window.__orderSize = window.__orderSize || {};
-  window.__orderSize[name] = size;
-}
-
-// ВКЛЮЧАЕМ размеры только для нужных товаров (впиши свои пиццы)
-const SIZE_ENABLED = new Set([
-  'Пепперони',
-  'Ассорти',
-  'Пицца 4 Сыра',
-  'Пицца Острая'
-]);
-
-// Маленькая = 75% от большой (можешь поменять)
-const SMALL_PRICE_FACTOR = 0.75;
-
-function getItemPrice(it, size){
-  const big = Number(it.price || 0);
-  if (size === SIZE_SMALL) return Math.round(big * SMALL_PRICE_FACTOR);
-  return big;
-}
 const setBodyScrollLock = (on)=> document.body.style.overflow = on ? 'hidden' : '';
 function safeParse(k, f){ try{ const v=JSON.parse(localStorage.getItem(k)||'null'); if(v==null) return f; if(Array.isArray(f)) return Array.isArray(v)?v:[]; if(typeof f==='object') return v&&typeof v==='object'?v:{}; return v; }catch{ return f } }
 function loadProfile(){ return safeParse(PROFILE_LS_KEY, {}); }
@@ -335,12 +290,6 @@ function applyTheme(theme){
 
   // Обновляем название в шапке
   document.getElementById('brandTitle').textContent = title;
-
-  const phoneEl = document.getElementById('brandPhone');
-if (phoneEl) phoneEl.textContent = BRAND_PHONE;
-
-const subEl = document.getElementById('brandSub');
-if (subEl) subEl.textContent = BRAND_SUB;
 
   // Обновляем заголовок вкладки браузера
   document.title = title + ' — локальный стенд';
@@ -837,87 +786,51 @@ function rebuildMenu() {
     const list  = el(`<div class="grid gap-3"></div>`);
 
     cat.items.forEach(it => {
-  const disabled = unavailableClient.has(it.name);
+      const q        = (window.__orderCounts?.[it.name] || 0);
+      const disabled = unavailableClient.has(it.name);
 
-  const hasSize = SIZE_ENABLED.has(it.name);
-  const curSize = hasSize ? getSizeFor(it.name) : SIZE_BIG;
-
-  // количество теперь храним по ключу name||size
-  const q = (window.__orderCounts?.[sizeKey(it.name, curSize)] || 0);
-
-  const sizeUi = hasSize ? `
-    <div class="ml-2 inline-flex rounded-xl border overflow-hidden">
-      <button type="button"
-        class="px-2 py-1 text-sm ${curSize===SIZE_BIG ? 'bg-black text-white' : 'bg-white'}"
-        data-act="size"
-        data-name="${it.name}"
-        data-size="${SIZE_BIG}"
-        ${disabled ? 'disabled' : ''}
-      >бол.</button>
-      <button type="button"
-        class="px-2 py-1 text-sm ${curSize===SIZE_SMALL ? 'bg-black text-white' : 'bg-white'}"
-        data-act="size"
-        data-name="${it.name}"
-        data-size="${SIZE_SMALL}"
-        ${disabled ? 'disabled' : ''}
-      >мал.</button>
-    </div>
-  ` : '';
-
-  const row = el(`
-    <div class="menu-card ${disabled ? 'opacity-50' : ''}">
-      <div class="flex-1 min-w-0">
-        <div class="font-medium text-sm flex items-center gap-2">
-          ${it.name}
-          ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
+      const row = el(`
+        <div class="menu-card ${disabled ? 'opacity-50' : ''}">
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-sm flex items-center gap-2">
+              ${it.name}
+              ${disabled ? '<span class="badge red">Нет в наличии</span>' : ''}
+            </div>
+            ${
+              cfg.theme.showPrice
+                ? `<div class="text-xs text-gray-500 mt-1">${money(it.price || 0)}</div>`
+                : ''
+            }
+            <div class="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                class="w-8 h-8 rounded-xl border"
+                data-name="${it.name}"
+                data-act="dec"
+                ${disabled ? 'disabled' : ''}
+              >−</button>
+              <div class="w-6 text-center text-sm" data-q="${it.name}">${q}</div>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-xl bg-black text-white"
+                data-name="${it.name}"
+                data-act="inc"
+                ${disabled ? 'disabled' : ''}
+              >+</button>
+            </div>
+          </div>
+          <img
+  src="${it.img || 'https://placehold.co/110x70?text=food'}"
+  class="menu-card-img"
+  alt=""
+  loading="lazy"
+  decoding="async"
+  >
+  
         </div>
-
-        ${
-          cfg.theme.showPrice
-            ? `<div class="text-xs text-gray-500 mt-1" data-price="${it.name}">
-                 ${money(getItemPrice(it, curSize))}
-               </div>`
-            : ''
-        }
-
-        <div class="flex items-center gap-3 mt-3">
-          <button
-            type="button"
-            class="w-8 h-8 rounded-xl border"
-            data-name="${it.name}"
-            data-act="dec"
-            ${disabled ? 'disabled' : ''}
-          >−</button>
-
-          <div class="w-6 text-center text-sm"
-               data-q="${it.name}"
-               data-qsize="${curSize}"
-          >${q}</div>
-
-          <button
-            type="button"
-            class="w-8 h-8 rounded-xl bg-black text-white"
-            data-name="${it.name}"
-            data-act="inc"
-            ${disabled ? 'disabled' : ''}
-          >+</button>
-
-          ${sizeUi}
-        </div>
-      </div>
-
-      <img
-        src="${it.img || 'https://placehold.co/110x70?text=food'}"
-        class="menu-card-img"
-        alt=""
-        loading="lazy"
-        decoding="async"
-      >
-    </div>
-  `);
-
-  list.appendChild(row);
-});
+      `);
+      list.appendChild(row);
+    });
 
     // запас снизу
     list.appendChild(el(`<div class="bottom-spacer"></div>`));
@@ -1025,64 +938,29 @@ function rebuildMenu() {
 
   // обработчик +/− по делегированию
   catPager.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn || btn.disabled) return;
+    const btn = e.target.closest('button[data-act]');
+    if (!btn || btn.disabled) return;
 
-  const act  = btn.dataset.act;
-  const name = btn.dataset.name;
+    const name  = btn.dataset.name;
+    const delta = btn.dataset.act === 'inc' ? +1 : -1;
 
-  // 1) переключение размера
-  if (act === 'size') {
-    const size = btn.dataset.size || SIZE_BIG;
-    setSizeFor(name, size);
+    const selector = `[data-q="${escAttr(name)}"]`;
 
-    // обновим UI в этой карточке
-    const card = btn.closest('.menu-card');
-    if (card) {
-      // подсветка
-      card.querySelectorAll(`button[data-act="size"][data-name="${name}"]`).forEach(b => {
-        const on = b.dataset.size === size;
-        b.classList.toggle('bg-black', on);
-        b.classList.toggle('text-white', on);
-        b.classList.toggle('bg-white', !on);
-      });
+    const cur = parseInt(
+      catPager.querySelector(selector)?.textContent || '0',
+      10
+    ) || 0;
 
-      // цена
-      const cfg = loadConfig();
-      const it = cfg.menu.flatMap(c => c.items).find(x => x.name === name);
-      const priceEl = card.querySelector(`[data-price="${name}"]`);
-      if (it && priceEl) priceEl.textContent = money(getItemPrice(it, size));
+    const next = Math.max(0, cur + delta);
 
-      // счетчик
-      const qEl = card.querySelector(`[data-q="${name}"]`);
-      if (qEl) {
-        qEl.dataset.qsize = size;
-        const q = (window.__orderCounts?.[sizeKey(name, size)] || 0);
-        qEl.textContent = String(q);
-      }
-    }
+    catPager.querySelectorAll(selector).forEach(n => {
+      n.textContent = String(next);
+    });
 
+    if (!window.__orderCounts) window.__orderCounts = {};
+    window.__orderCounts[name] = next;
     recalcTotal();
-    return;
-  }
-
-  // 2) +/− учитывают выбранный размер
-  const size = SIZE_ENABLED.has(name) ? getSizeFor(name) : SIZE_BIG;
-  const delta = act === 'inc' ? 1 : -1;
-
-  window.__orderCounts = window.__orderCounts || {};
-  const k = sizeKey(name, size);
-
-  const cur = Number(window.__orderCounts[k] || 0);
-  const next = Math.max(0, cur + delta);
-  window.__orderCounts[k] = next;
-
-  // обновляем счетчик в текущей карточке
-  const qEl = btn.closest('.menu-card')?.querySelector(`[data-q="${name}"]`);
-  if (qEl) qEl.textContent = String(next);
-
-  recalcTotal();
-});
+  });
 
     function applyHeights(){
     try {
@@ -1131,29 +1009,19 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
     }, 80);
   });
 
- function recalcTotal(){
-  const cfg    = loadConfig();
-  const counts = window.__orderCounts || {};
-  let sum = 0;
-
-  cfg.menu.forEach(cat =>
-    cat.items.forEach(it => {
-      if (SIZE_ENABLED.has(it.name)) {
-        const qBig = Number(counts[sizeKey(it.name, SIZE_BIG)] || 0);
-        const qSm  = Number(counts[sizeKey(it.name, SIZE_SMALL)] || 0);
-        sum += qBig * getItemPrice(it, SIZE_BIG);
-        sum += qSm  * getItemPrice(it, SIZE_SMALL);
-      } else {
-        const q = Number(counts[sizeKey(it.name, SIZE_BIG)] || 0);
-        sum += q * Number(it.price || 0);
-      }
-    })
-  );
-
-  totalEl.textContent = money(sum);
-  confirmBtn.disabled = sum <= 0;
-  return sum;
-}
+  function recalcTotal(){
+    const cfg    = loadConfig();
+    const counts = window.__orderCounts || {};
+    let sum = 0;
+    cfg.menu.forEach(cat =>
+      cat.items.forEach(it => {
+        sum += (counts[it.name] || 0) * (it.price || 0);
+      })
+    );
+    totalEl.textContent = money(sum);
+    confirmBtn.disabled = sum <= 0;
+    return sum;
+  }
 
   // обработка "Оформить заказ"
   confirmBtn.addEventListener('click', () => {
@@ -1162,21 +1030,13 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
     const items  = [];
 
     cfg.menu.forEach(cat =>
-  cat.items.forEach(it => {
-    if (SIZE_ENABLED.has(it.name)) {
-      const qBig = Number(counts[sizeKey(it.name, SIZE_BIG)] || 0);
-      const qSm  = Number(counts[sizeKey(it.name, SIZE_SMALL)] || 0);
-
-      if (qBig > 0) items.push({ name: `${it.name} (${SIZE_LABEL[SIZE_BIG]})`, qty: qBig, price: getItemPrice(it, SIZE_BIG) });
-      if (qSm  > 0) items.push({ name: `${it.name} (${SIZE_LABEL[SIZE_SMALL]})`, qty: qSm,  price: getItemPrice(it, SIZE_SMALL) });
-
-      return;
-    }
-
-    const q = Number(counts[sizeKey(it.name, SIZE_BIG)] || 0);
-    if (q > 0) items.push({ name: it.name, qty: q, price: Number(it.price || 0) });
-  })
-);
+      cat.items.forEach(it => {
+        const q = (counts[it.name] || 0);
+        if (q > 0){
+          items.push({ name: it.name, qty: q, price: it.price || 0 });
+        }
+      })
+    );
 
     if (!items.length) return;
 
@@ -1679,18 +1539,6 @@ async function exportReportPdf() {
   const nowTZ = toTZDate(Date.now());
   const todayClosed = isAfter23(nowTZ);
 
-  // сколько бизнес-дней (08:00–23:00) вообще накоплено
-const availableDaysCount = dayRevenueMap.size;
-
-// период "день" доступен только после 23:00 (закрытие дня)
-const dayReady = todayClosed;
-
-// "неделя" доступна только если есть >=7 дней истории И после 23:00
-const weekReady = todayClosed && (availableDaysCount >= 7);
-
-// "месяц" доступен только если есть >=31 дня истории И после 23:00
-const monthReady = todayClosed && (availableDaysCount >= 31);
-
   // Выручка по дням (YYYY-MM-DD) только 08:00–23:00
   const dayRevenueMap = new Map();
 
@@ -1844,9 +1692,10 @@ const monthReady = todayClosed && (availableDaysCount >= 31);
           headerRows: 1,
           widths: ['*', 'auto'],
           body: [
-          ['День (08:00–23:00)',  dayReady   ? avgDay   : '—'],
-          ['Неделя (7 дней)',     weekReady  ? avgWeek  : '—'],
-          ['Месяц (31 день)',     monthReady ? avgMonth : '—'],
+            ['Период', 'Средний чек'],
+            ['День (последние 24 часа)',  avgDay],
+            ['Неделя (последние 7 дней)', avgWeek],
+            ['Месяц (последние 30 дней)', avgMonth],
           ]
         },
         layout: 'lightHorizontalLines',
@@ -1864,10 +1713,11 @@ const monthReady = todayClosed && (availableDaysCount >= 31);
           widths: ['*', 'auto', 'auto'],
           body: [
             ['Позиция', 'Кол-во', 'Выручка'],
-            ...(weekReady && topWeek.length
-  ? topWeek.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
-  : [['Нет данных', '', '']]
-)
+            ...(
+              topWeek.length
+                ? topWeek.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+                : [['Нет данных', '', '']]
+            )
           ]
         },
         layout: 'lightHorizontalLines',
@@ -1885,10 +1735,11 @@ const monthReady = todayClosed && (availableDaysCount >= 31);
           widths: ['*', 'auto', 'auto'],
           body: [
             ['Позиция', 'Кол-во', 'Выручка'],
-           ...(monthReady && topMonth.length
-  ? topMonth.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
-  : [['Нет данных', '', '']]
-)
+            ...(
+              topMonth.length
+                ? topMonth.map(it => [it.name, it.qty, formatMoneyPlain(it.sum)])
+                : [['Нет данных', '', '']]
+            )
           ]
         },
         layout: 'lightHorizontalLines'
