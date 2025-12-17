@@ -2679,45 +2679,29 @@ function BuilderView(){
       const itemsBox = catCard.querySelector('[data-items]');
       cat.items.forEach((it, iidx) => {
         const row = el(`
-                    <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
-            <input class="col-span-4 border rounded-lg p-2"
-              placeholder="Название"
-              value="${it.name || ''}"
-              data-k="name"
-            >
+                   <div class="grid grid-cols-12 gap-2 border rounded-xl p-2">
+  <input class="col-span-4 min-w-0 w-full border rounded-lg p-2"
+    placeholder="Название" value="${it.name || ''}" data-k="name">
 
-            <!-- Цена БОЛ (основная) -->
-            <input class="col-span-2 border rounded-lg p-2"
-              type="number"
-              placeholder="Цена (бол)"
-              value="${it.price || 0}"
-              data-k="price"
-            >
+  <input class="col-span-2 min-w-0 w-full border rounded-lg p-2"
+    type="number" placeholder="Цена (бол)" value="${it.price || 0}" data-k="price">
 
-            <!-- Цена МАЛ -->
-            <input class="col-span-2 border rounded-lg p-2"
-              type="number"
-              placeholder="Цена (мал)"
-              value="${it.priceSmall || 0}"
-              data-k="priceSmall"
-            >
+  <input class="col-span-2 min-w-0 w-full border rounded-lg p-2"
+    type="number" placeholder="Цена (мал)" value="${it.priceSmall || 0}" data-k="priceSmall">
 
-            <input class="col-span-3 border rounded-lg p-2"
-              placeholder="URL фото товара"
-              value="${it.img || ''}"
-              data-k="img"
-            >
+  <input class="col-span-2 min-w-0 w-full border rounded-lg p-2 text-xs"
+    placeholder="URL фото" value="${it.img || ''}" data-k="img">
 
-            <div class="col-span-1 flex flex-col items-end gap-1 justify-start">
-              <label class="text-[10px] leading-none flex items-center gap-1 select-none">
-                <input type="checkbox" data-k="sized" ${it.sized ? 'checked' : ''}>
-                <span>бол/мал</span>
-              </label>
-              <button class="px-2 py-1 rounded-md border" data-act="iUp">↑</button>
-              <button class="px-2 py-1 rounded-md border" data-act="iDown">↓</button>
-              <button class="px-2 py-1 rounded-md border text-red-600" data-act="iDel">✕</button>
-            </div>
-          </div>
+  <div class="col-span-2 flex flex-col items-end gap-1 justify-start">
+    <label class="text-[10px] leading-none flex items-center gap-1 whitespace-nowrap select-none">
+      <input type="checkbox" data-k="sized" ${it.sized ? 'checked' : ''}>
+      <span>бол/мал</span>
+    </label>
+    <button class="px-2 py-1 rounded-md border" data-act="iUp">↑</button>
+    <button class="px-2 py-1 rounded-md border" data-act="iDown">↓</button>
+    <button class="px-2 py-1 rounded-md border text-red-600" data-act="iDel">✕</button>
+  </div>
+</div>
         `);
 
         row.addEventListener('input', (e) => {
