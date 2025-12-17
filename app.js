@@ -1090,23 +1090,33 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
     }, 80);
   });
 
-  function recalcTotal(){
-      cfg.menu.forEach(cat =>
+ function recalcTotal(){
+  const cfg    = loadConfig();
+  const counts = window.__orderCounts || {};  // ✅ ВОТ ЭТОГО у тебя сейчас нет => ошибка
+
+  let sum = 0;
+
+  cfg.menu.forEach(cat =>
     cat.items.forEach(it => {
       if (it.sized) {
-        const qb = counts[sizeKey(it.name, 'big')] || 0;
-        const qs = counts[sizeKey(it.name, 'small')] || 0;
-        sum += qb * priceFor(it, 'big');
-        sum += qs * priceFor(it, 'small');
+        const qb = counts[`${it.name}__big`]   || 0;
+        const qs = counts[`${it.name}__small`] || 0;
+
+        const pb = Number(it.price || 0);
+        const ps = Number(it.priceSmall || it.price || 0);
+
+        sum += qb * pb;
+        sum += qs * ps;
       } else {
-        sum += (counts[it.name] || 0) * (it.price || 0);
+        sum += (counts[it.name] || 0) * Number(it.price || 0);
       }
     })
   );
-    totalEl.textContent = money(sum);
-    confirmBtn.disabled = sum <= 0;
-    return sum;
-  }
+
+  totalEl.textContent = money(sum);
+  confirmBtn.disabled = sum <= 0;
+  return sum;
+}
 
   // обработка "Оформить заказ"
   confirmBtn.addEventListener('click', () => {
