@@ -843,28 +843,28 @@ function rebuildMenu() {
 
             ${
               isSized
-                ? `<div class="flex items-center gap-2 mt-3">
-                     <button
-  type="button"
-  class="px-3 py-1 rounded-full border text-xs no-swipe"
-  data-act="size"
->
+  ? `
+    <div class="flex items-center gap-2 mt-3">
+      <button
+        type="button"
+        class="px-3 py-1 rounded-full border text-xs ${curSize === 'small' ? 'bg-black text-white border-black' : 'bg-white/60'}"
+        data-act="size"
+        data-name="${it.name}"
+        data-size="small"
+        ${disabled ? 'disabled' : ''}
+      >Мал</button>
 
-                       data-name="${it.name}"
-                       data-size="small"
-                       ${disabled ? 'disabled' : ''}
-                     >Мал</button>
-                    <button
-  type="button"
-  class="px-3 py-1 rounded-full border text-xs no-swipe"
-  data-act="size"
->
-                       data-name="${it.name}"
-                       data-size="big"
-                       ${disabled ? 'disabled' : ''}
-                     >Бол</button>
-                   </div>`
-                : ''
+      <button
+        type="button"
+        class="px-3 py-1 rounded-full border text-xs ${curSize === 'big' ? 'bg-black text-white border-black' : 'bg-white/60'}"
+        data-act="size"
+        data-name="${it.name}"
+        data-size="big"
+        ${disabled ? 'disabled' : ''}
+      >Бол</button>
+    </div>
+  `
+  : ''
             }
 
             <div class="flex items-center gap-3 mt-3">
@@ -1012,24 +1012,27 @@ function rebuildMenu() {
         const act = btn.dataset.act;
 
     // переключение размера
-   if (act === 'size') {
-  e.preventDefault();
-  e.stopPropagation();
-
+  if (act === 'size') {
   const size = btn.dataset.size || 'big';
-  setSelectedSize(name, size);
 
-  // ⚠️ вместо rebuildMenu — ТОЛЬКО обновление цен
+  // сохраняем текущую прокрутку списка в активной категории
+  const currentBox = catPager.children[activeIdx]?.querySelector('.v-scroll');
+  const curTop = currentBox ? currentBox.scrollTop : 0;
+
+  setSelectedSize(name, size);
   rebuildMenu();
   recalcTotal();
+  applyHeights();
 
-  // 🔥 КРИТИЧНО: вернуть scroll
+  // возвращаем прокрутку назад (после пересборки DOM)
   requestAnimationFrame(() => {
-    document.body.style.overflow = '';
+    const newBox = catPager.children[activeIdx]?.querySelector('.v-scroll');
+    if (newBox) newBox.scrollTop = curTop;
   });
 
   return;
 }
+
         const delta = act === 'inc' ? +1 : -1;
 
         // если товар sized — считаем по ключу name__size
