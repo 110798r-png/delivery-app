@@ -845,17 +845,20 @@ function rebuildMenu() {
               isSized
                 ? `<div class="flex items-center gap-2 mt-3">
                      <button
-                       type="button"
-                       class="px-3 py-1 rounded-full border text-xs ${curSize === 'small' ? 'bg-black text-white border-black' : 'bg-white/60'}"
-                       data-act="size"
+  type="button"
+  class="px-3 py-1 rounded-full border text-xs no-swipe"
+  data-act="size"
+>
+
                        data-name="${it.name}"
                        data-size="small"
                        ${disabled ? 'disabled' : ''}
                      >Мал</button>
-                     <button
-                       type="button"
-                       class="px-3 py-1 rounded-full border text-xs ${curSize === 'big' ? 'bg-black text-white border-black' : 'bg-white/60'}"
-                       data-act="size"
+                    <button
+  type="button"
+  class="px-3 py-1 rounded-full border text-xs no-swipe"
+  data-act="size"
+>
                        data-name="${it.name}"
                        data-size="big"
                        ${disabled ? 'disabled' : ''}
@@ -1009,13 +1012,24 @@ function rebuildMenu() {
         const act = btn.dataset.act;
 
     // переключение размера
-    if (act === 'size') {
-      const size = btn.dataset.size || 'big';
-      setSelectedSize(name, size);
-      rebuildMenu();
-      recalcTotal();
-      return;
-    }
+   if (act === 'size') {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const size = btn.dataset.size || 'big';
+  setSelectedSize(name, size);
+
+  // ⚠️ вместо rebuildMenu — ТОЛЬКО обновление цен
+  rebuildMenu();
+  recalcTotal();
+
+  // 🔥 КРИТИЧНО: вернуть scroll
+  requestAnimationFrame(() => {
+    document.body.style.overflow = '';
+  });
+
+  return;
+}
         const delta = act === 'inc' ? +1 : -1;
 
         // если товар sized — считаем по ключу name__size
