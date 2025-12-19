@@ -1707,7 +1707,7 @@ const monthFromTs = monthStart_MSK();
 
   // считаем выручку по окну 08:00–23:00
   allOrders.forEach(o => {
-    const ts = Number(o.createdAt || 0);
+    const ts = Number(o.paidAt || o.createdAt || 0);
     if (!ts) return;
 
     const sum = orderTotal(o);
@@ -1766,7 +1766,7 @@ const monthFromTs = monthStart_MSK();
   // ====== /31 ДЕНЬ ======
 
   allOrders.forEach(o => {
-    const t = Number(o.createdAt || 0);
+    const t = Number(o.paidAt || o.createdAt || 0);
 
     if (!t) return;
 
