@@ -1614,6 +1614,9 @@ allOrders = allOrders.filter(o => !!o.paidAt || o.paid === true);
   
   if (!allOrders.length) {
     showToast('Нет заказов для отчёта');
+    // ✅ берём только оплаченные
+allOrders = allOrders.filter(o => o.status === 'оплачен' || o.paid === true || !!o.paidAt);
+
     return;
   }
 
@@ -2066,14 +2069,14 @@ if (printOrdersBtn) {
   // подгружаем локальное табло с учётом этого времени
   let dashOrders = loadDash().filter(o => {
     if (!clearedAfterTs) return true;
-    const t = Number(o.createdAt || 0);
+    const t = Number(o.paidAt || o.createdAt || 0);
     // если нет createdAt — оставляем, иначе сравниваем
     return !t || t >= clearedAfterTs;
   });
    // на табло показываем только не завершённые и не отменённые
   dashOrders = dashOrders.filter(o =>
-    o.status !== 'завершён' && o.status !== 'отменён'
-  );
+  o.status !== 'завершён' && o.status !== 'отменён' && o.status !== 'оплачен'
+);
   window.__dashOrders = dashOrders;
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
@@ -2412,25 +2415,27 @@ function orderCard(o) {
 }
 
       if (act === 'ready') {
-        const nowTs = Date.now();
-        const patch = {
-  status: 'оплачен',  // или оставь 'готов', но лучше 'оплачен'
-  paid: true,
-  paidAt: nowTs
-};
+  const nowTs = Date.now();
 
-        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-        if (i >= 0) {
-          dashOrders[i] = { ...dashOrders[i], ...patch };
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, patch.status);
-          showToast(`Заказ #${o.id} отмечен как готов`);
-          renderOrders();
-        }
+  // ✅ это и есть "оплата"
+  const patch = {
+    status: 'оплачен',
+    paid: true,
+    paidAt: nowTs
+  };
 
-        try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
-        return;
-      }
+  const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+  if (i >= 0) {
+    dashOrders[i] = { ...dashOrders[i], ...patch };
+    saveDash(dashOrders);
+    syncOrderStatus(o.id, patch.status);
+    showToast(`Заказ #${o.id} отмечен как оплачен`);
+    renderOrders();
+  }
+
+  try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
+  return;
+}
 
       if (act === 'delete') {
         if (!card.dataset.confirm) {
@@ -2560,14 +2565,14 @@ async function loadOrdersFromCloud(){
       // берём только активные заказы:
       // не показываем завершённые и отменённые
       let serverOrders = res.orders.filter(o =>
-        o.status !== 'завершён' && o.status !== 'отменён'
-      );
+  o.status !== 'завершён' && o.status !== 'отменён' && o.status !== 'оплачен'
+);
 
       // фильтруем по моменту последней очистки табло
       const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
       if (clearedAfter) {
         serverOrders = serverOrders.filter(o => {
-          const t = Number(o.createdAt || 0);
+          const t = Number(o.paidAt || o.createdAt || 0);
           return !t || t >= clearedAfter;
         });
       }
