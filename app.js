@@ -1609,16 +1609,13 @@ async function exportReportPdf() {
     console.warn('exportReportPdf: rpc list error', e);
   }
 
+  // ✅ В отчёты идут только оплаченные заказы
+allOrders = allOrders.filter(o => !!o.paidAt || o.paid === true);
+  
   if (!allOrders.length) {
     showToast('Нет заказов для отчёта');
     return;
   }
-
-  const MS_DAY = 24 * 60 * 60 * 1000;
-  const nowTs  = Date.now();
-  const dayFrom   = nowTs - MS_DAY;        // последние 24 часа
-  const weekFrom  = nowTs - 7 * MS_DAY;    // последние 7 дней
-  const monthFrom = nowTs - 30 * MS_DAY;   // последние 30 дней
 
   let totalAll = 0;
 
@@ -1675,6 +1672,34 @@ async function exportReportPdf() {
 
   // Время "сейчас" в МСК
   const nowTZ = toTZDate(Date.now());
+
+  function inShift_MSK(ts) {
+  const t = toTZDate(ts);
+  const h = t.getHours();
+  return h >= 8 && h < 23; // 08:00–23:00
+}
+
+function isToday_MSK(ts) {
+  const t = toTZDate(ts);
+  return ymdKey(t) === ymdKey(nowTZ);
+}
+
+function weekStart_MSK() {
+  const d0 = new Date(nowTZ.getFullYear(), nowTZ.getMonth(), nowTZ.getDate(), 0, 0, 0, 0);
+  const day = d0.getDay(); // 0=вс
+  const diffToMon = (day + 6) % 7; // до понедельника
+  d0.setDate(d0.getDate() - diffToMon);
+  return d0.getTime();
+}
+
+function monthStart_MSK() {
+  const d0 = new Date(nowTZ.getFullYear(), nowTZ.getMonth(), 1, 0, 0, 0, 0);
+  return d0.getTime();
+}
+
+const weekFromTs  = weekStart_MSK();
+const monthFromTs = monthStart_MSK();
+  
   const todayClosed = isAfter23(nowTZ);
 
   // Выручка по дням (YYYY-MM-DD) только 08:00–23:00
@@ -1742,21 +1767,29 @@ async function exportReportPdf() {
 
   allOrders.forEach(o => {
     const t = Number(o.createdAt || 0);
+
+    if (!t) return;
+
+// учитываем только смену 08–23
+if (!inShift_MSK(t)) return;
+    
     const sum = orderTotal(o);
     totalAll += sum;
 
-    if (t >= dayFrom) {
-      revDay += sum;
-      cntDay++;
-    }
-    if (t >= weekFrom) {
-      revWeek += sum;
-      cntWeek++;
-    }
-    if (t >= monthFrom) {
-      revMonth += sum;
-      cntMonth++;
-    }
+   if (isToday_MSK(t)) {
+  revDay += sum;
+  cntDay++;
+}
+
+if (t >= weekFromTs) {
+  revWeek += sum;
+  cntWeek++;
+}
+
+if (t >= monthFromTs) {
+  revMonth += sum;
+  cntMonth++;
+}
 
     const items = Array.isArray(o.items) ? o.items : [];
     items.forEach(it => {
@@ -1766,13 +1799,13 @@ async function exportReportPdf() {
       const p = Number(it.price || 0);
       const s = q * p;
 
-      if (t >= weekFrom) {
+      if (t >= weekFromTs) {
         const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
         rec.qty += q;
         rec.sum += s;
         weekAgg.set(name, rec);
       }
-      if (t >= monthFrom) {
+      if (t >= monthFromTs) {
         const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
         rec.qty += q;
         rec.sum += s;
@@ -1831,9 +1864,9 @@ async function exportReportPdf() {
           widths: ['*', 'auto'],
           body: [
             ['Период', 'Средний чек'],
-            ['День (последние 24 часа)',  avgDay],
-            ['Неделя (последние 7 дней)', avgWeek],
-            ['Месяц (последние 30 дней)', avgMonth],
+            ['День (сегодня, 08:00–23:00 МСК)',  avgDay],
+            ['Неделя (текущая, 08:00–23:00 МСК)', avgWeek],
+            ['Месяц (текущий, 08:00–23:00 МСК)', avgMonth],
           ]
         },
         layout: 'lightHorizontalLines',
@@ -2379,7 +2412,11 @@ function orderCard(o) {
 
       if (act === 'ready') {
         const nowTs = Date.now();
-        const patch = { status: 'готов', readyAt: nowTs };
+        const patch = {
+  status: 'оплачен',  // или оставь 'готов', но лучше 'оплачен'
+  paid: true,
+  paidAt: nowTs
+};
 
         const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
         if (i >= 0) {
