@@ -2265,6 +2265,7 @@ function orderCard(o) {
     'готовится': 'bg-blue-50 border-blue-300',
     'в пути':    'bg-purple-50 border-purple-300',
     'готов':     'bg-green-50 border-green-300',
+    'оплачен':  'bg-green-50 border-green-300',
     'завершён':  'bg-gray-100 border-gray-300',
     'отменён':   'bg-red-50 border-red-300'
   };
