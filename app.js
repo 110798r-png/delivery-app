@@ -1610,7 +1610,9 @@ async function exportReportPdf() {
   }
 
   // ✅ В отчёты идут только оплаченные заказы
-allOrders = allOrders.filter(o => !!o.paidAt || o.paid === true);
+allOrders = allOrders.filter(o =>
+  o.status === 'оплачен' || o.paid === true || !!o.paidAt
+);
   
   if (!allOrders.length) {
     showToast('Нет заказов для отчёта');
@@ -1768,54 +1770,44 @@ const monthFromTs = monthStart_MSK();
   days31.reverse();
   // ====== /31 ДЕНЬ ======
 
-  allOrders.forEach(o => {
-    const t = Number(o.paidAt || o.createdAt || 0);
+ allOrders.forEach(o => {
+  const t = Number(o.paidAt || o.createdAt || 0);
+  if (!t) return;
 
-    if (!t) return;
+  const sum = orderTotal(o);
 
-// учитываем только смену 08–23
-if (!inShift_MSK(t)) return;
-    
-    const sum = orderTotal(o);
-    totalAll += sum;
+  // ✅ "момент выгрузки" — ВСЕГДА
+  totalAll += sum;
 
-   if (isToday_MSK(t)) {
-  revDay += sum;
-  cntDay++;
-}
+  // ниже — только логика смены 08–23 (средний чек, топы, дни)
+  if (!inShift_MSK(t)) return;
 
-if (t >= weekFromTs) {
-  revWeek += sum;
-  cntWeek++;
-}
+  if (isToday_MSK(t)) { revDay += sum; cntDay++; }
+  if (t >= weekFromTs) { revWeek += sum; cntWeek++; }
+  if (t >= monthFromTs){ revMonth += sum; cntMonth++; }
 
-if (t >= monthFromTs) {
-  revMonth += sum;
-  cntMonth++;
-}
+  const items = Array.isArray(o.items) ? o.items : [];
+  items.forEach(it => {
+    const name = it.name || '';
+    if (!name) return;
+    const q = Number(it.qty || 0);
+    const p = Number(it.price || 0);
+    const s = q * p;
 
-    const items = Array.isArray(o.items) ? o.items : [];
-    items.forEach(it => {
-      const name = it.name || '';
-      if (!name) return;
-      const q = Number(it.qty || 0);
-      const p = Number(it.price || 0);
-      const s = q * p;
-
-      if (t >= weekFromTs) {
-        const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
-        rec.qty += q;
-        rec.sum += s;
-        weekAgg.set(name, rec);
-      }
-      if (t >= monthFromTs) {
-        const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
-        rec.qty += q;
-        rec.sum += s;
-        monthAgg.set(name, rec);
-      }
-    });
+    if (t >= weekFromTs) {
+      const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
+      rec.qty += q;
+      rec.sum += s;
+      weekAgg.set(name, rec);
+    }
+    if (t >= monthFromTs) {
+      const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
+      rec.qty += q;
+      rec.sum += s;
+      monthAgg.set(name, rec);
+    }
   });
+});
 
   function avgCheck(rev, cnt) {
     if (!cnt) return '—';
@@ -2075,7 +2067,6 @@ if (printOrdersBtn) {
   });
    // на табло показываем только не завершённые и не отменённые
   dashOrders = dashOrders.filter(o =>
-  o.status !== 'завершён' && o.status !== 'отменён' && o.status !== 'оплачен'
 );
   window.__dashOrders = dashOrders;
 
@@ -2565,7 +2556,6 @@ async function loadOrdersFromCloud(){
       // берём только активные заказы:
       // не показываем завершённые и отменённые
       let serverOrders = res.orders.filter(o =>
-  o.status !== 'завершён' && o.status !== 'отменён' && o.status !== 'оплачен'
 );
 
       // фильтруем по моменту последней очистки табло
