@@ -1609,18 +1609,16 @@ async function exportReportPdf() {
     console.warn('exportReportPdf: rpc list error', e);
   }
 
-  // ✅ В отчёты идут только оплаченные заказы
-allOrders = allOrders.filter(o =>
-  o.status === 'оплачен' || o.paid === true || !!o.paidAt
-);
-  
   if (!allOrders.length) {
     showToast('Нет заказов для отчёта');
-    // ✅ берём только оплаченные
-allOrders = allOrders.filter(o => o.status === 'оплачен' || o.paid === true || !!o.paidAt);
-
     return;
   }
+
+  const MS_DAY = 24 * 60 * 60 * 1000;
+  const nowTs  = Date.now();
+  const dayFrom   = nowTs - MS_DAY;        // последние 24 часа
+  const weekFrom  = nowTs - 7 * MS_DAY;    // последние 7 дней
+  const monthFrom = nowTs - 30 * MS_DAY;   // последние 30 дней
 
   let totalAll = 0;
 
@@ -1677,34 +1675,6 @@ allOrders = allOrders.filter(o => o.status === 'оплачен' || o.paid === tr
 
   // Время "сейчас" в МСК
   const nowTZ = toTZDate(Date.now());
-
-  function inShift_MSK(ts) {
-  const t = toTZDate(ts);
-  const h = t.getHours();
-  return h >= 8 && h < 23; // 08:00–23:00
-}
-
-function isToday_MSK(ts) {
-  const t = toTZDate(ts);
-  return ymdKey(t) === ymdKey(nowTZ);
-}
-
-function weekStart_MSK() {
-  const d0 = new Date(nowTZ.getFullYear(), nowTZ.getMonth(), nowTZ.getDate(), 0, 0, 0, 0);
-  const day = d0.getDay(); // 0=вс
-  const diffToMon = (day + 6) % 7; // до понедельника
-  d0.setDate(d0.getDate() - diffToMon);
-  return d0.getTime();
-}
-
-function monthStart_MSK() {
-  const d0 = new Date(nowTZ.getFullYear(), nowTZ.getMonth(), 1, 0, 0, 0, 0);
-  return d0.getTime();
-}
-
-const weekFromTs  = weekStart_MSK();
-const monthFromTs = monthStart_MSK();
-  
   const todayClosed = isAfter23(nowTZ);
 
   // Выручка по дням (YYYY-MM-DD) только 08:00–23:00
@@ -1712,7 +1682,7 @@ const monthFromTs = monthStart_MSK();
 
   // считаем выручку по окну 08:00–23:00
   allOrders.forEach(o => {
-    const ts = Number(o.paidAt || o.createdAt || 0);
+    const ts = Number(o.createdAt || 0);
     if (!ts) return;
 
     const sum = orderTotal(o);
@@ -1770,44 +1740,46 @@ const monthFromTs = monthStart_MSK();
   days31.reverse();
   // ====== /31 ДЕНЬ ======
 
- allOrders.forEach(o => {
-  const t = Number(o.paidAt || o.createdAt || 0);
-  if (!t) return;
+  allOrders.forEach(o => {
+    const t = Number(o.createdAt || 0);
+    const sum = orderTotal(o);
+    totalAll += sum;
 
-  const sum = orderTotal(o);
-
-  // ✅ "момент выгрузки" — ВСЕГДА
-  totalAll += sum;
-
-  // ниже — только логика смены 08–23 (средний чек, топы, дни)
-  if (!inShift_MSK(t)) return;
-
-  if (isToday_MSK(t)) { revDay += sum; cntDay++; }
-  if (t >= weekFromTs) { revWeek += sum; cntWeek++; }
-  if (t >= monthFromTs){ revMonth += sum; cntMonth++; }
-
-  const items = Array.isArray(o.items) ? o.items : [];
-  items.forEach(it => {
-    const name = it.name || '';
-    if (!name) return;
-    const q = Number(it.qty || 0);
-    const p = Number(it.price || 0);
-    const s = q * p;
-
-    if (t >= weekFromTs) {
-      const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
-      rec.qty += q;
-      rec.sum += s;
-      weekAgg.set(name, rec);
+    if (t >= dayFrom) {
+      revDay += sum;
+      cntDay++;
     }
-    if (t >= monthFromTs) {
-      const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
-      rec.qty += q;
-      rec.sum += s;
-      monthAgg.set(name, rec);
+    if (t >= weekFrom) {
+      revWeek += sum;
+      cntWeek++;
     }
+    if (t >= monthFrom) {
+      revMonth += sum;
+      cntMonth++;
+    }
+
+    const items = Array.isArray(o.items) ? o.items : [];
+    items.forEach(it => {
+      const name = it.name || '';
+      if (!name) return;
+      const q = Number(it.qty || 0);
+      const p = Number(it.price || 0);
+      const s = q * p;
+
+      if (t >= weekFrom) {
+        const rec = weekAgg.get(name) || { qty: 0, sum: 0 };
+        rec.qty += q;
+        rec.sum += s;
+        weekAgg.set(name, rec);
+      }
+      if (t >= monthFrom) {
+        const rec = monthAgg.get(name) || { qty: 0, sum: 0 };
+        rec.qty += q;
+        rec.sum += s;
+        monthAgg.set(name, rec);
+      }
+    });
   });
-});
 
   function avgCheck(rev, cnt) {
     if (!cnt) return '—';
@@ -1859,9 +1831,9 @@ const monthFromTs = monthStart_MSK();
           widths: ['*', 'auto'],
           body: [
             ['Период', 'Средний чек'],
-            ['День (сегодня, 08:00–23:00 МСК)',  avgDay],
-            ['Неделя (текущая, 08:00–23:00 МСК)', avgWeek],
-            ['Месяц (текущий, 08:00–23:00 МСК)', avgMonth],
+            ['День (последние 24 часа)',  avgDay],
+            ['Неделя (последние 7 дней)', avgWeek],
+            ['Месяц (последние 30 дней)', avgMonth],
           ]
         },
         layout: 'lightHorizontalLines',
@@ -2061,13 +2033,14 @@ if (printOrdersBtn) {
   // подгружаем локальное табло с учётом этого времени
   let dashOrders = loadDash().filter(o => {
     if (!clearedAfterTs) return true;
-    const t = Number(o.paidAt || o.createdAt || 0);
+    const t = Number(o.createdAt || 0);
     // если нет createdAt — оставляем, иначе сравниваем
     return !t || t >= clearedAfterTs;
   });
    // на табло показываем только не завершённые и не отменённые
   dashOrders = dashOrders.filter(o =>
-);
+    o.status !== 'завершён' && o.status !== 'отменён'
+  );
   window.__dashOrders = dashOrders;
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
@@ -2259,7 +2232,6 @@ function orderCard(o) {
     'готовится': 'bg-blue-50 border-blue-300',
     'в пути':    'bg-purple-50 border-purple-300',
     'готов':     'bg-green-50 border-green-300',
-    'оплачен':  'bg-green-50 border-green-300',
     'завершён':  'bg-gray-100 border-gray-300',
     'отменён':   'bg-red-50 border-red-300'
   };
@@ -2406,27 +2378,21 @@ function orderCard(o) {
 }
 
       if (act === 'ready') {
-  const nowTs = Date.now();
+        const nowTs = Date.now();
+        const patch = { status: 'готов', readyAt: nowTs };
 
-  // ✅ это и есть "оплата"
-  const patch = {
-    status: 'оплачен',
-    paid: true,
-    paidAt: nowTs
-  };
+        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+        if (i >= 0) {
+          dashOrders[i] = { ...dashOrders[i], ...patch };
+          saveDash(dashOrders);
+          syncOrderStatus(o.id, patch.status);
+          showToast(`Заказ #${o.id} отмечен как готов`);
+          renderOrders();
+        }
 
-  const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-  if (i >= 0) {
-    dashOrders[i] = { ...dashOrders[i], ...patch };
-    saveDash(dashOrders);
-    syncOrderStatus(o.id, patch.status);
-    showToast(`Заказ #${o.id} отмечен как оплачен`);
-    renderOrders();
-  }
-
-  try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
-  return;
-}
+        try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
+        return;
+      }
 
       if (act === 'delete') {
         if (!card.dataset.confirm) {
@@ -2556,13 +2522,14 @@ async function loadOrdersFromCloud(){
       // берём только активные заказы:
       // не показываем завершённые и отменённые
       let serverOrders = res.orders.filter(o =>
-);
+        o.status !== 'завершён' && o.status !== 'отменён'
+      );
 
       // фильтруем по моменту последней очистки табло
       const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
       if (clearedAfter) {
         serverOrders = serverOrders.filter(o => {
-          const t = Number(o.paidAt || o.createdAt || 0);
+          const t = Number(o.createdAt || 0);
           return !t || t >= clearedAfter;
         });
       }
