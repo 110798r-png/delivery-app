@@ -2992,24 +2992,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pinCancel= document.getElementById('pinCancel');
   const pinInput = document.getElementById('pinInput');
 
-  pinOk.onclick = (e) => {
-    e && e.preventDefault();
-    if ((pinInput.value || '').length > 0) {
-      pinM.classList.remove('open');
-      // сохраняем ключ админки в sessionStorage (для админ-операций на бэке)
-sessionStorage.setItem(ADMIN_KEY_SS, (pinInput.value || '').trim());
+  const ADMIN_PIN = 'zamir05'; // ← поменяй как хочешь
 
-      if (sessionStorage.getItem(WANT_DASH) === '1') {
-        sessionStorage.removeItem(WANT_DASH);
-        sessionStorage.setItem(TABLO_PIN_OK, '1');
-        location.hash = '#/dashboard';
-      } else {
-        router();
-      }
-    } else {
-      showToast('Введите ключ');
-    }
-  };
+function normalizePin(v){
+  return String(v || '').trim();
+}
+
+function openPinModal(){
+  pinM.classList.add('open');
+  pinInput.value = '';
+  // фокус чуть позже, чтобы модалка успела открыться
+  setTimeout(() => pinInput.focus(), 50);
+}
+
+function closePinModal(){
+  pinM.classList.remove('open');
+  pinInput.value = '';
+}
+
+pinOk.onclick = (e) => {
+  e && e.preventDefault();
+
+  const entered = normalizePin(pinInput.value);
+
+  if (!entered) {
+    showToast('Введите PIN');
+    return;
+  }
+
+  // ✅ строгая проверка
+  if (entered !== ADMIN_PIN) {
+    showToast('Неверный PIN');
+    pinInput.value = '';
+    pinInput.focus();
+    return;
+  }
+
+  // ✅ только после верного PIN выдаём допуск
+  closePinModal();
+
+  // это ключ для админ RPC (если бэк его проверяет)
+  sessionStorage.setItem(ADMIN_KEY_SS, entered);
+
+  if (sessionStorage.getItem(WANT_DASH) === '1') {
+    sessionStorage.removeItem(WANT_DASH);
+    sessionStorage.setItem(TABLO_PIN_OK, '1');
+    location.hash = '#/dashboard';
+  } else {
+    router();
+  }
+};
+
+pinCancel.onclick = () => {
+  closePinModal();
+  sessionStorage.removeItem(ADMIN_KEY_SS);
+  sessionStorage.removeItem(WANT_DASH);
+  location.hash = '#/order';
+};
+
+pinM.onclick = (e) => {
+  if (e.target === pinM) pinCancel.onclick();
+};
+
+// ✅ удобно: Enter подтверждает
+pinInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') pinOk.click();
+});
 
   pinCancel.onclick = () => {
     pinM.classList.remove('open');
