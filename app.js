@@ -1292,7 +1292,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         try {
           // IP телефона нужно взять из настроек или ввести вручную. 
           // Для теста можно зашить IP, который покажет приложение на экране.
-          const companionIp = "192.168.1.10"; // <--- ЗАМЕНИ НА IP ИЗ ЭКРАНА ТЕЛЕФОНА
+          const companionIp = "192.168.0.100"; // <--- ЗАМЕНИ НА IP ИЗ ЭКРАНА ТЕЛЕФОНА
           
           const printData = {
             orderId: res?.order?.id || Date.now().toString().slice(-6),
