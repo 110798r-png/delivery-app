@@ -246,6 +246,62 @@ function hideDoneModal(){
   dm.classList.remove('open');
 }
 
+// ===== ПЕЧАТЬ ЧЕРЕЗ COMPANION (Android) =====
+const COMPANION_SCHEME = 'zmprint';
+const COMPANION_HOST   = 'print';
+
+function b64FromUtf8(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin);
+}
+
+function buildReceiptText(order){
+  const id = order?.id || '—';
+  const table = order?.table ? `Столик: №${order.table}` : '';
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const created = order?.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+
+  let lines = [];
+  lines.push(`ZM TIME`);
+  lines.push(`Заказ: #${id}`);
+  if (table) lines.push(table);
+  if (created) lines.push(created);
+  lines.push('--------------------------');
+
+  items.forEach(it => {
+    const name = String(it.name || '');
+    const qty  = Number(it.qty || 0);
+    lines.push(name);
+    lines.push(`  x${qty}`);
+  });
+
+  lines.push('--------------------------');
+  if (typeof order?.total === 'number') lines.push(`ИТОГО: ${order.total} ₽`);
+  if (order?.pay) lines.push(`Оплата: ${order.pay}`);
+  lines.push('\n\n');
+
+  return lines.join('\n');
+}
+
+function printOrderViaCompanion(order){
+  const payload = {
+    type: 'receipt_text',
+    ts: Date.now(),
+    orderId: order?.id || null,
+    text: buildReceiptText(order)
+  };
+
+  const json = JSON.stringify(payload);
+  const b64  = b64FromUtf8(json);
+
+  // обычный диплинк (самый совместимый)
+  const url = `${COMPANION_SCHEME}://${COMPANION_HOST}?data=${encodeURIComponent(b64)}`;
+
+  window.location.href = url;
+}
+
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
   brandTitle: BRAND_TITLE,
@@ -2029,9 +2085,14 @@ if (exportPdfBtn) {
 const printOrdersBtn = root.querySelector('#printOrdersBtn');
 if (printOrdersBtn) {
   printOrdersBtn.onclick = () => {
-    window.print(); // откроется стандартное окно печати браузера
-  };
-}
+  if (!Array.isArray(dashOrders) || !dashOrders.length){
+    showToast('Нет заказов для печати');
+    return;
+  }
+  dashOrders.forEach((o, idx) => {
+    setTimeout(() => printOrderViaCompanion(o), idx * 700); // очередь
+  });
+};
   
    const list       = root.querySelector('#list');
   const stockList  = root.querySelector('#stockList');
@@ -2392,8 +2453,7 @@ function orderCard(o) {
   card.classList.add('print-one');
 
   // печать
-  window.print();
-
+ printOrderViaCompanion(o);
   // после печати — возвращаем как было
   setTimeout(() => {
     card.classList.remove('print-one');
