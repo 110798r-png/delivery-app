@@ -35,47 +35,7 @@ if (typeof window.CSS.escape !== 'function') {
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = '/api/order';
 
-// ===== ПЕЧАТЬ ЧЕРЕЗ ANDROID COMPANION (zmprint://) =====
-function toBase64UrlUtf8(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
 
-function printOrderViaCompanion(order) {
-  const items = Array.isArray(order?.items) ? order.items : [];
-  const lines = [];
-
-  lines.push('ZM TIME');
-  lines.push(`Заказ #${order?.id ?? ''}`);
-  if (order?.table) lines.push(`Столик: №${order.table}`);
-  lines.push('----------------');
-
-  items.forEach(i => {
-    const name = String(i?.name ?? '');
-    const qty  = Number(i?.qty ?? 0);
-    if (name && qty > 0) lines.push(`${name}  x${qty}`);
-  });
-
-  lines.push('----------------');
-  if (order?.total) lines.push(`Итого: ${order.total} ₽`);
-  lines.push('');
-  lines.push(new Date().toLocaleString('ru-RU'));
-
-  const payload = {
-    type: 'receipt_text',
-    ts: Date.now(),
-    orderId: String(order?.id ?? ''),
-    text: lines.join('\n')
-  };
-
-  const b64 = toBase64UrlUtf8(JSON.stringify(payload));
-  const url = `zmprint://print?data=${encodeURIComponent(b64)}`;
-
-  // ВАЖНО: вызывать строго из клика (иначе браузер может блокировать)
-  window.location.href = url;
-}
 
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
@@ -289,61 +249,7 @@ function hideDoneModal(){
   dm.classList.remove('open');
 }
 
-// ===== ПЕЧАТЬ ЧЕРЕЗ COMPANION (Android) =====
-const COMPANION_SCHEME = 'zmprint';
-const COMPANION_HOST   = 'print';
 
-function b64FromUtf8(str){
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  bytes.forEach(b => bin += String.fromCharCode(b));
-  return btoa(bin);
-}
-
-function buildReceiptText(order){
-  const id = order?.id || '—';
-  const table = order?.table ? `Столик: №${order.table}` : '';
-  const items = Array.isArray(order?.items) ? order.items : [];
-  const created = order?.createdAt ? new Date(order.createdAt).toLocaleString() : '';
-
-  let lines = [];
-  lines.push(`ZM TIME`);
-  lines.push(`Заказ: #${id}`);
-  if (table) lines.push(table);
-  if (created) lines.push(created);
-  lines.push('--------------------------');
-
-  items.forEach(it => {
-    const name = String(it.name || '');
-    const qty  = Number(it.qty || 0);
-    lines.push(name);
-    lines.push(`  x${qty}`);
-  });
-
-  lines.push('--------------------------');
-  if (typeof order?.total === 'number') lines.push(`ИТОГО: ${order.total} ₽`);
-  if (order?.pay) lines.push(`Оплата: ${order.pay}`);
-  lines.push('\n\n');
-
-  return lines.join('\n');
-}
-
-function printOrderViaCompanion(order){
-  const payload = {
-    type: 'receipt_text',
-    ts: Date.now(),
-    orderId: order?.id || null,
-    text: buildReceiptText(order)
-  };
-
-  const json = JSON.stringify(payload);
-  const b64  = b64FromUtf8(json);
-
-  // обычный диплинк (самый совместимый)
-  const url = `${COMPANION_SCHEME}://${COMPANION_HOST}?data=${encodeURIComponent(b64)}`;
-
-  window.location.href = url;
-}
 
 /* ===== конфиг (меню) ===== */
 const DEFAULT_CONFIG = {
@@ -376,6 +282,37 @@ const DEFAULT_CONFIG = {
 };
 function loadConfig(){ return safeParse(CONFIG_LS_KEY, DEFAULT_CONFIG); }
 function saveConfig(cfg){ localStorage.setItem(CONFIG_LS_KEY, JSON.stringify(cfg||DEFAULT_CONFIG)); }
+
+// === ЕДИНАЯ ФУНКЦИЯ ПЕЧАТИ ЧЕРЕЗ КОМПАНЬОН ПО HTTP ===
+function sendToPrinter(orderLike) {
+  // orderLike: { orderId, table, items, total, pay }
+
+  if (!orderLike) {
+    console.warn('sendToPrinter: пустой заказ');
+    return;
+  }
+
+  // ⬇️ ВАЖНО: сюда впиши IP телефона, где установлен компаньон
+  const companionIp = '192.168.0.100'; // ЗАМЕНИ НА IP, который показывает приложение-компаньон
+
+  const payload = {
+    orderId: orderLike.orderId || '',
+    table: orderLike.table || '—',
+    items: Array.isArray(orderLike.items) ? orderLike.items : [],
+    total: Number(orderLike.total || 0),
+    pay: orderLike.pay || 'Наличные'
+  };
+
+  fetch(`http://${companionIp}:8080/print`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    mode: 'no-cors',
+    body: JSON.stringify(payload)
+  }).catch(err => {
+    console.error('print error', err);
+  });
+}
+
 function applyTheme(theme){
   const r = document.documentElement;
   r.style.setProperty('--card-radius',  (theme.cardRadius||20)+'px');
@@ -1387,31 +1324,18 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
           }
         });
 
-        // --- НОВЫЙ БЛОК: ПРЯМАЯ ПЕЧАТЬ ЧЕРЕЗ КОМПАНЬОН ---
-        try {
-          // IP телефона нужно взять из настроек или ввести вручную. 
-          // Для теста можно зашить IP, который покажет приложение на экране.
-          const companionIp = "192.168.0.234"; // <--- ЗАМЕНИ НА IP ИЗ ЭКРАНА ТЕЛЕФОНА
-          
-          const printData = {
-            orderId: res?.order?.id || Date.now().toString().slice(-6),
-            table: tableId || "—",
-            items: itemsSel, // массив [{name, qty, price}, ...]
-            total: total,
-            pay: sel.value === 'cash' ? 'Наличные' : 'Карта'
-          };
+        // --- ПЕЧАТЬ ЧЕКА ЧЕРЕЗ КОМПАНЬОН ---
+const orderId = res?.order?.id || Date.now().toString().slice(-6);
 
-          fetch(`http://${companionIp}:8080/print`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            mode: 'no-cors', // Важно, чтобы браузер не ругался на разные адреса
-            body: JSON.stringify(printData)
-          });
-          console.log("Запрос на печать отправлен в компаньон");
-        } catch (e) {
-          console.error("Компаньон не ответил", e);
-        }
-        // --- КОНЕЦ БЛОКА ПЕЧАТИ ---
+sendToPrinter({
+  orderId,
+  table: tableId || '—',
+  items: itemsSel,
+  total,
+  pay: sel.value === 'cash' ? 'Наличные' : 'Карта'
+});
+// --- КОНЕЦ ПЕЧАТИ ---
+
 
         const order = res && res.order ? res.order : {
           id: Date.now().toString().slice(-6),
@@ -2124,19 +2048,17 @@ if (exportPdfBtn) {
   exportPdfBtn.onclick = () => exportReportPdf();
 }
 
-// Кнопка “Печать ордеров”
-const printOrdersBtn = root.querySelector('#printOrdersBtn');
-if (printOrdersBtn) {
-  printOrdersBtn.onclick = () => {
-  if (!Array.isArray(dashOrders) || !dashOrders.length){
-    showToast('Нет заказов для печати');
-    return;
-  }
-  dashOrders.forEach((o, idx) => {
-    setTimeout(() => printOrderViaCompanion(o), idx * 700); // очередь
-  });
-};
-  }
+dashOrders.forEach((o, idx) => {
+  setTimeout(() => {
+    sendToPrinter({
+      orderId: o.id,
+      table: o.table,
+      items: o.items,
+      total: o.total,
+      pay: o.pay === 'card' ? 'Карта' : 'Наличные'
+    });
+  }, idx * 700);
+});
   
    const list       = root.querySelector('#list');
   const stockList  = root.querySelector('#stockList');
@@ -2482,10 +2404,15 @@ function orderCard(o) {
     if (btn) {
       const act = btn.dataset.act;
 
-      if (act === 'print') {
-  // печатаем ТОЛЬКО эту карточку
-  const listEl = document.getElementById('list');
-  if (!listEl) return;
+     if (act === 'print') {
+  // печатаем ТОЛЬКО этот заказ через компаньон
+  sendToPrinter({
+    orderId: o.id,
+    table: o.table,
+    items: o.items,
+    total,
+    pay: o.pay === 'card' ? 'Карта' : 'Наличные'
+  });
 
   // включаем режим "одна карточка"
   listEl.classList.add('print-one-mode');
