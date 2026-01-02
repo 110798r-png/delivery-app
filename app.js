@@ -34,6 +34,49 @@ if (typeof window.CSS.escape !== 'function') {
 }
 /* ====== КОНСТАНТЫ ====== */
 const API_URL = '/api/order';
+
+// ===== ПЕЧАТЬ ЧЕРЕЗ ANDROID COMPANION (zmprint://) =====
+function toBase64UrlUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function printOrderViaCompanion(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const lines = [];
+
+  lines.push('ZM TIME');
+  lines.push(`Заказ #${order?.id ?? ''}`);
+  if (order?.table) lines.push(`Столик: №${order.table}`);
+  lines.push('----------------');
+
+  items.forEach(i => {
+    const name = String(i?.name ?? '');
+    const qty  = Number(i?.qty ?? 0);
+    if (name && qty > 0) lines.push(`${name}  x${qty}`);
+  });
+
+  lines.push('----------------');
+  if (order?.total) lines.push(`Итого: ${order.total} ₽`);
+  lines.push('');
+  lines.push(new Date().toLocaleString('ru-RU'));
+
+  const payload = {
+    type: 'receipt_text',
+    ts: Date.now(),
+    orderId: String(order?.id ?? ''),
+    text: lines.join('\n')
+  };
+
+  const b64 = toBase64UrlUtf8(JSON.stringify(payload));
+  const url = `zmprint://print?data=${encodeURIComponent(b64)}`;
+
+  // ВАЖНО: вызывать строго из клика (иначе браузер может блокировать)
+  window.location.href = url;
+}
+
 const CONFIG_REMOTE_URL = '';
 const BRAND_ICON_URL = 'https://storage.yandexcloud.net/audio123/free-icon-hot-coffee-3447211.png';
 const BRAND_TITLE = 'ZM TIME';  // изменишь тут — поменяется в шапке и во вкладке
@@ -3038,11 +3081,9 @@ window.addEventListener('hashchange', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   initTableIdFromUrl();
 
-    // подставляем иконку
+  // подставляем иконку
   const iconEl = document.getElementById('brandIcon');
-  if (iconEl && BRAND_ICON_URL) {
-    iconEl.src = BRAND_ICON_URL;
-  }
+  if (iconEl && BRAND_ICON_URL) iconEl.src = BRAND_ICON_URL;
 
   // дефолтный роут
   if (!location.hash || location.hash === '#' || location.hash === '#/') {
@@ -3053,114 +3094,102 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { await fetchRemoteConfig(); } catch (e) {}
   try { await fetchUnavailableRemote(); } catch (e) {}
 
-  // 2) только потом рисуем UI (без “старого меню” на первом запуске)
+  // 2) только потом рисуем UI
   router();
 
   // кнопка "Назад" в шапке идёт всегда на /order
   const backButton = document.getElementById('backBtn');
   const goOrder = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     location.hash = '#/order';
   };
-  ['click', 'pointerup', 'touchend'].forEach(ev =>
-    backButton.addEventListener(ev, goOrder, { passive: false })
-  );
+  if (backButton && !backButton._boundGoOrder) {
+    backButton._boundGoOrder = true;
+    ['click', 'pointerup', 'touchend'].forEach(ev =>
+      backButton.addEventListener(ev, goOrder, { passive: false })
+    );
+  }
 
   // скрытый вход на табло по 4-тапу
   bindTabloTapZone();
 
   // --- PIN-модалка ---
-  const pinM     = document.getElementById('pinModal');
-  const pinOk    = document.getElementById('pinOk');
-  const pinCancel= document.getElementById('pinCancel');
-  const pinInput = document.getElementById('pinInput');
+  const pinM      = document.getElementById('pinModal');
+  const pinOk     = document.getElementById('pinOk');
+  const pinCancel = document.getElementById('pinCancel');
+  const pinInput  = document.getElementById('pinInput');
 
-  const ADMIN_PIN = 'zamir05'; // ← поменяй как хочешь
+  const ADMIN_PIN_FALLBACK = 'zamir05';
 
-function normalizePin(v){
-  return String(v || '').trim();
-}
+  function normalizePin(v){ return String(v || '').trim(); }
 
-function openPinModal(){
-  pinM.classList.add('open');
-  pinInput.value = '';
-  // фокус чуть позже, чтобы модалка успела открыться
-  setTimeout(() => pinInput.focus(), 50);
-}
-
-function closePinModal(){
-  pinM.classList.remove('open');
-  pinInput.value = '';
-}
-
-pinOk.onclick = (e) => {
-  e && e.preventDefault();
-
-  const entered = normalizePin(pinInput.value);
-
-  if (!entered) {
-    showToast('Введите PIN');
-    return;
+  function closePinModal(){
+    if (pinM) pinM.classList.remove('open');
+    if (pinInput) pinInput.value = '';
   }
 
-  // ✅ строгая проверка
-  if (entered !== ADMIN_PIN) {
-    showToast('Неверный PIN');
-    pinInput.value = '';
-    pinInput.focus();
-    return;
-  }
-
-  // ✅ только после верного PIN выдаём допуск
-  closePinModal();
-
-  // это ключ для админ RPC (если бэк его проверяет)
-  sessionStorage.setItem(ADMIN_KEY_SS, entered);
-
-  if (sessionStorage.getItem(WANT_DASH) === '1') {
-    sessionStorage.removeItem(WANT_DASH);
-    sessionStorage.setItem(TABLO_PIN_OK, '1');
-    location.hash = '#/dashboard';
-  } else {
-    router();
-  }
-};
-
-pinCancel.onclick = () => {
-  closePinModal();
-  sessionStorage.removeItem(ADMIN_KEY_SS);
-  sessionStorage.removeItem(WANT_DASH);
-  location.hash = '#/order';
-};
-
-pinM.onclick = (e) => {
-  if (e.target === pinM) pinCancel.onclick();
-};
-
-// ✅ удобно: Enter подтверждает
-pinInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') pinOk.click();
-});
-
-  pinCancel.onclick = () => {
-    pinM.classList.remove('open');
+  function cancelPin(){
+    closePinModal();
     sessionStorage.removeItem(ADMIN_KEY_SS);
     sessionStorage.removeItem(WANT_DASH);
     location.hash = '#/order';
-  };
+  }
 
-  pinM.onclick = (e) => {
-    if (e.target === pinM) pinCancel.onclick();
-  };
+  if (pinOk && !pinOk._bound) {
+    pinOk._bound = true;
+    pinOk.addEventListener('click', (e) => {
+      e && e.preventDefault();
+
+      const entered = normalizePin(pinInput && pinInput.value);
+      if (!entered) { showToast('Введите ключ'); return; }
+
+      // PIN можно хранить в конфиге (см. ниже в Builder)
+      const cfg = loadConfig();
+      const adminPin = (cfg && cfg.adminPin) ? String(cfg.adminPin).trim() : ADMIN_PIN_FALLBACK;
+
+      if (entered !== adminPin) {
+        showToast('Неверный ключ');
+        if (pinInput) { pinInput.value = ''; pinInput.focus(); }
+        return;
+      }
+
+      closePinModal();
+      sessionStorage.setItem(ADMIN_KEY_SS, entered);
+
+      if (sessionStorage.getItem(WANT_DASH) === '1') {
+        sessionStorage.removeItem(WANT_DASH);
+        sessionStorage.setItem(TABLO_PIN_OK, '1');
+        location.hash = '#/dashboard';
+      } else {
+        router();
+      }
+    }, { passive: false });
+  }
+
+  if (pinCancel && !pinCancel._bound) {
+    pinCancel._bound = true;
+    pinCancel.addEventListener('click', cancelPin, { passive: false });
+  }
+
+  if (pinM && !pinM._boundBg) {
+    pinM._boundBg = true;
+    pinM.addEventListener('click', (e) => {
+      if (e.target === pinM) cancelPin();
+    }, { passive: true });
+  }
+
+  if (pinInput && !pinInput._boundEnter) {
+    pinInput._boundEnter = true;
+    pinInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') pinOk && pinOk.click();
+    });
+  }
 
   // --- Service worker ---
   if ('serviceWorker' in navigator) {
     try {
       await navigator.serviceWorker.register('/sw.js');
-      console.log('Service worker registered (cleanup mode)');
+      console.log('Service worker registered');
     } catch (e) {
       console.warn('SW registration failed', e);
     }
@@ -3168,27 +3197,20 @@ pinInput.addEventListener('keydown', (e) => {
 
   // --- WebPush ---
   if ('Notification' in window) {
-    if (Notification.permission === 'default') {
-      try {
+    try {
+      if (Notification.permission === 'default') {
         const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          initPushSubscription().catch(() => {});
-        }
-      } catch (e) {
-        console.warn('Notification permission error', e);
+        if (perm === 'granted') initPushSubscription().catch(()=>{});
+      } else if (Notification.permission === 'granted') {
+        initPushSubscription().catch(()=>{});
       }
-    } else if (Notification.permission === 'granted') {
-      initPushSubscription().catch(() => {});
+    } catch (e) {
+      console.warn('Notification permission error', e);
     }
   }
 });
 
-
-  
-  window.addEventListener('load', () => {
-  setTimeout(() => {
-    // старый, но иногда рабочий трюк — прокрутить страницу на 1px,
-    // чтобы браузер спрятал адресную строку
-    window.scrollTo(0, 1);
-  }, 250);
+window.addEventListener('load', () => {
+  setTimeout(() => window.scrollTo(0, 1), 250);
 });
+
