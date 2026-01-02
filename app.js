@@ -1988,80 +1988,93 @@ async function exportReportPdf() {
 }
 
 /* ===== Табло ===== */
-function DashboardView(){ 
-const root = el(`
-let dashOrders = [];
-  <div class="grid gap-4 max-w-6xl pb-24">
-    <div class="flex items-center justify-between flex-wrap gap-2">
-      <div class="flex items-center gap-2">
-        <h2 class="text-xl font-semibold">Текущие заказы</h2>
-        <button id="soundToggle" class="px-3 py-1.5 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
-      </div>
-      <div class="flex items-center gap-2">
-        <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
+function DashboardView() {
+  // переменная доступна во всей функции
+  let dashOrders = [];
+
+  const root = el(`
+    <div class="grid gap-4 max-w-6xl pb-24">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <h2 class="text-xl font-semibold">Текущие заказы</h2>
+          <button id="soundToggle" class="px-3 py-1.5 rounded-xl border bg-white" title="Звук уведомлений">🔔 Звук</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="#/builder" class="px-3 py-2 rounded-xl border bg-white" title="Конструктор">Конструктор</a>
           <button id="exportPdfBtn" class="px-3 py-2 rounded-xl border bg-white">Выгрузить PDF</button>
-            <button id="printOrdersBtn" class="px-3 py-2 rounded-xl border bg-white">Печать ордеров</button>
-        <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
-        <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
-      </div>
-    </div>
-
-        <div class="p-4 rounded-2xl bg-white border">
-      <!-- Кнопка-шапка шторки -->
-      <button
-        id="stockToggle"
-        class="w-full flex items-center justify-between gap-2 text-left"
-        type="button"
-      >
-        <span class="font-semibold">Наличие товаров</span>
-        <span id="stockArrow" class="text-lg leading-none">▼</span>
-      </button>
-
-      <!-- Содержимое, по умолчанию скрыто -->
-      <div id="stockPanel" class="mt-3 hidden">
-        <p class="text-sm text-gray-500 mb-3">
-          Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
-        </p>
-
-        <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
-
-        <div class="mt-3 flex gap-2">
-          <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
-          <button id="resetStock" class="px-3 py-2 rounded-xl border">Все в наличии</button>
+          <button id="printOrdersBtn" class="px-3 py-2 rounded-xl border bg-white">Печать ордеров</button>
+          <button id="btnClearAll" class="px-3 py-2 rounded-xl border bg-red-50 text-red-700">Очистить всё</button>
+          <button id="btnClearHistory" class="px-3 py-2 rounded-xl border bg-red-100 text-red-800">Очистить историю</button>
         </div>
       </div>
+
+      <div class="p-4 rounded-2xl bg-white border">
+        <!-- Кнопка-шапка шторки -->
+        <button
+          id="stockToggle"
+          class="w-full flex items-center justify-between gap-2 text-left"
+          type="button"
+        >
+          <span class="font-semibold">Наличие товаров</span>
+          <span id="stockArrow" class="text-lg leading-none">▼</span>
+        </button>
+
+        <!-- Содержимое, по умолчанию скрыто -->
+        <div id="stockPanel" class="mt-3 hidden">
+          <p class="text-sm text-gray-500 mb-3">
+            Отметьте галкой, чего НЕТ — на телефоне товар станет серым и его нельзя будет добавить.
+          </p>
+
+          <div id="stockList" class="grid gap-2 md:grid-cols-3"></div>
+
+          <div class="mt-3 flex gap-2">
+            <button id="saveStock" class="px-3 py-2 rounded-xl border bg-black text-white">Сохранить</button>
+            <button id="resetStock" class="px-3 py-2 rounded-xl border">Все в наличии</button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="list"
+        class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-5xl mx-auto"
+      ></div>
+
+      <div>
+        <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
+      </div>
     </div>
+  `);
 
-        <div
-      id="list"
-      class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-5xl mx-auto"
-    ></div>
+  // Кнопка “Выгрузить PDF”
+  const exportPdfBtn = root.querySelector('#exportPdfBtn');
+  if (exportPdfBtn) {
+    exportPdfBtn.onclick = () => exportReportPdf();
+  }
 
-    <div>
-      <button class="px-3 py-2 rounded-xl border" onclick="location.hash='#/order'">Назад</button>
-    </div>
-  </div>
-`);
+  // Кнопка “Печать ордеров” — печатаем ВСЕ текущие заказы через компаньон
+  const printOrdersBtn = root.querySelector('#printOrdersBtn');
+  if (printOrdersBtn) {
+    printOrdersBtn.onclick = () => {
+      if (!Array.isArray(dashOrders) || !dashOrders.length) {
+        showToast('Нет заказов для печати');
+        return;
+      }
 
-     // Кнопка “Выгрузить PDF”
-const exportPdfBtn = root.querySelector('#exportPdfBtn');
-if (exportPdfBtn) {
-  exportPdfBtn.onclick = () => exportReportPdf();
-}
+      dashOrders.forEach((o, idx) => {
+        setTimeout(() => {
+          sendToPrinter({
+            orderId: o.id,
+            table: o.table,
+            items: o.items,
+            total: typeof o.total === 'number' ? o.total : 0,
+            pay: o.pay === 'card' ? 'Карта' : 'Наличные'
+          });
+        }, idx * 700); // задержка, чтобы компаньон не охренел
+      });
+    };
+  }
 
-dashOrders.forEach((o, idx) => {
-  setTimeout(() => {
-    sendToPrinter({
-      orderId: o.id,
-      table: o.table,
-      items: o.items,
-      total: o.total,
-      pay: o.pay === 'card' ? 'Карта' : 'Наличные'
-    });
-  }, idx * 700);
-});
-  
-   const list       = root.querySelector('#list');
+  const list       = root.querySelector('#list');
   const stockList  = root.querySelector('#stockList');
   const stockPanel = root.querySelector('#stockPanel');
   const stockToggle= root.querySelector('#stockToggle');
@@ -2075,23 +2088,20 @@ dashOrders.forEach((o, idx) => {
 
   // Открыть/закрыть шторку
   stockToggle.onclick = () => {
-    const isHidden = stockPanel.classList.toggle('hidden'); // toggle вернёт true, если теперь скрыто
+    const isHidden = stockPanel.classList.toggle('hidden');
     stockArrow.textContent = isHidden ? '▼' : '▲';
   };
- 
+
   let unavailable = new Set(loadUnavailable());
 
-  // когда последний раз очищали табло (только локально)
   const clearedAfterTs = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
 
-  // подгружаем локальное табло с учётом этого времени
-    dashOrders = loadDash().filter(o => {
+  dashOrders = loadDash().filter(o => {
     if (!clearedAfterTs) return true;
     const t = Number(o.createdAt || 0);
-    // если нет createdAt — оставляем, иначе сравниваем
     return !t || t >= clearedAfterTs;
   });
-   // на табло показываем только не завершённые и не отменённые
+
   dashOrders = dashOrders.filter(o =>
     o.status !== 'завершён' && o.status !== 'отменён'
   );
@@ -2099,7 +2109,7 @@ dashOrders.forEach((o, idx) => {
 
   let knownIds       = new Set(dashOrders.map(o => String(o.id)));
   const ding         = document.getElementById('orderDing');
-  
+
   const soundBtn     = root.querySelector('#soundToggle');
   let hiddenNewCount = 0;
   let pollTimer      = null;
@@ -2114,15 +2124,15 @@ dashOrders.forEach((o, idx) => {
   setSound(soundOn());
   soundBtn.onclick = () => setSound(!soundOn());
 
-  function handleVisibilityChange(){
-    if (document.visibilityState === 'visible' && hiddenNewCount > 0){
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible' && hiddenNewCount > 0) {
       showToast(`Новых заказов: ${hiddenNewCount}`);
       hiddenNewCount = 0;
     }
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  function renderStock(){
+  function renderStock() {
     stockList.innerHTML = '';
     loadConfig().menu.forEach(cat =>
       cat.items.forEach(item => {
@@ -2148,31 +2158,25 @@ dashOrders.forEach((o, idx) => {
 
     window.dispatchEvent(new CustomEvent('stock:updated'));
     await pushUnavailableRemote(checked);
-    };
+  };
+
   root.querySelector('#resetStock').onclick = async () => {
-  // Локально считаем, что всё в наличии
-  saveUnavailable([]);
-  unavailable = new Set();
+    saveUnavailable([]);
+    unavailable = new Set();
 
-  // Обновляем свой UI (чтоб галочки снялись)
-  renderStock();
+    renderStock();
+    window.dispatchEvent(new CustomEvent('stock:updated'));
 
-  // Сообщаем другим экранам этого же браузера
-  window.dispatchEvent(new CustomEvent('stock:updated'));
-
-  // Пишем на сервер пустой список, чтобы другие устройства при синке тоже обнулили
-  try {
-    await pushUnavailableRemote([]);
-    showToast('Все товары в наличии');
-  } catch (e) {
-    console.warn('resetStock error', e);
-    showToast('Не удалось отправить на сервер, но локально всё в наличии');
-  }
-};
+    try {
+      await pushUnavailableRemote([]);
+      showToast('Все товары в наличии');
+    } catch (e) {
+      console.warn('resetStock error', e);
+      showToast('Не удалось отправить на сервер, но локально всё в наличии');
+    }
+  };
 
   // ====== ОВЕРЛЕЙ ДЛЯ "ЕЩЁ" ======
-
-  // создаём оверлей, если его ещё нет в DOM
   let overlay = document.getElementById('orderOverlay');
   if (!overlay) {
     overlay = el(`
@@ -2198,7 +2202,6 @@ dashOrders.forEach((o, idx) => {
   const overlayClose = overlay.querySelector('#orderOverlayClose');
   const overlayBody  = overlay.querySelector('#orderOverlayContent');
 
-  // открыть модалку с полным списком позиций
   function openOrderOverlay(order) {
     if (!overlay || !overlayBody) return;
 
@@ -2253,7 +2256,6 @@ dashOrders.forEach((o, idx) => {
     document.body.style.overflow = 'hidden';
   }
 
-  // закрыть модалку
   function closeOrderOverlay() {
     if (!overlay) return;
     overlay.classList.add('hidden');
@@ -2265,234 +2267,205 @@ dashOrders.forEach((o, idx) => {
     overlayClose.onclick = () => closeOrderOverlay();
   }
 
-  // клик по тёмному фону – тоже закрывает
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeOrderOverlay();
   });
 
-  // ====== /ОВЕРЛЕЙ ======
-function orderCard(o) {
-  const items = Array.isArray(o.items) ? o.items : [];
+  // ====== КАРТОЧКА ЗАКАЗА ======
+  function orderCard(o) {
+    const items = Array.isArray(o.items) ? o.items : [];
 
-  const clientTotal = items.reduce(
-    (s, i) => s + (i.price || 0) * (i.qty || 0),
-    0
-  );
-  const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
-  const created = o.createdAt ? new Date(o.createdAt) : new Date();
+    const clientTotal = items.reduce(
+      (s, i) => s + (i.price || 0) * (i.qty || 0),
+      0
+    );
+    const total   = Math.max(typeof o.total === 'number' ? o.total : 0, clientTotal);
+    const created = o.createdAt ? new Date(o.createdAt) : new Date();
 
-  const colorMap = {
-    'новый':     'bg-yellow-50 border-yellow-300',
-    'готовится': 'bg-blue-50 border-blue-300',
-    'в пути':    'bg-purple-50 border-purple-300',
-    'готов':     'bg-green-50 border-green-300',
-    'завершён':  'bg-gray-100 border-gray-300',
-    'отменён':   'bg-red-50 border-red-300'
-  };
-  const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
+    const colorMap = {
+      'новый':     'bg-yellow-50 border-yellow-300',
+      'готовится': 'bg-blue-50 border-blue-300',
+      'в пути':    'bg-purple-50 border-purple-300',
+      'готов':     'bg-green-50 border-green-300',
+      'завершён':  'bg-gray-100 border-gray-300',
+      'отменён':   'bg-red-50 border-red-300'
+    };
+    const statusColor = colorMap[o.status] || 'bg-white border-gray-200';
 
-  // --- экранная версия: максимум 3 позиции ---
-  const MAX_INLINE  = 3;
-  const hasMore     = items.length > MAX_INLINE;
-  const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
+    const MAX_INLINE  = 3;
+    const hasMore     = items.length > MAX_INLINE;
+    const inlineItems = hasMore ? items.slice(0, MAX_INLINE) : items;
 
-  const itemsHtmlScreen = inlineItems.map(i => `
+    const itemsHtmlScreen = inlineItems.map(i => `
       <div class="flex justify-between">
         <div class="mr-2">${i.name}</div>
         <div class="font-semibold whitespace-nowrap">${i.qty} × ${i.price}</div>
       </div>
     `).join('');
 
-  const etaBlock = o.etaUntil
-    ? `<div class="text-sm text-gray-700 mt-1">
-         Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-       </div>`
-    : '';
+    const etaBlock = o.etaUntil
+      ? `<div class="text-sm text-gray-700 mt-1">
+           Готово примерно в ${new Date(o.etaUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+         </div>`
+      : '';
 
-  // --- печатная версия: ВСЕ позиции, только название + qty ---
-  const itemsHtmlPrint = items.map(i => `
+    const itemsHtmlPrint = items.map(i => `
       <div class="flex justify-between text-sm">
         <div class="mr-2">${i.name}</div>
         <div class="whitespace-nowrap">× ${i.qty}</div>
       </div>
     `).join('') || '<div class="text-sm text-gray-400">Нет позиций</div>';
 
-  const card = el(`
-    <div
-      class="
-        order-card
-        p-4 rounded-3xl border-2 ${statusColor} shadow-sm
-        flex flex-col gap-2
-        transition-transform hover:scale-[1.01] hover:shadow-md
-      "
-      data-id="${o.id}"
-    >
-      <!-- ЭКРАННАЯ ЧАСТЬ -->
-      <div class="order-card-main">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
-            ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+    const card = el(`
+      <div
+        class="
+          order-card
+          p-4 rounded-3xl border-2 ${statusColor} shadow-sm
+          flex flex-col gap-2
+          transition-transform hover:scale-[1.01] hover:shadow-md
+        "
+        data-id="${o.id}"
+      >
+        <div class="order-card-main">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xl font-extrabold tracking-tight">#${o.id || '—'}</div>
+              ${o.table ? `<div class="text-xs text-gray-700 mt-0.5">Столик: №${o.table}</div>` : ''}
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
+              ${o.status || 'новый'}
+            </span>
           </div>
-          <span class="px-3 py-1 rounded-full text-xs font-medium border bg-white/50">
-            ${o.status || 'новый'}
-          </span>
+
+          <div class="text-gray-600 text-xs mt-1">
+            ${created.toLocaleString()}
+          </div>
+
+          ${etaBlock}
+
+          <div class="order-card-items mt-2 grid gap-1 text-sm">
+            ${itemsHtmlScreen || '—'}
+            ${hasMore ? `<div class="text-xs text-blue-700 mt-1">…ещё позиций</div>` : ''}
+          </div>
+
+          <div class="mt-2 flex items-center justify-between text-lg font-bold">
+            <span>Итого:</span>
+            <div>${total} ₽</div>
+          </div>
+
+          <div class="mt-3 flex flex-col items-center gap-2 no-print">
+            <button
+              type="button"
+              class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm flex items-center justify-center gap-1"
+              data-act="print"
+              title="Печать этого заказа"
+            >
+              🖨️ Печать
+            </button>
+
+            <button
+              type="button"
+              class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
+              data-act="ready"
+            >
+              Оплачено
+            </button>
+
+            <button
+              type="button"
+              class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
+              data-act="delete"
+            >
+              Удалить
+            </button>
+          </div>
         </div>
 
-        <div class="text-gray-600 text-xs mt-1">
-          ${created.toLocaleString()}
-        </div>
-
-        ${etaBlock}
-
-        <!-- список позиций (кратко) -->
-        <div class="order-card-items mt-2 grid gap-1 text-sm">
-          ${itemsHtmlScreen || '—'}
-          ${hasMore ? `<div class="text-xs text-blue-700 mt-1">…ещё позиций</div>` : ''}
-        </div>
-
-        <!-- Итоговая сумма -->
-        <div class="mt-2 flex items-center justify-between text-lg font-bold">
-          <span>Итого:</span>
-          <div>${total} ₽</div>
-        </div>
-
-      <!-- Кнопки управления, только на экране -->
-<div class="mt-3 flex flex-col items-center gap-2 no-print">
-  <button
-    type="button"
-    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm flex items-center justify-center gap-1"
-    data-act="print"
-    title="Печать этого заказа"
-  >
-    🖨️ Печать
-  </button>
-
-  <button
-    type="button"
-    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-white hover:bg-gray-100 text-sm"
-    data-act="ready"
-  >
-    Оплачено
-  </button>
-
-  <button
-    type="button"
-    class="w-full max-w-[140px] px-3 py-2 rounded-xl border bg-red-50 hover:bg-red-100 text-red-600 text-sm"
-    data-act="delete"
-  >
-    Удалить
-  </button>
-</div>
-      </div>
-
-      <!-- ПЕЧАТНАЯ ЧАСТЬ (показывается только @media print) -->
-      <div class="order-card-print text-sm">
-        <div class="text-base font-extrabold mb-1">#${o.id || '—'}</div>
-        ${o.table ? `<div class="mb-1">Столик: №${o.table}</div>` : ''}
-        <div class="mt-1 pt-1 border-t border-gray-300">
-          ${itemsHtmlPrint}
+        <div class="order-card-print text-sm">
+          <div class="text-base font-extrabold mb-1">#${o.id || '—'}</div>
+          ${o.table ? `<div class="mb-1">Столик: №${o.table}</div>` : ''}
+          <div class="mt-1 pt-1 border-t border-gray-300">
+            ${itemsHtmlPrint}
+          </div>
         </div>
       </div>
-    </div>
-  `);
+    `);
 
-  // обработка кликов по карточке
-  card.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-act]');
+    card.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-act]');
 
-    // 1) Клик по кнопкам "Готово" / "Удалить"
-    if (btn) {
-      const act = btn.dataset.act;
+      if (btn) {
+        const act = btn.dataset.act;
 
-     if (act === 'print') {
-  // печатаем ТОЛЬКО этот заказ через компаньон
-  sendToPrinter({
-    orderId: o.id,
-    table: o.table,
-    items: o.items,
-    total,
-    pay: o.pay === 'card' ? 'Карта' : 'Наличные'
-  });
-
-  // включаем режим "одна карточка"
-  listEl.classList.add('print-one-mode');
-
-  // снимаем старые метки
-  listEl.querySelectorAll('.order-card.print-one').forEach(x => x.classList.remove('print-one'));
-
-  // помечаем текущую карточку
-  card.classList.add('print-one');
-
-  // печать
- printOrderViaCompanion(o);
-  // после печати — возвращаем как было
-  setTimeout(() => {
-    card.classList.remove('print-one');
-    listEl.classList.remove('print-one-mode');
-  }, 400);
-
-  return;
-}
-
-      if (act === 'ready') {
-        const nowTs = Date.now();
-        const patch = { status: 'готов', readyAt: nowTs };
-
-        const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
-        if (i >= 0) {
-          dashOrders[i] = { ...dashOrders[i], ...patch };
-          saveDash(dashOrders);
-          syncOrderStatus(o.id, patch.status);
-          showToast(`Заказ #${o.id} отмечен как готов`);
-          renderOrders();
-        }
-
-        try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
-        return;
-      }
-
-      if (act === 'delete') {
-        if (!card.dataset.confirm) {
-          card.dataset.confirm = '1';
-          btn.textContent = 'Точно удалить?';
-          setTimeout(() => {
-            if (card && card.dataset.confirm === '1') {
-              delete card.dataset.confirm;
-              btn.textContent = 'Удалить';
-            }
-          }, 3000);
+        if (act === 'print') {
+          // печать только этого заказа через компаньон
+          sendToPrinter({
+            orderId: o.id,
+            table: o.table,
+            items: o.items,
+            total,
+            pay: o.pay === 'card' ? 'Карта' : 'Наличные'
+          });
           return;
         }
 
-        delete card.dataset.confirm;
+        if (act === 'ready') {
+          const nowTs = Date.now();
+          const patch = { status: 'готов', readyAt: nowTs };
 
-        dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
-        saveDash(dashOrders);
-        card.remove();
-        showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+          const i = dashOrders.findIndex(x => String(x.id) === String(o.id));
+          if (i >= 0) {
+            dashOrders[i] = { ...dashOrders[i], ...patch };
+            saveDash(dashOrders);
+            syncOrderStatus(o.id, patch.status);
+            showToast(`Заказ #${o.id} отмечен как готов`);
+            renderOrders();
+          }
 
-        const nowTs = Date.now();
-        const patch = { status: 'завершён', finishedAt: nowTs };
+          try { rpc({ op: 'update', id: o.id, patch }).catch(() => {}); } catch {}
+          return;
+        }
 
-        try {
-          rpc({ op: 'update', id: o.id, patch }).catch(() => {});
-        } catch {}
+        if (act === 'delete') {
+          if (!card.dataset.confirm) {
+            card.dataset.confirm = '1';
+            btn.textContent = 'Точно удалить?';
+            setTimeout(() => {
+              if (card && card.dataset.confirm === '1') {
+                delete card.dataset.confirm;
+                btn.textContent = 'Удалить';
+              }
+            }, 3000);
+            return;
+          }
+
+          delete card.dataset.confirm;
+
+          dashOrders = dashOrders.filter(x => String(x.id) !== String(o.id));
+          saveDash(dashOrders);
+          card.remove();
+          showToast(`Заказ #${o.id} убран с табло (в истории он останется)`);
+
+          const nowTs = Date.now();
+          const patch = { status: 'завершён', finishedAt: nowTs };
+
+          try {
+            rpc({ op: 'update', id: o.id, patch }).catch(() => {});
+          } catch {}
+          return;
+        }
+
         return;
       }
 
-      return;
-    }
+      // клик не по кнопке — открываем модалку
+      openOrderOverlay(o);
+    });
 
-    // 2) Клик по самой карточке (не по кнопкам) – можно при желании
-    //    оставить открытие модалки с полным описанием:
-    openOrderOverlay(o);
-  });
+    return card;
+  }
 
-  return card;
-}
-
-  function renderOrders(){
+  function renderOrders() {
     const unique = new Map();
     dashOrders.forEach(o => unique.set(String(o.id), o));
     const orders = [...unique.values()];
@@ -2500,19 +2473,19 @@ function orderCard(o) {
     orders.forEach(o => list.appendChild(orderCard(o)));
   }
 
-  function load(){
+  function load() {
     const unique = new Map();
     dashOrders.forEach(o => unique.set(String(o.id), o));
 
     const incoming = [...unique.keys()].filter(id => !knownIds.has(id));
 
-    if (incoming.length){
-      if (document.visibilityState === 'visible' && soundOn()){
+    if (incoming.length) {
+      if (document.visibilityState === 'visible' && soundOn()) {
         try {
           ding.currentTime = 0;
           ding.play().catch(()=>{});
         } catch {}
-      } else if (document.visibilityState === 'hidden'){
+      } else if (document.visibilityState === 'hidden') {
         hiddenNewCount += incoming.length;
       }
     }
@@ -2522,11 +2495,10 @@ function orderCard(o) {
     renderOrders();
   }
 
-    root.querySelector('#btnClearAll').onclick = async () => {
+  root.querySelector('#btnClearAll').onclick = async () => {
     if (!confirm('Очистить только табло (заказы останутся в истории и отчётах)?')) return;
 
     const now = Date.now();
-    // запоминаем, что все заказы до этого момента — "старые", их не показываем
     localStorage.setItem(DASH_CLEARED_AFTER_KEY, String(now));
 
     dashOrders = [];
@@ -2538,13 +2510,10 @@ function orderCard(o) {
     showToast('Табло очищено. Все заказы остались на сервере.');
   };
 
-    root.querySelector('#btnClearHistory').onclick = async () => {
+  root.querySelector('#btnClearHistory').onclick = async () => {
     const pin = prompt('Введите PIN для очистки истории:');
 
-    if (pin === null) {
-      // нажал "Отмена"
-      return;
-    }
+    if (pin === null) return;
 
     if (pin !== 'zamir05') {
       showToast('Неверный PIN');
@@ -2558,7 +2527,6 @@ function orderCard(o) {
     try {
       await rpc({ op: 'clear' });
 
-      // локально тоже всё обнуляем
       dashOrders = [];
       saveDash(dashOrders);
       window.__dashOrders = dashOrders;
@@ -2573,35 +2541,32 @@ function orderCard(o) {
     }
   };
 
-async function loadOrdersFromCloud(){
-  try{
-    const res = await rpc({ op:'list' });
-    if (Array.isArray(res.orders)){
-      // берём только активные заказы:
-      // не показываем завершённые и отменённые
-      let serverOrders = res.orders.filter(o =>
-        o.status !== 'завершён' && o.status !== 'отменён'
-      );
+  async function loadOrdersFromCloud() {
+    try {
+      const res = await rpc({ op:'list' });
+      if (Array.isArray(res.orders)) {
+        let serverOrders = res.orders.filter(o =>
+          o.status !== 'завершён' && o.status !== 'отменён'
+        );
 
-      // фильтруем по моменту последней очистки табло
-      const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
-      if (clearedAfter) {
-        serverOrders = serverOrders.filter(o => {
-          const t = Number(o.createdAt || 0);
-          return !t || t >= clearedAfter;
-        });
+        const clearedAfter = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
+        if (clearedAfter) {
+          serverOrders = serverOrders.filter(o => {
+            const t = Number(o.createdAt || 0);
+            return !t || t >= clearedAfter;
+          });
+        }
+
+        saveDash(serverOrders);
+        dashOrders = serverOrders.slice();
+        window.__dashOrders = dashOrders;
+        load();
       }
-
-      saveDash(serverOrders);
-      dashOrders = serverOrders.slice();
-      window.__dashOrders = dashOrders;
-      load();
+    } catch (e) {
+      console.warn('loadOrdersFromCloud', e);
     }
-  } catch(e){
-    console.warn('loadOrdersFromCloud', e);
   }
-}
-  
+
   load();
   loadOrdersFromCloud();
   pollTimer = setInterval(loadOrdersFromCloud, 3000);
@@ -2613,6 +2578,7 @@ async function loadOrdersFromCloud(){
 
   return root;
 }
+
 
 /* ===== КОНСТРУКТОР (меню) ===== */
 function BuilderView(){
