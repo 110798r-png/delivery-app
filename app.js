@@ -2136,6 +2136,7 @@ if (printOrdersBtn) {
     setTimeout(() => printOrderViaCompanion(o), idx * 700); // очередь
   });
 };
+  }
   
    const list       = root.querySelector('#list');
   const stockList  = root.querySelector('#stockList');
