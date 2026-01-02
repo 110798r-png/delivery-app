@@ -1277,7 +1277,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
            const tableId = getTableId();
 
       try {
-        const res = await rpc({
+                const res = await rpc({
           op: 'create',
           data: {
             clientId: getClientId(),
@@ -1286,6 +1286,32 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
             pay: sel.value || 'cash',
             table: tableId || null
           }
+        });
+
+        // --- НОВЫЙ БЛОК: ПРЯМАЯ ПЕЧАТЬ ЧЕРЕЗ КОМПАНЬОН ---
+        try {
+          // IP телефона нужно взять из настроек или ввести вручную. 
+          // Для теста можно зашить IP, который покажет приложение на экране.
+          const companionIp = "192.168.1.10"; // <--- ЗАМЕНИ НА IP ИЗ ЭКРАНА ТЕЛЕФОНА
+          
+          const printData = {
+            orderId: res?.order?.id || Date.now().toString().slice(-6),
+            table: tableId || "—",
+            items: itemsSel, // массив [{name, qty, price}, ...]
+            total: total,
+            pay: sel.value === 'cash' ? 'Наличные' : 'Карта'
+          };
+
+          fetch(`http://${companionIp}:8080/print`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'no-cors', // Важно, чтобы браузер не ругался на разные адреса
+            body: JSON.stringify(printData)
+          });
+          console.log("Запрос на печать отправлен в компаньон");
+        } catch (e) {
+          console.error("Компаньон не ответил", e);
+        }
         });
 
         const order = res && res.order ? res.order : {
