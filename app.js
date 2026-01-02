@@ -1312,7 +1312,7 @@ root.querySelectorAll('.bottom-spacer').forEach(el => {
         } catch (e) {
           console.error("Компаньон не ответил", e);
         }
-        });
+        // --- КОНЕЦ БЛОКА ПЕЧАТИ ---
 
         const order = res && res.order ? res.order : {
           id: Date.now().toString().slice(-6),
