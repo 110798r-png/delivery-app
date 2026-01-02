@@ -1990,6 +1990,7 @@ async function exportReportPdf() {
 /* ===== Табло ===== */
 function DashboardView(){ 
 const root = el(`
+let dashOrders = [];
   <div class="grid gap-4 max-w-6xl pb-24">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center gap-2">
@@ -2084,7 +2085,7 @@ dashOrders.forEach((o, idx) => {
   const clearedAfterTs = Number(localStorage.getItem(DASH_CLEARED_AFTER_KEY) || 0);
 
   // подгружаем локальное табло с учётом этого времени
-  let dashOrders = loadDash().filter(o => {
+    dashOrders = loadDash().filter(o => {
     if (!clearedAfterTs) return true;
     const t = Number(o.createdAt || 0);
     // если нет createdAt — оставляем, иначе сравниваем
