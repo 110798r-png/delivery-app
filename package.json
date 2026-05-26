@@ -1,0 +1,14 @@
+{
+  "name": "delivery-app",
+  "version": "1.0.0",
+  "description": "ZM TIME - локальный стенд для заказов",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static site - no build needed'",
+    "lint": "echo 'No linting configured'"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.14"
+  }
+}
